@@ -313,8 +313,8 @@ if(APPLE)
 endif()
 
 
-message(STATUS "${PROJECT_NAME} will be installed to ${CMAKE_INSTALL_PREFIX}")
-install(TARGETS ${PROJECT_NAME} DESTINATION ${BIN_INSTALL_DIR})
+message(STATUS "${PROJECT_TARGET} will be installed to ${CMAKE_INSTALL_PREFIX}")
+install(TARGETS ${PROJECT_TARGET} DESTINATION ${BIN_INSTALL_DIR})
 
 # Only support CPack packaging on newer versions of CMake.
 if(NOT "${CMAKE_VERSION}" VERSION_LESS "2.8.4")
@@ -369,7 +369,8 @@ IF(APPLE OR WIN32)
 
 #SET(PLUGIN_LIST "${CMAKE_BINARY_DIR}/_CPack_Packages/OSX/DragNDrop/${TOMAHAWK_APPLICATION_NAME}-${TOMAHAWK_VERSION}/${EXECUTABLE}/Contents/Plugins/libtomahawk_sipzeroconf.dylib")
     MESSAGE(STATUS "FIXUP PLUGINS: ${PLUGIN_LIST}")
-    install_qt4_app( ${EXECUTABLE} "qsqlite;qgif;qico;qjpeg;qmng" ${PLUGIN_LIST} )
+    MESSAGE(STATUS "${PLUGIN_LIST}")
+    install_qt4_app( "tomahawk" "qsqlite;qgif;qico;qjpeg;qmng" "${PLUGIN_LIST}")
 ENDIF()
 
 
