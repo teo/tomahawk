@@ -64,6 +64,9 @@ CategoryAddItem::text() const
 
         case SourcesModel::StationsCategory:
             return tr( "Create new Station" );
+
+        case SourcesModel::ListeningRoomsCategory:
+            return tr( "Start new Listening Room" );
     }
 
     return QString();
@@ -81,6 +84,10 @@ CategoryAddItem::activate()
 
         case SourcesModel::StationsCategory:
             APP->mainWindow()->createStation();
+            break;
+
+        case SourcesModel::ListeningRoomsCategory:
+            //TODO: APP->mainWindow()->createListeningRoom();
             break;
     }
 }
@@ -321,8 +328,12 @@ CategoryAddItem::peerSortValue() const
 
 /// CategoryItem
 
-CategoryItem::CategoryItem( SourcesModel* model, SourceTreeItem* parent, SourcesModel::CategoryType category, bool showAddItem )
-    : SourceTreeItem( model, parent, SourcesModel::Category )
+CategoryItem::CategoryItem( SourcesModel* model,
+                            SourceTreeItem* parent,
+                            SourcesModel::CategoryType category,
+                            bool showAddItem,
+                            int peerSortValue )
+    : SourceTreeItem( model, parent, SourcesModel::Category, peerSortValue )
     , m_category( category )
     , m_addItem( 0 )
     , m_showAdd( showAddItem )
@@ -389,6 +400,8 @@ CategoryItem::text() const
         return tr( "Playlists" );
     case SourcesModel::StationsCategory:
         return tr( "Stations" );
+    case SourcesModel::ListeningRoomsCategory:
+        return tr( "Listening Rooms" );
     }
     return QString();
 }
@@ -405,4 +418,15 @@ SourcesModel::CategoryType
 CategoryItem::categoryType()
 {
     return m_category;
+}
+
+
+void
+GroupCategoryItem::checkExpandedState()
+{
+    if ( m_defaultExpanded )
+    {
+        m_defaultExpanded = false;
+        requestExpanding();
+    }
 }

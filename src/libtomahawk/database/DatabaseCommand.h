@@ -53,6 +53,8 @@ public:
     virtual ~DatabaseCommand();
 
     virtual QString commandname() const { return "DatabaseCommand"; }
+
+    // doesMutates = true => makes changes to the db, like an insert or update command
     virtual bool doesMutates() const { return true; }
     State state() const { return m_state; }
 
@@ -71,8 +73,15 @@ public:
     const Tomahawk::source_ptr& source() const;
 
     virtual bool loggable() const { return false; }
+
+    // groupable = true => aggregate all commands of this type into a single
+    // database transaction when executing it
     virtual bool groupable() const { return false; }
+
+    // singletonCmd = true => only store the last command of that type in the
+    // database, all previous commands are ignored
     virtual bool singletonCmd() const { return false; }
+
     virtual bool localOnly() const { return false; }
 
     virtual QVariant data() const { return m_data; }

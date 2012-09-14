@@ -54,7 +54,11 @@ class CategoryItem : public SourceTreeItem
 {
     Q_OBJECT
 public:
-    CategoryItem( SourcesModel* model, SourceTreeItem* parent, SourcesModel::CategoryType category, bool showAddItem );
+    CategoryItem( SourcesModel* model,
+                  SourceTreeItem* parent,
+                  SourcesModel::CategoryType category,
+                  bool showAddItem,
+                  int peerSortValue = 0 );
 
     virtual QString text() const;
     virtual void activate();
@@ -71,6 +75,48 @@ private:
     SourcesModel::CategoryType m_category;
     CategoryAddItem* m_addItem;
     bool m_showAdd;
+};
+
+/**
+ * @brief The GroupCategoryItem class creates something like a GroupItem, i.e.
+ * a source view item that's usually top-level and acts as a grouping item to
+ * show/hide its contents; which also happens to handle its contents dynamically
+ * like a CategoryItem.
+ */
+class GroupCategoryItem : public CategoryItem
+{
+    Q_OBJECT
+public:
+    GroupCategoryItem( SourcesModel* model,
+                       SourceTreeItem* parent,
+                       SourcesModel::CategoryType category,
+                       bool showAddItem,
+                       int peerSortValue = 0 )
+        : CategoryItem( model, parent, category, showAddItem, peerSortValue )
+        , m_defaultExpanded( true )
+    {
+        setRowType( SourcesModel::Group );
+    }
+
+    virtual bool willAcceptDrag( const QMimeData* ) const { return false; }
+    virtual QIcon icon() const { return QIcon(); }
+    virtual bool isBeingPlayed() const { return false; }
+    virtual int peerSortValue() const { return SourceTreeItem::peerSortValue(); }
+
+    void checkExpandedState();
+    void setDefaultExpanded( bool b ) { m_defaultExpanded = b; }
+
+public slots:
+    virtual void activate() { emit toggleExpandRequest( this ); }
+
+signals:
+    void activated();
+
+private slots:
+    void requestExpanding() { emit expandRequest( this ); }
+
+private:
+    bool m_defaultExpanded;
 };
 
 

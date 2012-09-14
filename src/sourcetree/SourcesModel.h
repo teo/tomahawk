@@ -34,6 +34,7 @@ class QMimeData;
 
 class SourceTreeItem;
 class GroupItem;
+class GroupCategoryItem;
 
 namespace Tomahawk {
     class Source;
@@ -61,12 +62,15 @@ public:
 
         GenericPage = 6,
         TemporaryPage = 7,
-        LovedTracksPage = 10
+        LovedTracksPage = 10,
+
+        ListeningRoom = 11,
     };
 
     enum CategoryType {
         PlaylistsCategory = 0,
-        StationsCategory = 1
+        StationsCategory = 1,
+        ListeningRoomsCategory = 2
     };
 
     enum Roles {
@@ -145,6 +149,7 @@ private:
     SourceTreeItem* m_rootItem;
     GroupItem* m_collectionsGroup;
     GroupItem* m_myMusicGroup;
+    GroupCategoryItem* m_roomsGroup;
 
     QList< Tomahawk::source_ptr > m_sourcesWithViewPage;
     QHash< Tomahawk::source_ptr, SourceTreeItem* > m_sourcesWithViewPageItems;

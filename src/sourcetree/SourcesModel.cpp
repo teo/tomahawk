@@ -22,6 +22,7 @@
 
 #include "sourcetree/items/SourceTreeItem.h"
 #include "sourcetree/items/SourceItem.h"
+#include "sourcetree/items/CategoryItems.h"
 #include "sourcetree/items/GroupItem.h"
 #include "sourcetree/items/GenericPageItems.h"
 #include "sourcetree/items/HistoryItem.h"
@@ -312,7 +313,13 @@ SourcesModel::appendGroups()
                                                 boost::bind( &ViewManager::newReleasesWidget, ViewManager::instance() ) );
     newReleases->setSortValue( 5 );
 
-    m_collectionsGroup = new GroupItem( this, m_rootItem, tr( "Friends" ), 4 );
+    m_roomsGroup = new GroupCategoryItem( this,
+                                          m_rootItem,
+                                          SourcesModel::ListeningRoomsCategory,
+                                          true, //showAddItem
+                                          4 );
+
+    m_collectionsGroup = new GroupItem( this, m_rootItem, tr( "Friends" ), 5 );
 
     endInsertRows();
 }
