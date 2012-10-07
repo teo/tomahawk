@@ -179,6 +179,7 @@ set( libSources
     Collection.cpp
     CountryUtils.cpp
     FuncTimeout.cpp
+    ListeningRoom.cpp
     Playlist.cpp
     PlaylistPlaylistInterface.cpp
     Resolver.cpp
@@ -267,7 +268,7 @@ set( libSources
     database/DatabaseCommand_CollectionAttributes.cpp
     database/DatabaseCommand_TrackAttributes.cpp
     database/DatabaseCommand_SetTrackAttributes.cpp
-    database/DatabaseCommand_ListeningRooms.cpp
+    database/DatabaseCommand_ListeningRoomInfo.cpp
     database/Database.cpp
     database/TomahawkSqlQuery.cpp
     database/IdThreadWorker.cpp

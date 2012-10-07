@@ -75,6 +75,10 @@ public:
     void addCollection( const Tomahawk::collection_ptr& c );
     void removeCollection( const Tomahawk::collection_ptr& c );
 
+    Tomahawk::listeningroom_ptr listeningRoom( const QString& guid ) const;
+    void addListeningRoom( const Tomahawk::listeningroom_ptr& p );
+    void removeListeningRoom( const Tomahawk::listeningroom_ptr& p );
+
     int id() const { return m_id; }
     ControlConnection* controlConnection() const { return m_cc; }
     void setControlConnection( ControlConnection* cc );
@@ -99,6 +103,9 @@ signals:
 
     void collectionAdded( const collection_ptr& collection );
     void collectionRemoved( const collection_ptr& collection );
+
+    void listeningRoomAdded( const Tomahawk::listeningroom_ptr& );
+    void listeningRoomRemoved( const Tomahawk::listeningroom_ptr& );
 
     void stats( const QVariantMap& );
     void usernameChanged( const QString& );
@@ -139,6 +146,7 @@ private:
     void reportSocialAttributesChanged( DatabaseCommand_SocialAction* action );
 
     QList< QSharedPointer<Collection> > m_collections;
+    QHash< QString, Tomahawk::listeningroom_ptr > m_listeningRooms;
     QVariantMap m_stats;
 
     bool m_isLocal;

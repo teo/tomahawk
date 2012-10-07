@@ -96,6 +96,7 @@ public slots:
     void createAutomaticPlaylist( QString );
     void createStation();
     void createPlaylist();
+    void createListeningRoom();
     void loadSpiff();
     void showSettingsDialog();
     void showDiagnosticsDialog();

@@ -27,20 +27,30 @@ class ListeningRoomItem : public SourceTreeItem
 public:
     explicit ListeningRoomItem( SourcesModel* model,
                                 SourceTreeItem* parent,
-                                const QString& text,
-                                const QIcon& icon );
+                                const Tomahawk::listeningroom_ptr& lr,
+                                int index = -1 );
 
-    virtual Qt::ItemFlags flags() const;
     virtual QString text() const;
+    virtual Tomahawk::listeningroom_ptr listeningroom() const;
+    virtual Qt::ItemFlags flags() const;
+//    virtual bool willAcceptDrag( const QMimeData* data ) const;
+//    virtual DropTypes supportedDropTypes( const QMimeData* data ) const;
+//    virtual bool dropMimeData( const QMimeData* data, Qt::DropAction action );
     virtual QIcon icon() const;
+    virtual bool setData(const QVariant& v, bool role);
     virtual int peerSortValue() const;
+    virtual int IDValue() const;
+//    virtual bool isBeingPlayed() const;
 
-    virtual bool willAcceptDrag(const QMimeData* data) const;
-    virtual DropTypes supportedDropTypes(const QMimeData* data) const;
-    virtual bool dropMimeData(const QMimeData* data, Qt::DropAction action);
+    virtual SourceTreeItem* activateCurrent();
+
+public slots:
+    virtual void activate();
+
 
 private:
-    
+    QIcon m_icon;
+    Tomahawk::listeningroom_ptr m_listeningroom;
 };
 
 #endif // LISTENINGROOMITEM_H

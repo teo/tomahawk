@@ -45,6 +45,7 @@
 #include "sip/SipPlugin.h"
 
 #include "Playlist.h"
+#include "ListeningRoom.h"
 #include "Query.h"
 #include "Artist.h"
 #include "ViewManager.h"
@@ -1058,6 +1059,20 @@ TomahawkWindow::createPlaylist()
 
     connect( playlistSelectorDlg, SIGNAL( finished( int ) ), SLOT( playlistCreateDialogFinished( int ) ) );
     playlistSelectorDlg->show();
+}
+
+void
+TomahawkWindow::createListeningRoom()
+{
+    QString creator = "Someone"; //FIXME: get the current user's name
+    QString roomName = tr( "%1's room" ).arg( creator );
+    QString guid = uuid();
+
+    listeningroom_ptr listeningRoom = Tomahawk::ListeningRoom::create( SourceList::instance()->getLocal(),
+                                                                       uuid(),
+                                                                       roomName,
+                                                                       creator );
+    ViewManager::instance()->show( listeningRoom );
 }
 
 

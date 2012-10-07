@@ -34,7 +34,7 @@ class QMimeData;
 
 class SourceTreeItem;
 class GroupItem;
-class GroupCategoryItem;
+class ListeningRoomsCategoryItem;
 
 namespace Tomahawk {
     class Source;
@@ -149,7 +149,7 @@ private:
     SourceTreeItem* m_rootItem;
     GroupItem* m_collectionsGroup;
     GroupItem* m_myMusicGroup;
-    GroupCategoryItem* m_roomsGroup;
+    ListeningRoomsCategoryItem* m_roomsGroup;
 
     QList< Tomahawk::source_ptr > m_sourcesWithViewPage;
     QHash< Tomahawk::source_ptr, SourceTreeItem* > m_sourcesWithViewPageItems;

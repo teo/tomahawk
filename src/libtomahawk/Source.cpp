@@ -22,6 +22,7 @@
 #include "Collection.h"
 #include "SourceList.h"
 #include "SourcePlaylistInterface.h"
+#include "ListeningRoom.h"
 
 #include "accounts/AccountManager.h"
 #include "network/ControlConnection.h"
@@ -233,6 +234,32 @@ Source::removeCollection( const collection_ptr& c )
     Q_ASSERT( m_collections.length() == 1 && m_collections.first() == c ); // only 1 source supported atm
     m_collections.removeAll( c );
     emit collectionRemoved( c );
+}
+
+
+listeningroom_ptr
+Source::listeningRoom( const QString& guid ) const
+{
+    return m_listeningRooms.value( guid, Tomahawk::listeningroom_ptr() );
+}
+
+
+void
+Source::addListeningRoom( const listeningroom_ptr& p )
+{
+    if( m_listeningRooms.contains( p->guid() ) )
+        return;
+
+    m_listeningRooms.insert( p->guid(), p );
+    emit listeningRoomAdded( p );
+}
+
+
+void
+Source::removeListeningRoom( const listeningroom_ptr& p )
+{
+    m_listeningRooms.remove( p->guid() );
+    emit listeningRoomRemoved( p );
 }
 
 

@@ -87,7 +87,7 @@ CategoryAddItem::activate()
             break;
 
         case SourcesModel::ListeningRoomsCategory:
-            //TODO: APP->mainWindow()->createListeningRoom();
+            APP->mainWindow()->createListeningRoom();
             break;
     }
 }

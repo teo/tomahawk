@@ -61,6 +61,8 @@ SET( tomahawkSourcesGui ${tomahawkSourcesGui}
      sourcetree/items/PlaylistItems.cpp
      sourcetree/items/CategoryItems.cpp
      sourcetree/items/GenericPageItems.cpp
+     sourcetree/items/ListeningRoomItem.cpp
+     sourcetree/items/ListeningRoomsCategoryItem.cpp
      sourcetree/items/LovedTracksItem.cpp
      sourcetree/items/TemporaryPageItem.cpp
      sourcetree/items/GroupItem.cpp

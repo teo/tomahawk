@@ -33,6 +33,7 @@
 #include "playlist/TreeView.h"
 #include "playlist/GridView.h"
 #include "playlist/AlbumModel.h"
+#include "ListeningRoom.h"
 #include "SourceList.h"
 #include "TomahawkSettings.h"
 
@@ -314,6 +315,13 @@ ViewManager::show( const Tomahawk::source_ptr& source )
 
     setPage( swidget );
     return swidget;
+}
+
+Tomahawk::ViewPage*
+ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
+{
+    //TODO: implement
+    return 0;
 }
 
 
@@ -769,6 +777,15 @@ ViewManager::createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVari
     Tomahawk::dynplaylist_ptr p = Tomahawk::dynplaylist_ptr( new Tomahawk::DynamicPlaylist( src, contents.toMap().value( "type", QString() ).toString()  ) );
     QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
     p->reportCreated( p );
+}
+
+void
+ViewManager::createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents )
+{
+    Tomahawk::listeningroom_ptr p = Tomahawk::listeningroom_ptr( new Tomahawk::ListeningRoom( src ) );
+    QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
+    p->reportCreated( p );
+    tDebug() << Q_FUNC_INFO << "room created";
 }
 
 

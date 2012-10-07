@@ -143,6 +143,7 @@ public slots:
     Tomahawk::ViewPage* show( const Tomahawk::query_ptr& query );
     Tomahawk::ViewPage* show( const Tomahawk::collection_ptr& collection );
     Tomahawk::ViewPage* show( const Tomahawk::source_ptr& source );
+    Tomahawk::ViewPage* show( const Tomahawk::listeningroom_ptr& listeningRoom );
 
     void historyBack();
     void historyForward();
@@ -162,6 +163,7 @@ public slots:
     // called by the playlist creation dbcmds
     void createPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
     void createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
+    void createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents );
 
     void setTomahawkLoaded();
 
