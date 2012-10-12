@@ -71,9 +71,14 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
     if ( p.isNull() )
         return;
 
-//    beginRowsAdded( children().count() - 1, children().count() );
-    ListeningRoomItem* lrItem = new ListeningRoomItem( model(), this, p );
-    insertItem( lrItem );
+
+    int count = children().count();
+    if ( m_showAdd )
+        --count; //if an add item exists, it should always appear at the end of the list
+
+    beginRowsAdded( count, count );
+    ListeningRoomItem* lrItem = new ListeningRoomItem( model(), this, p ); //inserts child too
+    endRowsAdded();
 
     if ( p->author()->isLocal() )
         connect( p.data(), SIGNAL( aboutToBeDeleted( Tomahawk::listeningroom_ptr ) ),
@@ -81,8 +86,6 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
     else
         connect( p.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
                  SLOT( onListeningRoomDeleted( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
-
-//    endRowsAdded();
 
     tDebug() << "listening room added to model.";
 }

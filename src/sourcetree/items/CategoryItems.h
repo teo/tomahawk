@@ -71,10 +71,12 @@ public:
 
     SourcesModel::CategoryType categoryType();
 
+protected:
+    bool m_showAdd;
+
 private:
     SourcesModel::CategoryType m_category;
     CategoryAddItem* m_addItem;
-    bool m_showAdd;
 };
 
 
