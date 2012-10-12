@@ -136,6 +136,8 @@ SourceTreeView::SourceTreeView( QWidget* parent )
     connect( this, SIGNAL( latchModeChangeRequest( Tomahawk::source_ptr, bool ) ), m_latchManager, SLOT( latchModeChangeRequest( Tomahawk::source_ptr, bool ) ) );
 
     connect( ActionCollection::instance(), SIGNAL( privacyModeChanged() ), SLOT( repaint() ) );
+
+    QTimer::singleShot( 0, m_model, SLOT( performDefaultExpandForTopLevelItems() ) );
 }
 
 

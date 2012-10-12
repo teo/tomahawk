@@ -64,7 +64,7 @@ public:
         TemporaryPage = 7,
         LovedTracksPage = 10,
 
-        ListeningRoom = 11,
+        ListeningRoom = 11
     };
 
     enum CategoryType {
@@ -128,6 +128,8 @@ public slots:
     void itemSelectRequest( SourceTreeItem* item );
     void itemExpandRequest( SourceTreeItem* item );
     void itemToggleExpandRequest( SourceTreeItem* item );
+
+    void performDefaultExpandForTopLevelItems();
 
 signals:
     void selectRequest( const QPersistentModelIndex& idx );

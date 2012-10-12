@@ -687,3 +687,9 @@ SourcesModel::sourcesWithViewPage() const
 {
     return m_sourcesWithViewPage;
 }
+
+
+void SourcesModel::performDefaultExpandForTopLevelItems()
+{
+    m_roomsGroup->checkExpandedState();
+}
