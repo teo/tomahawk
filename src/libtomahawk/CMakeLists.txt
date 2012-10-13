@@ -151,6 +151,7 @@ set( libGuiSources
     widgets/FadingPixmap.cpp
     widgets/SocialPlaylistWidget.cpp
     widgets/SourceTreePopupDialog.cpp
+    widgets/ListeningRoomWidget.cpp
     widgets/infowidgets/SourceInfoWidget.cpp
     widgets/infowidgets/ArtistInfoWidget.cpp
     widgets/infowidgets/AlbumInfoWidget.cpp

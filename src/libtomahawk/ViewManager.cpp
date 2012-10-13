@@ -50,6 +50,7 @@
 #include "widgets/infowidgets/TrackInfoWidget.h"
 #include "widgets/NewPlaylistWidget.h"
 #include "widgets/AnimatedSplitter.h"
+#include "widgets/ListeningRoomWidget.h"
 
 #include "utils/Logger.h"
 
@@ -190,6 +191,25 @@ ViewManager::show( const Tomahawk::playlist_ptr& playlist )
 
 
 Tomahawk::ViewPage*
+ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
+{
+    ListeningRoomWidget* w;
+    if ( !m_listeningRoomWidgets.contains( listeningRoom ) || m_listeningRoomWidgets.value( listeningRoom ).isNull() )
+    {
+        w = new ListeningRoomWidget();
+        m_listeningRoomWidgets.insert( listeningRoom, w );
+    }
+    else
+    {
+        w = m_listeningRoomWidgets.value( listeningRoom ).data();
+    }
+
+    setPage( w );
+    return w;
+}
+
+
+Tomahawk::ViewPage*
 ViewManager::show( const Tomahawk::dynplaylist_ptr& playlist )
 {
     if ( !m_dynamicWidgets.contains( playlist ) || m_dynamicWidgets.value( playlist ).isNull() )
@@ -315,13 +335,6 @@ ViewManager::show( const Tomahawk::source_ptr& source )
 
     setPage( swidget );
     return swidget;
-}
-
-Tomahawk::ViewPage*
-ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
-{
-    //TODO: implement
-    return 0;
 }
 
 
@@ -798,16 +811,23 @@ ViewManager::setTomahawkLoaded()
 
 
 ViewPage*
-ViewManager::pageForDynPlaylist(const dynplaylist_ptr& pl) const
+ViewManager::pageForDynPlaylist( const dynplaylist_ptr& pl ) const
 {
     return m_dynamicWidgets.value( pl ).data();
 }
 
 
 ViewPage*
-ViewManager::pageForPlaylist(const playlist_ptr& pl) const
+ViewManager::pageForPlaylist( const playlist_ptr& pl ) const
 {
     return m_playlistViews.value( pl ).data();
+}
+
+
+ViewPage*
+ViewManager::pageForListeningRoom( const listeningroom_ptr& lr ) const
+{
+    return m_listeningRoomWidgets.value( lr ).data();
 }
 
 

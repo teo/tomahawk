@@ -88,6 +88,6 @@ private:
     QString m_filter;
 };
 
-}; // ns
+} // namespace Tomahawk
 
 #endif //VIEWPAGE_H

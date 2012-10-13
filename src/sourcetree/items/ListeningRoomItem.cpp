@@ -99,14 +99,14 @@ ListeningRoomItem::IDValue() const
 SourceTreeItem*
 ListeningRoomItem::activateCurrent()
 {
-//    if ( ViewManager::instance()->pageForListeningRoom( m_listeningroom ) ==
-//         ViewManager::instance()->currentPage() )
-//    {
-//        model()->linkSourceItemToPage( this, ViewManager::instance()->currentPage() );
-//        emit selectRequest( this );
+    if ( ViewManager::instance()->pageForListeningRoom( m_listeningroom ) ==
+         ViewManager::instance()->currentPage() )
+    {
+        model()->linkSourceItemToPage( this, ViewManager::instance()->currentPage() );
+        emit selectRequest( this );
 
-//        return this;
-//    }
+        return this;
+    }
 
     return 0;
 }

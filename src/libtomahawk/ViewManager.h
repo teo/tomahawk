@@ -41,6 +41,7 @@ class TreeView;
 class CollectionModel;
 class ContextWidget;
 class FlexibleView;
+class ListeningRoomWidget;
 class PlaylistModel;
 class PlaylistView;
 class TrackProxyModel;
@@ -96,6 +97,8 @@ public:
     /// Get the view page for the given item. Not pretty...
     Tomahawk::ViewPage* pageForPlaylist( const Tomahawk::playlist_ptr& pl ) const;
     Tomahawk::ViewPage* pageForDynPlaylist( const Tomahawk::dynplaylist_ptr& pl ) const;
+
+    Tomahawk::ViewPage* pageForListeningRoom( const Tomahawk::listeningroom_ptr& lr ) const;
 
     /// Get a playlist (or dynamic playlist ) from a ViewPage* if the page is PlaylistView or DynamicWidget.
     /// Lives here but used by SourcesModel
@@ -206,6 +209,7 @@ private:
     QHash< Tomahawk::query_ptr, QWeakPointer<TrackInfoWidget> > m_trackViews;
     QHash< Tomahawk::playlist_ptr, QWeakPointer<FlexibleView> > m_playlistViews;
     QHash< Tomahawk::source_ptr, QWeakPointer<SourceInfoWidget> > m_sourceViews;
+    QHash< Tomahawk::listeningroom_ptr, QWeakPointer<ListeningRoomWidget> > m_listeningRoomWidgets;
 
     QList<Tomahawk::ViewPage*> m_pageHistoryBack;
     QList<Tomahawk::ViewPage*> m_pageHistoryFwd;
