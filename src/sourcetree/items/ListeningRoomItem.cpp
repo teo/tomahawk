@@ -40,7 +40,9 @@ ListeningRoomItem::ListeningRoomItem( SourcesModel* model,
 QString
 ListeningRoomItem::text() const
 {
-    return m_listeningroom->title();
+    return tr( "%1 (%2)", "the name of a listening room, followed by the current host inside ()" )
+            .arg( m_listeningroom->title() )
+            .arg( m_listeningroom->author()->friendlyName() );
 }
 
 

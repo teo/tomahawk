@@ -1064,7 +1064,7 @@ TomahawkWindow::createPlaylist()
 void
 TomahawkWindow::createListeningRoom()
 {
-    QString creator = "Someone"; //FIXME: get the current user's name
+    QString creator = SourceList::instance()->getLocal()->userName();
     QString roomName = tr( "%1's room" ).arg( creator );
     QString guid = uuid();
 
