@@ -94,5 +94,20 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
 void
 ListeningRoomsCategoryItem::onListeningRoomDeleted( const Tomahawk::listeningroom_ptr& p )
 {
-    //TODO: implement
+    Q_ASSERT( p );
+
+    int count = children().count();
+    for ( int i = 0; i < count; ++i )
+    {
+        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( children().at( i ) );
+        if( lrItem && lrItem->listeningroom() == p )
+        {
+            beginRowsRemoved( i, i );
+            removeChild( lrItem );
+            endRowsRemoved();
+
+            delete lrItem;
+            break;
+        }
+    }
 }

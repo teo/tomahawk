@@ -182,6 +182,9 @@ signals:
     void changed();
     void renamed( const QString& newTitle, const QString& oldTitle );
 
+    void aboutToBeDeleted( const Tomahawk::listeningroom_ptr& lr );
+    void deleted( const Tomahawk::listeningroom_ptr& lr );
+
 public slots:
     // want to update the playlist from the model?
     // generate a newrev using uuid() and call this:

@@ -37,20 +37,47 @@ DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( QObject* p
     tDebug() << Q_FUNC_INFO << "dbcmd listeningroominfo received";
 }
 
-
-DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( const source_ptr& author,
-                                                                      const listeningroom_ptr& listeningRoom )
+/*private*/
+DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( Action action,
+                                                                      const source_ptr& author )
     : DatabaseCommandLoggable( author )
-    , m_listeningRoom( listeningRoom )
+    , m_action( action )
 {}
+
+
+DatabaseCommand_ListeningRoomInfo*
+DatabaseCommand_ListeningRoomInfo::RoomInfo( const source_ptr& author,
+                                             const listeningroom_ptr& listeningRoom )
+{
+    DatabaseCommand_ListeningRoomInfo* cmd =
+            new DatabaseCommand_ListeningRoomInfo( Info, author );
+    cmd->m_listeningRoom = listeningRoom;
+    cmd->m_guid = listeningRoom->guid();
+
+    return cmd;
+}
+
+DatabaseCommand_ListeningRoomInfo*
+DatabaseCommand_ListeningRoomInfo::DisbandRoom( const Tomahawk::source_ptr& author,
+                                                const QString& roomGuid )
+{
+    DatabaseCommand_ListeningRoomInfo* cmd =
+            new DatabaseCommand_ListeningRoomInfo( Disband, author );
+    cmd->m_guid = roomGuid;
+
+    return cmd;
+}
 
 
 void
 DatabaseCommand_ListeningRoomInfo::exec( DatabaseImpl* lib )
 {
     Q_UNUSED( lib );
-    Q_ASSERT( !( m_listeningRoom.isNull() && m_v.isNull() ) );
     Q_ASSERT( !source().isNull() );
+    if ( m_action == Info )
+        Q_ASSERT( !( m_listeningRoom.isNull() && m_v.isNull() ) );
+    else if ( m_action == Disband )
+        Q_ASSERT( !m_guid.isEmpty() );
 
     tDebug() << Q_FUNC_INFO;
 
@@ -71,7 +98,7 @@ DatabaseCommand_ListeningRoomInfo::exec( DatabaseImpl* lib )
 QVariant
 DatabaseCommand_ListeningRoomInfo::listeningRoomV() const
 {
-    if ( m_v.isNull() ) //this is so that QVariant conversion only happens when serializing the DBcmd
+    if ( m_action == Info && m_v.isNull() ) //this is so that QVariant conversion only happens when serializing the DBcmd
         return QJson::QObjectHelper::qobject2qvariant( (QObject*)m_listeningRoom.data() );
     else
         return m_v;
@@ -88,23 +115,42 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
         Servent::instance()->triggerDBSync();
     }
 
-    if ( m_listeningRoom.isNull() ) //if I'm not local
+
+    if ( m_action == Info )
     {
-        source_ptr src = source();
-        //if ( )
-#ifndef ENABLE_HEADLESS
-        // db commands run on separate threads, which is good!
-        // But one must be careful what he does there, so to create something on the main thread,
-        // you either emit a signal or do a queued invoke.
-        QMetaObject::invokeMethod( ViewManager::instance(),
-                                   "createListeningRoom",
-                                   Qt::BlockingQueuedConnection,
-                                   QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
-                                   Q_ARG( QVariant, m_v ) );
-#endif
+        if ( m_listeningRoom.isNull() ) //if I'm not local
+        {
+            source_ptr src = source();
+    #ifndef ENABLE_HEADLESS
+            // db commands run on separate threads, which is good!
+            // But one must be careful what he does there, so to create something on the main thread,
+            // you either emit a signal or do a queued invoke.
+            QMetaObject::invokeMethod( ViewManager::instance(),
+                                      "createListeningRoom",
+                                       Qt::BlockingQueuedConnection,
+                                       QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
+                                       Q_ARG( QVariant, m_v ) );
+
+    #endif
+        }
+        else
+        {
+            m_listeningRoom->reportCreated( m_listeningRoom );
+        }
     }
-    else
+    else if ( m_action == Disband )
     {
-        m_listeningRoom->reportCreated( m_listeningRoom );
+        if ( source().isNull() )
+            return;
+
+        listeningroom_ptr room = source()->listeningRoom( m_guid );
+        if ( room.isNull() )
+        {
+            tDebug() << "The Listening Room does not exist or has already been disbanded.";
+            return;
+        }
+
+        room->reportDeleted( room );
     }
 }
+

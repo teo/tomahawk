@@ -117,7 +117,8 @@ ListeningRoom::create( const source_ptr& author,
     listeningroom_ptr listeningRoom( new ListeningRoom( author, guid, title, creator, entries ), &QObject::deleteLater );
     listeningRoom->setWeakSelf( listeningRoom.toWeakRef() );
 
-    DatabaseCommand_ListeningRoomInfo* cmd = new DatabaseCommand_ListeningRoomInfo( author, listeningRoom );
+    DatabaseCommand_ListeningRoomInfo* cmd =
+            DatabaseCommand_ListeningRoomInfo::RoomInfo( author, listeningRoom );
     connect( cmd, SIGNAL( finished() ), listeningRoom.data(), SIGNAL( created() ) );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
     listeningRoom->reportCreated( listeningRoom );
@@ -148,7 +149,11 @@ ListeningRoom::load( const QString& guid )
 void
 ListeningRoom::remove( const listeningroom_ptr& room )
 {
-    //TODO: implement!
+    room->aboutToBeDeleted( room );
+
+    DatabaseCommand_ListeningRoomInfo* cmd =
+            DatabaseCommand_ListeningRoomInfo::DisbandRoom( room->author(), room->guid() );
+    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
 }
 
 
@@ -183,7 +188,9 @@ ListeningRoom::reportCreated( const listeningroom_ptr& self )
 void
 ListeningRoom::reportDeleted( const listeningroom_ptr& self )
 {
-    //TODO: implement!
+    Q_ASSERT( self.data() == this );
+    m_source->removeListeningRoom( self );
+    emit deleted( self );
 }
 
 

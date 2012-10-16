@@ -71,7 +71,7 @@ private slots:
     void onItemDoubleClicked( const QModelIndex& idx );
 
     void loadPlaylist();
-    void deletePlaylist( const QModelIndex& = QModelIndex() );
+    void deletePlaylistOrListeningRoom( const QModelIndex& = QModelIndex() );
     void copyPlaylistLink();
     void exportPlaylist();
     void addToLocal();
@@ -85,7 +85,7 @@ private slots:
     void onCustomContextMenu( const QPoint& pos );
     void onSelectionChanged();
 
-    void onDeletePlaylistResult( bool result );
+    void onDeletePlaylistOrListeningRoomResult( bool result );
 
 protected:
     void drawRow( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
@@ -116,6 +116,8 @@ private:
     QMenu m_roPlaylistMenu;
     QMenu m_latchMenu;
     QMenu m_privacyMenu;
+    QMenu m_listeningRoomMenu;
+    QMenu m_roListeningRoomMenu;
 
     bool m_dragging;
     QRect m_dropRect;

@@ -89,6 +89,10 @@ ActionCollection::initActions()
     m_actionCollection[ "quit" ]->setShortcutContext( Qt::ApplicationShortcut );
     m_actionCollection[ "quit" ]->setMenuRole( QAction::QuitRole );
 
+    // listening room actions
+    m_actionCollection[ "renameListeningRoom" ]  = new QAction( tr( "&Rename Listening Room" ), this );
+    m_actionCollection[ "disbandListeningRoom" ] = new QAction( tr( "&Disband Listening Room" ), this );
+
     // connect actions to AudioEngine
     AudioEngine *ae = AudioEngine::instance();
     connect( m_actionCollection[ "playPause" ],     SIGNAL( triggered() ), ae,   SLOT( playPause() ), Qt::UniqueConnection );
@@ -111,7 +115,7 @@ ActionCollection::initActions()
     m_actionCollection[ "zoom" ] =               new QAction( tr( "Zoom" ), this );
     m_actionCollection[ "zoom" ]->setShortcut( QKeySequence( "Meta+Ctrl+Z" ) );
 #else
-    m_actionCollection[ "toggleMenuBar" ] =     new QAction( tr( "Hide Menu Bar" ), this );
+    m_actionCollection[ "toggleMenuBar" ] =      new QAction( tr( "Hide Menu Bar" ), this );
     m_actionCollection[ "toggleMenuBar" ]->setShortcut( QKeySequence( "Ctrl+M" ) );
     m_actionCollection[ "toggleMenuBar" ]->setShortcutContext( Qt::ApplicationShortcut );
 #endif

@@ -3,6 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright 2010-2012, Leo Franchi   <lfranchi@kde.org>
+ *   Copyright      2012, Teo Mrnjavac  <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -22,12 +23,14 @@
 
 #include "ActionCollection.h"
 #include "Playlist.h"
+#include "ListeningRoom.h"
 #include "ViewManager.h"
 #include "SourcesProxyModel.h"
 #include "SourceList.h"
 #include "SourceDelegate.h"
 #include "sourcetree/items/PlaylistItems.h"
 #include "sourcetree/items/SourceItem.h"
+#include "sourcetree/items/ListeningRoomItem.h"
 #include "audio/AudioEngine.h"
 #include "SourcePlaylistInterface.h"
 #include "TomahawkSettings.h"
@@ -153,6 +156,8 @@ SourceTreeView::setupMenus()
     m_roPlaylistMenu.clear();
     m_latchMenu.clear();
     m_privacyMenu.clear();
+    m_listeningRoomMenu.clear();
+    m_roListeningRoomMenu.clear();
 
     bool readonly = true;
     SourcesModel::RowType type = ( SourcesModel::RowType )model()->data( m_contextMenuIndex, SourcesModel::SourceTreeItemTypeRole ).toInt();
@@ -165,6 +170,16 @@ SourceTreeView::setupMenus()
         if ( !playlist.isNull() )
         {
             readonly = !playlist->author()->isLocal();
+        }
+    }
+    else if ( type == SourcesModel::ListeningRoom )
+    {
+        const ListeningRoomItem* item = itemFromIndex< ListeningRoomItem >( m_contextMenuIndex );
+        const listeningroom_ptr room = item->listeningroom();
+
+        if ( !room.isNull() )
+        {
+            readonly = !room->author()->isLocal();
         }
     }
 
@@ -246,10 +261,21 @@ SourceTreeView::setupMenus()
 
     connect( loadPlaylistAction,   SIGNAL( triggered() ), SLOT( loadPlaylist() ) );
     connect( renamePlaylistAction, SIGNAL( triggered() ), SLOT( renamePlaylist() ) );
-    connect( deletePlaylistAction, SIGNAL( triggered() ), SLOT( deletePlaylist() ) );
+    connect( deletePlaylistAction, SIGNAL( triggered() ), SLOT( deletePlaylistOrListeningRoom() ) );
     connect( copyPlaylistAction,   SIGNAL( triggered() ), SLOT( copyPlaylistLink() ) );
     connect( addToLocalAction,     SIGNAL( triggered() ), SLOT( addToLocal() ) );
     connect( latchOnAction,        SIGNAL( triggered() ), SLOT( latchOnOrCatchUp() ), Qt::QueuedConnection );
+
+    QAction* renameListeningRoomAction  = ActionCollection::instance()->getAction( "renameListeningRoom" );
+    QAction* disbandListeningRoomAction = ActionCollection::instance()->getAction( "disbandListeningRoom" );
+
+    m_listeningRoomMenu.addAction( renameListeningRoomAction );
+    m_listeningRoomMenu.addAction( disbandListeningRoomAction );
+
+    connect( renameListeningRoomAction,  SIGNAL( triggered() ), SLOT( renameListeningRoom() ) ); //TODO: implement!
+    connect( disbandListeningRoomAction, SIGNAL( triggered() ), SLOT( deletePlaylistOrListeningRoom() ) );
+
+    //TODO: add actions to read-only LR menu m_roListeningRoomMenu
 }
 
 
@@ -346,7 +372,7 @@ SourceTreeView::loadPlaylist()
 
 
 void
-SourceTreeView::deletePlaylist( const QModelIndex& idxIn )
+SourceTreeView::deletePlaylistOrListeningRoom( const QModelIndex& idxIn )
 {
     QModelIndex idx = idxIn.isValid() ? idxIn : m_contextMenuIndex;
     if ( !idx.isValid() )
@@ -354,57 +380,77 @@ SourceTreeView::deletePlaylist( const QModelIndex& idxIn )
 
     SourcesModel::RowType type = ( SourcesModel::RowType )model()->data( idx, SourcesModel::SourceTreeItemTypeRole ).toInt();
     QString typeDesc;
+    QString actionDesc;
+    QString buttonDesc;
     switch ( type )
     {
         case SourcesModel::StaticPlaylist:
             typeDesc = tr( "playlist" );
+            actionDesc = tr( "delete" );
+            buttonDesc = tr( "Delete" );
             break;
 
         case SourcesModel::AutomaticPlaylist:
             typeDesc = tr( "automatic playlist" );
+            actionDesc = tr( "delete" );
+            buttonDesc = tr( "Delete" );
             break;
 
         case SourcesModel::Station:
             typeDesc = tr( "station" );
+            actionDesc = tr( "delete" );
+            buttonDesc = tr( "Delete" );
+            break;
+
+        case SourcesModel::ListeningRoom:
+            typeDesc = tr( "listening room" );
+            actionDesc = tr( "disband" );
+            buttonDesc = tr( "Disband" );
             break;
 
         default:
             Q_ASSERT( false );
     }
 
-    PlaylistItem* item = itemFromIndex< PlaylistItem >( idx );
-    playlist_ptr playlist = item->playlist();
     QPoint rightCenter = viewport()->mapToGlobal( visualRect( idx ).topRight() + QPoint( 0, visualRect( idx ).height() / 2 ) );
 #ifdef Q_OS_WIN
     rightCenter = QApplication::activeWindow()->mapFromGlobal( rightCenter );
 #endif
 
-    if ( playlist->hasCustomDeleter() )
+    // corner case, if it's a playlist i.e. not a listening room
+    if ( type == SourcesModel::StaticPlaylist ||
+         type == SourcesModel::AutomaticPlaylist ||
+         type == SourcesModel::Station )
     {
-        playlist->customDelete( rightCenter );
-    }
-    else
-    {
-        if ( m_popupDialog.isNull() )
+        PlaylistItem* item = itemFromIndex< PlaylistItem >( idx );
+        playlist_ptr playlist = item->playlist();
+
+        if ( playlist->hasCustomDeleter() )
         {
-            m_popupDialog = QWeakPointer< SourceTreePopupDialog >( new SourceTreePopupDialog() );
-            connect( m_popupDialog.data(), SIGNAL( result( bool ) ), this, SLOT( onDeletePlaylistResult( bool ) ) );
+            playlist->customDelete( rightCenter );
+            return;
         }
-
-        m_popupDialog.data()->setMainText( tr( "Would you like to delete the %1 <b>\"%2\"</b>?", "e.g. Would you like to delete the playlist named Foobar?" )
-                                .arg( typeDesc ).arg( idx.data().toString() ) );
-        m_popupDialog.data()->setOkButtonText( tr( "Delete" ) );
-        m_popupDialog.data()->setProperty( "idx", QVariant::fromValue< QModelIndex >( idx ) );
-
-        m_popupDialog.data()->move( rightCenter.x() - m_popupDialog.data()->offset(), rightCenter.y() - m_popupDialog.data()->sizeHint().height() / 2. );
-        m_popupDialog.data()->show();
     }
 
+
+    if ( m_popupDialog.isNull() )
+    {
+        m_popupDialog = QWeakPointer< SourceTreePopupDialog >( new SourceTreePopupDialog() );
+        connect( m_popupDialog.data(), SIGNAL( result( bool ) ), this, SLOT( onDeletePlaylistOrListeningRoomResult( bool ) ) );
+    }
+
+    m_popupDialog.data()->setMainText( tr( "Would you like to %1 the %2 <b>\"%3\"</b>?", "e.g. Would you like to delete the playlist named Foobar?" )
+                            .arg( actionDesc ).arg( typeDesc ).arg( idx.data().toString() ) );
+    m_popupDialog.data()->setOkButtonText( buttonDesc );
+    m_popupDialog.data()->setProperty( "idx", QVariant::fromValue< QModelIndex >( idx ) );
+
+    m_popupDialog.data()->move( rightCenter.x() - m_popupDialog.data()->offset(), rightCenter.y() - m_popupDialog.data()->sizeHint().height() / 2. );
+    m_popupDialog.data()->show();
 }
 
 
 void
-SourceTreeView::onDeletePlaylistResult( bool result )
+SourceTreeView::onDeletePlaylistOrListeningRoomResult( bool result )
 {
     Q_ASSERT( !m_popupDialog.isNull() );
 
@@ -429,6 +475,13 @@ SourceTreeView::onDeletePlaylistResult( bool result )
         dynplaylist_ptr playlist = item->dynPlaylist();
         qDebug() << "Doing delete of playlist:" << playlist->title();
         DynamicPlaylist::remove( playlist );
+    }
+    else if ( type == SourcesModel::ListeningRoom )
+    {
+        ListeningRoomItem* item = itemFromIndex< ListeningRoomItem >( idx );
+        listeningroom_ptr room = item->listeningroom();
+        qDebug() << "Doing delete of listening room:" << room->title();
+        ListeningRoom::remove( room );
     }
 }
 
@@ -631,6 +684,14 @@ SourceTreeView::onCustomContextMenu( const QPoint& pos )
         else if ( !item->source().isNull() )
             m_privacyMenu.exec( mapToGlobal( pos ) );
     }
+    else if ( model()->data( m_contextMenuIndex, SourcesModel::SourceTreeItemTypeRole ) == SourcesModel::ListeningRoom )
+    {
+        ListeningRoomItem* item = itemFromIndex< ListeningRoomItem >( m_contextMenuIndex );
+        if ( item->listeningroom()->author()->isLocal() )
+            m_listeningRoomMenu.exec( mapToGlobal( pos ) );
+        else
+            m_roListeningRoomMenu.exec( mapToGlobal( pos ) );
+    }
     else if ( !customActions.isEmpty() )
     {
         QMenu customMenu;
@@ -811,7 +872,7 @@ SourceTreeView::keyPressEvent( QKeyEvent* event )
             Q_ASSERT( item );
 
             if ( item->playlist()->author()->isLocal() )
-                deletePlaylist( idx );
+                deletePlaylistOrListeningRoom( idx );
         }
         event->accept();
     }
