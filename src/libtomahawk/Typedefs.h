@@ -228,5 +228,6 @@ inline static QString uuid()
 Q_DECLARE_METATYPE( QModelIndex )
 Q_DECLARE_METATYPE( QPersistentModelIndex )
 Q_DECLARE_METATYPE( QNetworkReply* );
+Q_DECLARE_METATYPE( Tomahawk::source_ptr );
 
 #endif // TYPEDEFS_H

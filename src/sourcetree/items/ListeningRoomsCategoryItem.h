@@ -73,6 +73,9 @@ public:
                                 SourceTreeItem* parent,
                                 int peerSortValue = 0 );
 
+public slots:
+    void onSourceRemoved( const Tomahawk::source_ptr& src );
+
 private slots:
     void onSourceAdded( const Tomahawk::source_ptr& src );
     void onListeningRoomAdded( const Tomahawk::listeningroom_ptr& p );

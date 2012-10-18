@@ -21,6 +21,7 @@
 #include "ListeningRoom.h"
 #include "ListeningRoomItem.h"
 #include "SourceList.h"
+#include "utils/Closure.h"
 
 
 void
@@ -61,7 +62,37 @@ ListeningRoomsCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
 
     connect( src.data(), SIGNAL( listeningRoomAdded( Tomahawk::listeningroom_ptr ) ),
              SLOT( onListeningRoomAdded( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
+
+    NewClosure( src.data(), SIGNAL( offline() ),
+                this, SLOT( onSourceRemoved( Tomahawk::source_ptr ) ), src );
+
     tDebug() << "End" << Q_FUNC_INFO;
+}
+
+void
+ListeningRoomsCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
+{
+    if ( src->isOnline() )
+        return;
+    tDebug() << Q_FUNC_INFO;
+    tDebug() << "Removed source " << src->friendlyName();
+    for ( int i = 0; i < children().count(); )
+    {
+        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( children().at( i ) );
+        if( lrItem && lrItem->listeningroom()->author()->id() == src->id() )
+        {
+            beginRowsRemoved( i, i );
+            removeChild( lrItem );
+            endRowsRemoved();
+
+            src->removeListeningRoom( lrItem->listeningroom() );
+            lrItem->listeningroom()->deleteLater();
+
+            delete lrItem;
+        }
+        else
+            ++i;
+    }
 }
 
 
@@ -87,7 +118,7 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
         connect( p.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
                  SLOT( onListeningRoomDeleted( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
 
-    tDebug() << "listening room added to model.";
+    tDebug() << "listening room added to model." << p->title();
 }
 
 
