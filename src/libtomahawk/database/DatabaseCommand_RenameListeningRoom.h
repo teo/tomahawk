@@ -47,6 +47,7 @@ public:
     virtual void exec( DatabaseImpl* lib );
     virtual void postCommitHook();
     virtual bool doesMutates() const { return false; }
+    virtual bool singletonCmd() const { return true; }
 
     QString listeningRoomGuid() const { return m_listeningRoomGuid; }
     void setListeningRoomguid( const QString& s ) { m_listeningRoomGuid = s; }
