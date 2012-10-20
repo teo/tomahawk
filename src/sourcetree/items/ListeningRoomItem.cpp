@@ -34,6 +34,8 @@ ListeningRoomItem::ListeningRoomItem( SourcesModel* model,
     Q_ASSERT( lr );
 
     m_icon = QIcon( RESPATH "images/playlist-icon.png" );
+
+    connect( lr.data(), SIGNAL( changed() ), SLOT( onUpdated() ), Qt::QueuedConnection );
 }
 
 
@@ -43,6 +45,12 @@ ListeningRoomItem::text() const
     return tr( "%1 (%2)", "the name of a listening room, followed by the current host inside ()" )
             .arg( m_listeningroom->title() )
             .arg( m_listeningroom->author()->friendlyName() );
+}
+
+QString
+ListeningRoomItem::editorText() const
+{
+    return m_listeningroom->title();
 }
 
 
@@ -56,8 +64,9 @@ ListeningRoomItem::listeningroom() const
 Qt::ItemFlags
 ListeningRoomItem::flags() const
 {
-    //TODO: implement
-    return SourceTreeItem::flags();
+    Qt::ItemFlags flags = SourceTreeItem::flags();
+    flags |= Qt::ItemIsEditable;
+    return flags;
 }
 
 
@@ -117,4 +126,10 @@ ListeningRoomItem::activate()
 {
     Tomahawk::ViewPage* p = ViewManager::instance()->show( m_listeningroom );
     model()->linkSourceItemToPage( this, p );
+}
+
+void
+ListeningRoomItem::onUpdated()
+{
+    emit updated();
 }

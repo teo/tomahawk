@@ -31,6 +31,7 @@ public:
                                 int index = -1 );
 
     virtual QString text() const;
+    virtual QString editorText() const;
     virtual Tomahawk::listeningroom_ptr listeningroom() const;
     virtual Qt::ItemFlags flags() const;
 //    virtual bool willAcceptDrag( const QMimeData* data ) const;
@@ -47,6 +48,8 @@ public:
 public slots:
     virtual void activate();
 
+private slots:
+    void onUpdated();
 
 private:
     QIcon m_icon;

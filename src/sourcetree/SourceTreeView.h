@@ -75,6 +75,7 @@ private slots:
     void copyPlaylistLink();
     void exportPlaylist();
     void addToLocal();
+    void renameListeningRoom();
 
     void latchOnOrCatchUp();
     void latchOff();

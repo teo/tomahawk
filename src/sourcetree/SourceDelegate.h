@@ -41,6 +41,7 @@ public:
     void dragLeaveEvent();
 
     SourceTreeItem::DropType hoveredDropType() const;
+    virtual void setEditorData( QWidget* editor, const QModelIndex& index ) const;
 
 signals:
     void clicked( const QModelIndex& idx );

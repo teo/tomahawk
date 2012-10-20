@@ -272,7 +272,7 @@ SourceTreeView::setupMenus()
     m_listeningRoomMenu.addAction( renameListeningRoomAction );
     m_listeningRoomMenu.addAction( disbandListeningRoomAction );
 
-    connect( renameListeningRoomAction,  SIGNAL( triggered() ), SLOT( renameListeningRoom() ) ); //TODO: implement!
+    connect( renameListeningRoomAction,  SIGNAL( triggered() ), SLOT( renameListeningRoom() ) );
     connect( disbandListeningRoomAction, SIGNAL( triggered() ), SLOT( deletePlaylistOrListeningRoom() ) );
 
     //TODO: add actions to read-only LR menu m_roListeningRoomMenu
@@ -567,6 +567,15 @@ SourceTreeView::addToLocal()
 
         playlist_ptr newpl = Playlist::create( SourceList::instance()->getLocal(), uuid(), playlist->title(), playlist->info(), playlist->creator(), playlist->shared(), queries );
     }
+}
+
+void
+SourceTreeView::renameListeningRoom()
+{
+    if ( !m_contextMenuIndex.isValid() && !selectionModel()->selectedIndexes().isEmpty() )
+        edit( selectionModel()->selectedIndexes().first() );
+    else
+        edit( m_contextMenuIndex );
 }
 
 

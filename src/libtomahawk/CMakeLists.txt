@@ -270,6 +270,7 @@ set( libSources
     database/DatabaseCommand_TrackAttributes.cpp
     database/DatabaseCommand_SetTrackAttributes.cpp
     database/DatabaseCommand_ListeningRoomInfo.cpp
+    database/DatabaseCommand_RenameListeningRoom.cpp
     database/Database.cpp
     database/TomahawkSqlQuery.cpp
     database/IdThreadWorker.cpp

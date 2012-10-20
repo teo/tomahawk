@@ -23,6 +23,7 @@
 #include "DatabaseCommand_DeleteFiles.h"
 #include "DatabaseCommand_DeletePlaylist.h"
 #include "DatabaseCommand_ListeningRoomInfo.h"
+#include "DatabaseCommand_RenameListeningRoom.h"
 #include "DatabaseCommand_LogPlayback.h"
 #include "DatabaseCommand_RenamePlaylist.h"
 #include "DatabaseCommand_SetPlaylistRevision.h"
@@ -189,6 +190,13 @@ DatabaseCommand::factory( const QVariant& op, const source_ptr& source )
     else if( name == "listeningroominfo" )
     {
         DatabaseCommand_ListeningRoomInfo * cmd = new DatabaseCommand_ListeningRoomInfo;
+        cmd->setSource( source );
+        QJson::QObjectHelper::qvariant2qobject( op.toMap(), cmd );
+        return cmd;
+    }
+    else if( name == "renamelisteningroom" )
+    {
+        DatabaseCommand_RenameListeningRoom* cmd = new DatabaseCommand_RenameListeningRoom;
         cmd->setSource( source );
         QJson::QObjectHelper::qvariant2qobject( op.toMap(), cmd );
         return cmd;

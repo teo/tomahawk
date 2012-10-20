@@ -2,8 +2,9 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2011-2012, Leo Franchi <lfranchi@kde.org>
- *   Copyright 2011, Michael Zanetti <mzanetti@kde.org>
+ *   Copyright 2011,      Michael Zanetti <mzanetti@kde.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,6 +27,7 @@
 #include "items/PlaylistItems.h"
 #include "items/CategoryItems.h"
 #include "items/TemporaryPageItem.h"
+#include "items/ListeningRoomItem.h"
 
 #include "utils/TomahawkUtilsGui.h"
 #include "audio/AudioEngine.h"
@@ -40,6 +42,12 @@
 #include <QPainter>
 #include <QMouseEvent>
 
+#include <QtGui/QApplication>
+#include <QtGui/QPainter>
+#include <QtGui/QMouseEvent>
+#include <QtGui/QLineEdit>
+#include <audio/AudioEngine.h>
+#include <ActionCollection.h>
 
 #define TREEVIEW_INDENT_ADD 12
 
@@ -608,8 +616,14 @@ SourceDelegate::paint( QPainter* painter, const QStyleOptionViewItem& option, co
 void
 SourceDelegate::updateEditorGeometry( QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index ) const
 {
-    if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::StaticPlaylist )
-        editor->setGeometry( option.rect.adjusted( 20, 0, 0, 0 ) );
+    SourcesModel::RowType rowType = static_cast< SourcesModel::RowType >(
+            index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() );
+    if ( rowType == SourcesModel::StaticPlaylist ||
+         rowType == SourcesModel::AutomaticPlaylist ||
+         rowType == SourcesModel::Station )
+        editor->setGeometry( option.rect.adjusted( 20 /*tree indent*/ + 16 /*icon!*/, 0, 0, 0 ) );
+    else if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::ListeningRoom )
+        editor->setGeometry( option.rect.adjusted( 16 /*icon! hardcoded!*/, 0, 0, 0 ) ); //TODO: make smarter
     else
         QStyledItemDelegate::updateEditorGeometry( editor, option, index );
 
@@ -798,6 +812,23 @@ SourceTreeItem::DropType
 SourceDelegate::hoveredDropType() const
 {
     return m_hoveredDropType;
+}
+
+void
+SourceDelegate::setEditorData( QWidget* editor, const QModelIndex& index ) const
+{
+    //We need to special-case the initial editor text for Listening Rooms because an item shows not
+    //only the room's title but also other non-editable data such as the name of the owner (i.e. the
+    //name of the source the room is hosted by).
+    if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::ListeningRoom )
+    {
+        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( index.data( SourcesModel::SourceTreeItemRole ).value< SourceTreeItem* >() );
+        QLineEdit* textEditor = qobject_cast< QLineEdit* >( editor );
+        if ( textEditor )
+            textEditor->setText( lrItem->editorText() );
+    }
+    else
+        QStyledItemDelegate::setEditorData( editor, index );
 }
 
 
