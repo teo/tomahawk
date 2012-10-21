@@ -21,28 +21,41 @@
 
 #include <QWidget>
 
+#include "libtomahawk/Typedefs.h"
+#include "libtomahawk/ListeningRoom.h"
 #include "ViewPage.h"
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomWidget( QWidget* parent = 0 );
+    explicit ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
+                                  QWidget* parent = 0 );
     virtual ~ListeningRoomWidget() {}
+
+    void load( const Tomahawk::listeningroom_ptr& listeningRoom );
 
     QWidget* widget() { return this; }
     Tomahawk::playlistinterface_ptr playlistInterface() const { return Tomahawk::playlistinterface_ptr(); }
 
-    QString title() const { return QString(); }
+    QString title() const { return m_listeningRoom->title(); }
 
-    QString description() const { return QString(); }
+    QString description() const;
+    QString longDescription() const { return QString(); }
+    QPixmap pixmap() const;
+
+    bool isTemporaryPage() const { return false; }
+    bool showInfoBar() const { return true; }
 
     bool jumpToCurrentTrack() { return true; } //FIXME: what does this do?
     
 signals:
     
 public slots:
-    
+
+private:
+    Tomahawk::listeningroom_ptr m_listeningRoom;
+    QPixmap m_pixmap;
 };
 
 #endif // LISTENINGROOMWIDGET_H

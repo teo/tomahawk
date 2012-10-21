@@ -18,10 +18,37 @@
 
 #include "ListeningRoomWidget.h"
 
+#include "Source.h"
+
 #include <QLabel>
 
-ListeningRoomWidget::ListeningRoomWidget(QWidget *parent) :
-    QWidget(parent)
+ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
+                                          QWidget* parent )
+    : QWidget( parent )
+    , m_listeningRoom( listeningRoom )
 {
     QLabel* label = new QLabel( "lol room", this );
+}
+
+
+QPixmap
+ListeningRoomWidget::pixmap() const
+{
+    if ( m_pixmap.isNull() )
+        return ViewPage::pixmap();
+    else
+        return m_pixmap;
+}
+
+
+QString
+ListeningRoomWidget::description() const
+{
+    //TODO: implement!
+    QString name = m_listeningRoom->author()->isLocal() ? "me"
+                                                        : m_listeningRoom->author()->friendlyName();
+    QString desc = tr( "A room hosted by %1 with %2 listeners." )
+                   .arg( name )
+                   .arg( "over 9000" );
+    return desc;
 }

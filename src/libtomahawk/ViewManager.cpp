@@ -196,7 +196,7 @@ ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
     ListeningRoomWidget* w;
     if ( !m_listeningRoomWidgets.contains( listeningRoom ) || m_listeningRoomWidgets.value( listeningRoom ).isNull() )
     {
-        w = new ListeningRoomWidget();
+        w = new ListeningRoomWidget( listeningRoom );
         m_listeningRoomWidgets.insert( listeningRoom, w );
     }
     else
