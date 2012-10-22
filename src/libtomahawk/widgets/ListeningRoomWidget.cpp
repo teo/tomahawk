@@ -19,25 +19,34 @@
 #include "ListeningRoomWidget.h"
 
 #include "Source.h"
+#include "utils/TomahawkUtilsGui.h"
+#include "ListeningRoomHeader.h"
 
-#include <QLabel>
+#include <QtGui/QIcon>
+#include <QtGui/QLabel>
+#include <QtGui/QBoxLayout>
 
 ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
                                           QWidget* parent )
     : QWidget( parent )
     , m_listeningRoom( listeningRoom )
 {
-    QLabel* label = new QLabel( "lol room", this );
-}
+    Q_ASSERT( !m_listeningRoom.isNull() );
+    setLayout( new QVBoxLayout );
 
+    m_header = new ListeningRoomHeader( this );
+    m_body = new QWidget( this );
 
-QPixmap
-ListeningRoomWidget::pixmap() const
-{
-    if ( m_pixmap.isNull() )
-        return ViewPage::pixmap();
-    else
-        return m_pixmap;
+    layout()->addWidget( m_header );
+    layout()->addWidget( m_body );
+    TomahawkUtils::unmarginLayout( layout() );
+
+    QLabel* label = new QLabel( "lol room", m_body );
+
+    m_header->setPixmap( QIcon( RESPATH "images/playlist-icon.png" )
+                         .pixmap( 64 ) );
+    m_header->setCaption( title() );
+    m_header->setDescription( description() );
 }
 
 
@@ -45,10 +54,13 @@ QString
 ListeningRoomWidget::description() const
 {
     //TODO: implement!
-    QString name = m_listeningRoom->author()->isLocal() ? "me"
-                                                        : m_listeningRoom->author()->friendlyName();
-    QString desc = tr( "A room hosted by %1 with %2 listeners." )
-                   .arg( name )
-                   .arg( "over 9000" );
+    QString desc;
+    if ( m_listeningRoom->author()->isLocal() )
+        desc = tr( "A room you are hosting, with %1 listeners." )
+               .arg( "over 9000" /*placeholder*/);
+    else
+        desc = tr( "A room hosted by %1, with %2 listeners." )
+               .arg( m_listeningRoom->author()->friendlyName() )
+               .arg( "over 9000" /*placeholder*/);
     return desc;
 }

@@ -19,11 +19,13 @@
 #ifndef LISTENINGROOMWIDGET_H
 #define LISTENINGROOMWIDGET_H
 
-#include <QWidget>
+#include <QtGui/QWidget>
 
 #include "libtomahawk/Typedefs.h"
 #include "libtomahawk/ListeningRoom.h"
 #include "ViewPage.h"
+
+class ListeningRoomHeader;
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
@@ -41,11 +43,9 @@ public:
     QString title() const { return m_listeningRoom->title(); }
 
     QString description() const;
-    QString longDescription() const { return QString(); }
-    QPixmap pixmap() const;
 
     bool isTemporaryPage() const { return false; }
-    bool showInfoBar() const { return true; }
+    bool showInfoBar() const { return false; } //we take care of our own header
 
     bool jumpToCurrentTrack() { return true; } //FIXME: what does this do?
     
@@ -55,7 +55,9 @@ public slots:
 
 private:
     Tomahawk::listeningroom_ptr m_listeningRoom;
-    QPixmap m_pixmap;
+
+    ListeningRoomHeader *m_header;
+    QWidget* m_body;
 };
 
 #endif // LISTENINGROOMWIDGET_H
