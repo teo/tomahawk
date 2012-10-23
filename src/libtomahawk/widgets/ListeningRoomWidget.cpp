@@ -21,6 +21,7 @@
 #include "Source.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "ListeningRoomHeader.h"
+#include "ListeningRoomModel.h"
 #include "playlist/TrackView.h"
 
 #include <QtGui/QIcon>
@@ -28,12 +29,10 @@
 #include <QtGui/QBoxLayout>
 #include <QtGui/QListView>
 
-ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
-                                          QWidget* parent )
+ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
     : QWidget( parent )
-    , m_listeningRoom( listeningRoom )
+    , m_model( 0 )
 {
-    Q_ASSERT( !m_listeningRoom.isNull() );
     setLayout( new QVBoxLayout );
 
     m_header = new ListeningRoomHeader( this );
@@ -60,8 +59,6 @@ ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& lis
 
     m_view = new TrackView( m_body );
     bodyLayout->addWidget( m_view );
-
-    load( m_listeningRoom );
 }
 
 
@@ -69,22 +66,17 @@ QString
 ListeningRoomWidget::description() const
 {
     //TODO: implement!
-    QString desc;
-    if ( m_listeningRoom->author()->isLocal() )
-        desc = tr( "A room you are hosting, with %1 listeners." )
-               .arg( "over 9000" /*placeholder*/);
-    else
-        desc = tr( "A room hosted by %1, with %2 listeners." )
-               .arg( m_listeningRoom->author()->friendlyName() )
-               .arg( "over 9000" /*placeholder*/);
-    return desc;
+    return m_model->description();
 }
 
 void
-ListeningRoomWidget::load( const Tomahawk::listeningroom_ptr& listeningRoom )
+ListeningRoomWidget::setModel( ListeningRoomModel* model )
 {
-    if ( m_listeningRoom != listeningRoom )
-        m_listeningRoom = listeningRoom;
+    Q_ASSERT( !m_model ); //TODO: does it ever happen that m_model is already assigned?
+    if ( m_model )
+        delete m_model;
 
-    //TODO: load m_listeningRoom contents
+    m_model = model;
+    m_view->setPlayableModel( model );
 }
+

@@ -26,22 +26,20 @@
 #include "ViewPage.h"
 
 class ListeningRoomHeader;
+class ListeningRoomModel;
 class TrackView;
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
-                                  QWidget* parent = 0 );
+    explicit ListeningRoomWidget( QWidget* parent = 0 );
     virtual ~ListeningRoomWidget() {}
-
-    void load( const Tomahawk::listeningroom_ptr& listeningRoom );
 
     QWidget* widget() { return this; }
     Tomahawk::playlistinterface_ptr playlistInterface() const { return Tomahawk::playlistinterface_ptr(); }
 
-    QString title() const { return m_listeningRoom->title(); }
+    QString title() const { return m_model->title(); }
 
     QString description() const;
 
@@ -49,17 +47,25 @@ public:
     bool showInfoBar() const { return false; } //we take care of our own header
 
     bool jumpToCurrentTrack() { return true; } //FIXME: what does this do?
+
+    /**
+     * @brief setModel sets the model for this ListeningRoomWidget
+     * @param model a pointer to the model
+     * ListeningRoomModel wraps around a ListeningRoom object, for easy use with ListeningRoomWidget
+     * and its model-view-ish contents. Ideally, LRW should access LR data through LRM rather than
+     * getting a pointer to LR and talking to it directly.
+     */
+    void setModel( ListeningRoomModel* model );
     
 signals:
     
 public slots:
 
 private:
-    Tomahawk::listeningroom_ptr m_listeningRoom;
-
     ListeningRoomHeader *m_header;
     QWidget* m_body;
     TrackView* m_view;
+    ListeningRoomModel* m_model;
 };
 
 #endif // LISTENINGROOMWIDGET_H

@@ -108,6 +108,8 @@ public:
     // linked to the sidebar. call it right after creating the playlist
     FlexibleView* createPageForPlaylist( const Tomahawk::playlist_ptr& playlist );
 
+    ListeningRoomWidget* createPageForListeningRoom( const Tomahawk::listeningroom_ptr& room );
+
     bool isTomahawkLoaded() const { return m_loaded; }
 
 signals:

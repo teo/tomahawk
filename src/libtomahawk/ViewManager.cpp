@@ -2,7 +2,8 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
- *   Copyright 2010-2012, Leo Franchi   <lfranchi@kde.org>
+ *   Copyright 2010-2012, Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -34,6 +35,7 @@
 #include "playlist/GridView.h"
 #include "playlist/AlbumModel.h"
 #include "ListeningRoom.h"
+#include "ListeningRoomModel.h"
 #include "SourceList.h"
 #include "TomahawkSettings.h"
 
@@ -153,6 +155,19 @@ ViewManager::createPageForPlaylist( const playlist_ptr& playlist )
     return view;
 }
 
+ListeningRoomWidget*
+ViewManager::createPageForListeningRoom( const listeningroom_ptr& room )
+{
+    ListeningRoomWidget* w = new ListeningRoomWidget();
+    ListeningRoomModel* model = new ListeningRoomModel();
+
+    model->loadListeningRoom( room );
+    w->setModel( model );
+    room->resolve();
+
+    return w;
+}
+
 
 playlist_ptr
 ViewManager::playlistForPage( ViewPage* page ) const
@@ -196,7 +211,7 @@ ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
     ListeningRoomWidget* w;
     if ( !m_listeningRoomWidgets.contains( listeningRoom ) || m_listeningRoomWidgets.value( listeningRoom ).isNull() )
     {
-        w = new ListeningRoomWidget( listeningRoom );
+        w = createPageForListeningRoom( listeningRoom );
         m_listeningRoomWidgets.insert( listeningRoom, w );
     }
     else

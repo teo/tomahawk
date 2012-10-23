@@ -26,11 +26,20 @@ class ListeningRoomModel : public PlayableModel
     Q_OBJECT
 public:
     explicit ListeningRoomModel( QObject* parent = 0 );
-    
+    virtual ~ListeningRoomModel();
+
+    Tomahawk::listeningroom_ptr listeningRoom() const { return m_listeningRoom; }
+
+    virtual void loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries = true );
+
 signals:
+    void listeningRoomDeleted();
+    void listeningRoomChanged();
+
+private:
+    Tomahawk::listeningroom_ptr m_listeningRoom;
     
-public slots:
-    
+    bool m_isLoading;
 };
 
 #endif // LISTENINGROOMMODEL_H
