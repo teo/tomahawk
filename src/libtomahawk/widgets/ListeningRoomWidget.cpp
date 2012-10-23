@@ -21,10 +21,12 @@
 #include "Source.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "ListeningRoomHeader.h"
+#include "playlist/TrackView.h"
 
 #include <QtGui/QIcon>
 #include <QtGui/QLabel>
 #include <QtGui/QBoxLayout>
+#include <QtGui/QListView>
 
 ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& listeningRoom,
                                           QWidget* parent )
@@ -41,12 +43,25 @@ ListeningRoomWidget::ListeningRoomWidget( const Tomahawk::listeningroom_ptr& lis
     layout()->addWidget( m_body );
     TomahawkUtils::unmarginLayout( layout() );
 
-    QLabel* label = new QLabel( "lol room", m_body );
-
     m_header->setPixmap( QIcon( RESPATH "images/playlist-icon.png" )
                          .pixmap( 64 ) );
     m_header->setCaption( title() );
     m_header->setDescription( description() );
+
+    //TODO: add listeners to header
+
+    QVBoxLayout* bodyLayout = new QVBoxLayout;
+    m_body->setLayout( bodyLayout );
+    TomahawkUtils::unmarginLayout( bodyLayout );
+
+    QLabel* upcomingTracksLabel = new QLabel( m_body );
+    upcomingTracksLabel->setText( "Upcoming tracks:" );
+    bodyLayout->addWidget( upcomingTracksLabel );
+
+    m_view = new TrackView( m_body );
+    bodyLayout->addWidget( m_view );
+
+    load( m_listeningRoom );
 }
 
 
@@ -63,4 +78,13 @@ ListeningRoomWidget::description() const
                .arg( m_listeningRoom->author()->friendlyName() )
                .arg( "over 9000" /*placeholder*/);
     return desc;
+}
+
+void
+ListeningRoomWidget::load( const Tomahawk::listeningroom_ptr& listeningRoom )
+{
+    if ( m_listeningRoom != listeningRoom )
+        m_listeningRoom = listeningRoom;
+
+    //TODO: load m_listeningRoom contents
 }

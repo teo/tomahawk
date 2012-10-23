@@ -26,6 +26,7 @@
 #include "ViewPage.h"
 
 class ListeningRoomHeader;
+class TrackView;
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
@@ -58,6 +59,7 @@ private:
 
     ListeningRoomHeader *m_header;
     QWidget* m_body;
+    TrackView* m_view;
 };
 
 #endif // LISTENINGROOMWIDGET_H
