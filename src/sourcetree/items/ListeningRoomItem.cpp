@@ -33,7 +33,7 @@ ListeningRoomItem::ListeningRoomItem( SourcesModel* model,
     tDebug() << Q_FUNC_INFO << "le wild Listening Room item appears.";
     Q_ASSERT( lr );
 
-    m_icon = QIcon( RESPATH "images/playlist-icon.png" );
+    m_icon = QIcon( RESPATH "images/listeningroom.png" );
 
     connect( lr.data(), SIGNAL( changed() ), SLOT( onUpdated() ), Qt::QueuedConnection );
 }
