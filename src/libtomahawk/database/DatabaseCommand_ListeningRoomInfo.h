@@ -29,9 +29,9 @@
 class DLLEXPORT DatabaseCommand_ListeningRoomInfo : public DatabaseCommandLoggable
 {
     Q_OBJECT
-    Q_PROPERTY( QVariant listeningRoom READ listeningRoomV WRITE setListeningRoomV )
-    Q_PROPERTY( QString listeningRoomGuid READ listeningRoomGuid WRITE setListeningRoomGuid )
-    Q_PROPERTY( int action READ action WRITE setAction )
+    Q_PROPERTY( QVariant listeningRoom      READ listeningRoomV WRITE setListeningRoomV )
+    Q_PROPERTY( QString listeningRoomGuid   READ listeningRoomGuid WRITE setListeningRoomGuid )
+    Q_PROPERTY( int action                  READ action WRITE setAction )
 
 public:
     //TODO: must use this same dbcmd to send delete messages as well.

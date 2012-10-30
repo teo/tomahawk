@@ -92,7 +92,9 @@ ListeningRoom::~ListeningRoom()
 void
 ListeningRoom::init()
 {
-
+    m_locallyChanged = false;
+    m_deleted = false;
+    connect( Pipeline::instance(), SIGNAL( idle() ), SLOT( onResolvingFinished() ) );
 }
 
 
@@ -169,6 +171,43 @@ ListeningRoom::rename( const QString& title )
     }
 }
 
+void
+ListeningRoom::updateFrom( const listeningroom_ptr& other )
+{
+    Q_ASSERT( !other.isNull() );
+    Q_ASSERT( other->guid() == guid() );
+
+    bool isChanged = false;
+
+    if ( m_title != other->m_title )
+    {
+        QString oldTitle = m_title;
+        m_title = other->m_title;
+        emit renamed( m_title, oldTitle );
+        isChanged = true;
+    }
+
+    if ( m_creator != other->m_creator )
+    {
+        setCreator( other->creator() );
+        isChanged = true;
+    }
+
+    if ( m_createdOn != other->m_createdOn )
+    {
+        setCreatedOn( other->m_createdOn );
+        isChanged = true;
+    }
+
+    //TODO: don't reload if not needed
+    m_entries.clear();
+    m_entries.append( other->m_entries );
+    isChanged = true;
+
+    if ( isChanged )
+        emit changed();
+}
+
 
 void
 ListeningRoom::setTitle( const QString& title )
@@ -180,6 +219,20 @@ ListeningRoom::setTitle( const QString& title )
     m_title = title;
     emit changed();
     emit renamed( m_title, oldTitle );
+}
+
+void
+ListeningRoom::setEntriesV( const QVariantList& l )
+{
+    m_entries.clear();
+    foreach ( const QVariant& e, l )
+    {
+        ListeningRoomEntry* lre = new ListeningRoomEntry;
+        QJson::QObjectHelper::qvariant2qobject( e.toMap(), lre );
+
+        if ( lre->isValid() )
+            m_entries << lrentry_ptr( lre );
+    }
 }
 
 
@@ -210,24 +263,6 @@ ListeningRoom::onDeleteResult( SourceTreePopupDialog* dialog )
 
 
 void
-ListeningRoom::createNewRevision( const QString& newrev,
-                                  const QString& oldrev,
-                                  const QList< lrentry_ptr >& entries )
-{
-    //TODO: implement, but not like Playlist!
-}
-
-
-void
-ListeningRoom::updateEntries( const QString& newrev,
-                              const QString& oldrev,
-                              const QList< lrentry_ptr >& entries )
-{
-    //TODO: implement, but not like Playlist!
-}
-
-
-void
 ListeningRoom::resolve()
 {
     QList< query_ptr > qlist;
@@ -241,47 +276,89 @@ ListeningRoom::resolve()
 
 
 void
-ListeningRoom::onResultsFound( const QList< result_ptr >& results )
+ListeningRoom::onResultsChanged()
 {
-    //TODO: implement!
+    m_locallyChanged = true;
 }
 
 
 void
 ListeningRoom::onResolvingFinished()
 {
-    //TODO: implement! hint: should create a new revision if locally changed
+    if ( m_locallyChanged && !m_deleted )
+    {
+        m_locallyChanged = false;
+        pushUpdate();
+    }
 }
 
 
 void
-ListeningRoom::addEntry( const query_ptr& query, const QString& oldrev )
+ListeningRoom::addEntry( const query_ptr& query )
 {
-    //TODO: figure out how to do revisions!
     QList< query_ptr > queries;
     queries << query;
 
-    addEntries( queries, oldrev );
+    addEntries( queries );
 }
 
 
 void
-ListeningRoom::addEntries( const QList< query_ptr >& queries, const QString& oldrev )
+ListeningRoom::addEntries( const QList< query_ptr >& queries )
 {
-    QList< lrentry_ptr > el = entriesFromQueries( queries );
+    Q_ASSERT( m_source->isLocal() );
+    QList< lrentry_ptr > el = entriesFromQueries( queries, true /*only return entries for these new queries*/ );
 
     const int prevSize = m_entries.size();
 
-    //TODO: implement, with revisions!
+    m_entries.append( el );
+
+    pushUpdate();
+
+    //We are appending at end, so notify listeners.
+    qDebug() << "ListeningRoom got" << queries.size() << "tracks added, emitting tracksInserted with:" << el.size() << "at pos:" << prevSize - 1;
+
+    emit tracksInserted( el, prevSize );
 }
 
 
 void
 ListeningRoom::insertEntries( const QList< query_ptr >& queries,
-                              const int position,
-                              const QString& oldrev )
+                              const int position )
 {
-    //TODO: implement, with revisions!
+    QList< lrentry_ptr > toInsert = entriesFromQueries( queries, true );
+
+    Q_ASSERT( position <= m_entries.size() );
+    if ( position > m_entries.size() )
+    {
+        qWarning() << "ERROR trying to insert tracks past end of playlist! Appending!!";
+        addEntries( queries );
+        return;
+    }
+
+    for ( int i = toInsert.size()-1; i >= 0; --i )
+        m_entries.insert( position, toInsert.at( i ) );
+
+    pushUpdate();
+
+    //Notify listeners.
+    qDebug() << "ListeningRoom got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
+    emit tracksInserted( toInsert, position );
+}
+
+
+void
+ListeningRoom::pushUpdate()
+{
+    Tomahawk::listeningroom_ptr me =
+            SourceList::instance()->getLocal()->listeningRoom( guid() );
+
+    if ( !me.isNull() )
+    {
+        DatabaseCommand_ListeningRoomInfo* cmd =
+                DatabaseCommand_ListeningRoomInfo::RoomInfo( author(), me );
+        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    }
 }
 
 
@@ -303,13 +380,6 @@ ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, 
     }
 
     return el;
-}
-
-
-void
-ListeningRoom::checkRevisionQueue()
-{
-    //TODO: implement!
 }
 
 

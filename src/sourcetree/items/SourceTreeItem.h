@@ -110,5 +110,6 @@ private:
 };
 
 Q_DECLARE_METATYPE( SourceTreeItem* );
+Q_DECLARE_OPERATORS_FOR_FLAGS(SourceTreeItem::DropTypes) //for PlaylistItem and ListeningRoomItem
 
 #endif // SOURCETREEITEM_H

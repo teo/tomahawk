@@ -25,23 +25,23 @@ class ListeningRoomItem : public SourceTreeItem
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomItem( SourcesModel* model,
+    explicit ListeningRoomItem( SourcesModel* mdl,
                                 SourceTreeItem* parent,
                                 const Tomahawk::listeningroom_ptr& lr,
                                 int index = -1 );
 
-    virtual QString text() const;
+    QString text() const;
     virtual QString editorText() const;
     virtual Tomahawk::listeningroom_ptr listeningroom() const;
-    virtual Qt::ItemFlags flags() const;
-//    virtual bool willAcceptDrag( const QMimeData* data ) const;
-//    virtual DropTypes supportedDropTypes( const QMimeData* data ) const;
-//    virtual bool dropMimeData( const QMimeData* data, Qt::DropAction action );
-    virtual QIcon icon() const;
-    virtual bool setData(const QVariant& v, bool role);
-    virtual int peerSortValue() const;
-    virtual int IDValue() const;
-//    virtual bool isBeingPlayed() const;
+    Qt::ItemFlags flags() const;
+    bool willAcceptDrag( const QMimeData* data ) const;
+    DropTypes supportedDropTypes( const QMimeData* data ) const;
+    bool dropMimeData( const QMimeData* data, Qt::DropAction action );
+    QIcon icon() const;
+    bool setData(const QVariant& v, bool role);
+    int peerSortValue() const;
+    int IDValue() const;
+    //bool isBeingPlayed() const;
 
     virtual SourceTreeItem* activateCurrent();
 
@@ -50,6 +50,7 @@ public slots:
 
 private slots:
     void onUpdated();
+    void parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks );
 
 private:
     QIcon m_icon;

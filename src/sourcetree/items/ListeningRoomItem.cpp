@@ -18,16 +18,21 @@
 
 #include "ListeningRoomItem.h"
 
+#include <QMimeData>
+
+#include "DropJob.h"
 #include "ListeningRoom.h"
+#include "SourcesModel.h"
+#include "Query.h"
 #include "ViewManager.h"
 #include "ViewPage.h"
 
 
-ListeningRoomItem::ListeningRoomItem( SourcesModel* model,
+ListeningRoomItem::ListeningRoomItem( SourcesModel* mdl,
                                       SourceTreeItem* parent,
                                       const Tomahawk::listeningroom_ptr& lr,
                                       int index )
-    : SourceTreeItem( model, parent, SourcesModel::ListeningRoom, index )
+    : SourceTreeItem( mdl, parent, SourcesModel::ListeningRoom, index )
     , m_listeningroom( lr )
 {
     tDebug() << Q_FUNC_INFO << "le wild Listening Room item appears.";
@@ -36,6 +41,9 @@ ListeningRoomItem::ListeningRoomItem( SourcesModel* model,
     m_icon = QIcon( RESPATH "images/listeningroom.png" );
 
     connect( lr.data(), SIGNAL( changed() ), SLOT( onUpdated() ), Qt::QueuedConnection );
+
+    if ( ViewManager::instance()->pageForListeningRoom( lr ) )
+        model()->linkSourceItemToPage( this, ViewManager::instance()->pageForListeningRoom( lr ) );
 }
 
 
@@ -67,6 +75,112 @@ ListeningRoomItem::flags() const
     Qt::ItemFlags flags = SourceTreeItem::flags();
     flags |= Qt::ItemIsEditable;
     return flags;
+}
+
+
+bool
+ListeningRoomItem::willAcceptDrag( const QMimeData* data ) const
+{
+    return !m_listeningroom.isNull() &&
+           m_listeningroom->author()->isLocal() &&
+           DropJob::acceptsMimeData( data, DropJob::Track ) /*&&
+           !m_listeningroom->busy()*/;
+    //FIXME: use busy or not!
+}
+
+
+ListeningRoomItem::DropTypes
+ListeningRoomItem::supportedDropTypes( const QMimeData* data ) const
+{
+    //same as PlaylistItem::supportedDropTypes
+    if ( data->hasFormat( "application/tomahawk.mixed" ) )
+    {
+        // If this is mixed but only queries/results, we can still handle them
+        bool mixedQueries = true;
+
+        QByteArray itemData = data->data( "application/tomahawk.mixed" );
+        QDataStream stream( &itemData, QIODevice::ReadOnly );
+        QString mimeType;
+        qlonglong val;
+
+        while ( !stream.atEnd() )
+        {
+            stream >> mimeType;
+            if ( mimeType != "application/tomahawk.query.list" &&
+                 mimeType != "application/tomahawk.result.list" )
+            {
+                mixedQueries = false;
+                break;
+            }
+            stream >> val;
+        }
+
+        if ( mixedQueries )
+            return DropTypeThisTrack | DropTypeThisAlbum | DropTypeAllFromArtist | DropTypeLocalItems | DropTypeTop50;
+        else
+            return DropTypesNone;
+    }
+
+    if ( data->hasFormat( "application/tomahawk.query.list" ) )
+        return DropTypeThisTrack | DropTypeThisAlbum | DropTypeAllFromArtist | DropTypeLocalItems | DropTypeTop50;
+    else if ( data->hasFormat( "application/tomahawk.result.list" ) )
+        return DropTypeThisTrack | DropTypeThisAlbum | DropTypeAllFromArtist | DropTypeLocalItems | DropTypeTop50;
+    else if ( data->hasFormat( "application/tomahawk.metadata.album" ) )
+        return DropTypeThisAlbum | DropTypeAllFromArtist | DropTypeLocalItems | DropTypeTop50;
+    else if ( data->hasFormat( "application/tomahawk.metadata.artist" ) )
+        return DropTypeAllFromArtist | DropTypeLocalItems | DropTypeTop50;
+    else if ( data->hasFormat( "text/plain" ) )
+    {
+        return DropTypesNone;
+    }
+    return DropTypesNone;
+}
+
+
+bool
+ListeningRoomItem::dropMimeData( const QMimeData* data, Qt::DropAction action )
+{
+    tDebug() << Q_FUNC_INFO;
+    Q_UNUSED( action );
+
+//    if ( m_listeningroom->busy() )
+//        return false;
+
+    QList< Tomahawk::query_ptr > queries;
+
+    if ( data->hasFormat( "application/tomahawk.listeningroom.id" ) &&
+        data->data( "application/tomahawk.listeningroom.id" ) == m_listeningroom->guid() )
+        return false; // don't allow dropping on ourselves
+
+    if ( !DropJob::acceptsMimeData( data, DropJob::Track ) )
+        return false;
+
+    DropJob *dj = new DropJob();
+    dj->setDropTypes( DropJob::Track );
+    dj->setDropAction( DropJob::Append );
+
+    connect( dj, SIGNAL( tracks( QList< Tomahawk::query_ptr > ) ), this, SLOT( parsedDroppedTracks( QList< Tomahawk::query_ptr > ) ) );
+
+    if ( dropType() == DropTypeAllFromArtist )
+        dj->setGetWholeArtists( true );
+    if ( dropType() == DropTypeThisAlbum )
+        dj->setGetWholeAlbums( true );
+
+    if ( dropType() == DropTypeLocalItems )
+    {
+        dj->setGetWholeArtists( true );
+        dj->tracksFromMimeData( data, false, true );
+    }
+    else if ( dropType() == DropTypeTop50 )
+    {
+        dj->setGetWholeArtists( true );
+        dj->tracksFromMimeData( data, false, false, true );
+    }
+    else
+        dj->tracksFromMimeData( data, false, false );
+
+    // TODO can't know if it works or not yet...
+    return true;
 }
 
 
@@ -133,3 +247,16 @@ ListeningRoomItem::onUpdated()
 {
     emit updated();
 }
+
+void
+ListeningRoomItem::parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks )
+{
+    qDebug() << "adding" << tracks.count() << "tracks";
+    if ( tracks.count() && !m_listeningroom.isNull() && m_listeningroom->author()->isLocal() )
+    {
+        qDebug() << "on listening room:" << m_listeningroom->title() << m_listeningroom->guid();
+
+        m_listeningroom->addEntries( tracks );
+    }
+}
+

@@ -31,6 +31,7 @@
 #include "playlist/dynamic/GeneratorInterface.h"
 #include "utils/Logger.h"
 #include "DropJob.h"
+#include "ListeningRoom.h"
 
 #include <echonest/Playlist.h>
 
@@ -99,6 +100,7 @@ CategoryAddItem::flags() const
     switch ( m_categoryType )
     {
         case SourcesModel::PlaylistsCategory:
+        case SourcesModel::ListeningRoomsCategory:
             return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled;
 
         case SourcesModel::StationsCategory:
@@ -121,7 +123,9 @@ CategoryAddItem::icon() const
 bool
 CategoryAddItem::willAcceptDrag( const QMimeData* data ) const
 {
-    if ( ( m_categoryType == SourcesModel::PlaylistsCategory || m_categoryType == SourcesModel::StationsCategory ) && DropJob::acceptsMimeData( data ) )
+    if ( ( m_categoryType == SourcesModel::PlaylistsCategory ||
+           m_categoryType == SourcesModel::StationsCategory ||
+           m_categoryType == SourcesModel::ListeningRoomsCategory ) && DropJob::acceptsMimeData( data ) )
     {
         return true;
     }
@@ -316,6 +320,15 @@ CategoryAddItem::parsedDroppedTracks( const QList< query_ptr >& tracks )
         ViewManager::instance()->show( newpl );
         connect( newpl.data(), SIGNAL( dynamicRevisionLoaded( Tomahawk::DynamicPlaylistRevision ) ), this, SLOT( playlistToRenameLoaded() ) );
     }
+    else if ( m_categoryType == SourcesModel::ListeningRoomsCategory )
+    {
+        listeningroom_ptr newlr = ListeningRoom::create( SourceList::instance()->getLocal(),
+                                                         uuid(),
+                                                         "New Room",
+                                                         SourceList::instance()->getLocal()->friendlyName(),
+                                                         tracks );
+        ViewManager::instance()->show( newlr );
+    }
 }
 
 
@@ -334,8 +347,8 @@ CategoryItem::CategoryItem( SourcesModel* model,
                             bool showAddItem,
                             int peerSortValue )
     : SourceTreeItem( model, parent, SourcesModel::Category, peerSortValue )
-    , m_category( category )
     , m_addItem( 0 )
+    , m_category( category )
     , m_showAdd( showAddItem )
 {
     // in the constructor we're still being added to the parent, so we don't exist to have rows addded yet. so this is safe.

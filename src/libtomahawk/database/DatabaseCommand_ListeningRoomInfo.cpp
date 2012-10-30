@@ -75,23 +75,29 @@ DatabaseCommand_ListeningRoomInfo::exec( DatabaseImpl* lib )
     Q_UNUSED( lib );
     Q_ASSERT( !source().isNull() );
     if ( m_action == Info )
+    {
+        tDebug() << Q_FUNC_INFO << "with action Info";
         Q_ASSERT( !( m_listeningRoom.isNull() && m_v.isNull() ) );
+
+        uint now = 0;
+        if ( m_listeningRoom.isNull() ) //we don't have the unserialized version, so we're remote
+        {
+            now = m_v.toMap()[ "createdon" ].toUInt();
+        }
+        else //we're executing locally
+        {
+            if ( m_listeningRoom->createdOn() == 0 ) //creating it locally now
+                now = QDateTime::currentDateTime().toTime_t();
+            else
+                now = m_listeningRoom->createdOn();
+            m_listeningRoom->setCreatedOn( now );
+        }
+    }
     else if ( m_action == Disband )
+    {
+        tDebug() << Q_FUNC_INFO << "with action Disband";
         Q_ASSERT( !m_guid.isEmpty() );
-
-    tDebug() << Q_FUNC_INFO;
-
-    uint now = 0;
-    if ( m_listeningRoom.isNull() ) //we don't have the unserialized version, so we're remote
-    {
-        now = m_v.toMap()[ "createdon" ].toUInt();
     }
-    else //we're executing locally
-    {
-        now = QDateTime::currentDateTime().toTime_t();
-        m_listeningRoom->setCreatedOn( now );
-    }
-
 }
 
 

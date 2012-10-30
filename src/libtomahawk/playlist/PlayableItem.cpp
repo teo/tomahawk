@@ -21,6 +21,7 @@
 #include "utils/TomahawkUtils.h"
 #include "Artist.h"
 #include "Album.h"
+#include "ListeningRoom.h"
 #include "Query.h"
 #include "Source.h"
 #include "utils/Logger.h"
@@ -102,6 +103,24 @@ PlayableItem::PlayableItem( const Tomahawk::plentry_ptr& entry, PlayableItem* pa
     , m_entry( entry )
 {
     m_query = entry->query();
+    init( parent, row );
+
+    connect( m_query.data(), SIGNAL( socialActionsLoaded() ),
+                             SIGNAL( dataChanged() ) );
+
+    connect( m_query.data(), SIGNAL( updated() ),
+                             SIGNAL( dataChanged() ) );
+
+    connect( m_query.data(), SIGNAL( resultsChanged() ),
+                               SLOT( onResultsChanged() ) );
+}
+
+
+PlayableItem::PlayableItem( const Tomahawk::lrentry_ptr& lrentry, PlayableItem* parent, int row )
+    : QObject( parent )
+    , m_lrentry( lrentry )
+{
+    m_query = lrentry->query();
     init( parent, row );
 
     connect( m_query.data(), SIGNAL( socialActionsLoaded() ),

@@ -731,6 +731,7 @@ SourceTreeView::dragEnterEvent( QDragEnterEvent* event )
 void
 SourceTreeView::dragLeaveEvent( QDragLeaveEvent* event )
 {
+    tDebug() << Q_FUNC_INFO;
     QTreeView::dragLeaveEvent( event );
 
     m_dragging = false;
@@ -745,6 +746,7 @@ SourceTreeView::dragLeaveEvent( QDragLeaveEvent* event )
 void
 SourceTreeView::dragMoveEvent( QDragMoveEvent* event )
 {
+    tDebug() << Q_FUNC_INFO;
     bool accept = false;
 
     // Don't highlight the drop for a playlist, as it won't get added to the playlist but created generally
@@ -778,6 +780,7 @@ SourceTreeView::dragMoveEvent( QDragMoveEvent* event )
                 switch ( model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() )
                 {
                     case SourcesModel::StaticPlaylist:
+                    case SourcesModel::ListeningRoom:
                     case SourcesModel::CategoryAdd:
                         m_delegate->hovered( index, event->mimeData() );
                         dataChanged( index, index );
@@ -821,12 +824,14 @@ SourceTreeView::dragMoveEvent( QDragMoveEvent* event )
 void
 SourceTreeView::dropEvent( QDropEvent* event )
 {
+    tDebug() << Q_FUNC_INFO;
     const QPoint pos = event->pos();
     const QModelIndex index = indexAt( pos );
 
     if ( model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::StaticPlaylist
          || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::LovedTracksPage
-         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::CategoryAdd )
+         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::CategoryAdd
+         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::ListeningRoom )
     {
         SourceTreeItem* item = itemFromIndex< SourceTreeItem >( index );
         Q_ASSERT( item );

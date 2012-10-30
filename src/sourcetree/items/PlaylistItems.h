@@ -71,7 +71,6 @@ private:
     QPixmap m_subscribedOnIcon, m_subscribedOffIcon;
     QList<Tomahawk::PlaylistUpdaterInterface*> m_overlaidUpdaters;
 };
-Q_DECLARE_OPERATORS_FOR_FLAGS(PlaylistItem::DropTypes)
 
 // can be a station or an auto playlist
 class DynamicPlaylistItem : public PlaylistItem

@@ -248,7 +248,11 @@ void
 Source::addListeningRoom( const listeningroom_ptr& p )
 {
     if( m_listeningRooms.contains( p->guid() ) )
+    {
+        if ( !m_listeningRooms[ p->guid() ]->author()->isLocal() )
+            m_listeningRooms[ p->guid() ]->updateFrom( p );
         return;
+    }
 
     m_listeningRooms.insert( p->guid(), p );
     emit listeningRoomAdded( p );

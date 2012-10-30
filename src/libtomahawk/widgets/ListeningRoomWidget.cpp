@@ -18,11 +18,14 @@
 
 #include "ListeningRoomWidget.h"
 
-#include "Source.h"
-#include "utils/TomahawkUtilsGui.h"
+#include "HeaderLabel.h"
 #include "ListeningRoomHeader.h"
 #include "ListeningRoomModel.h"
 #include "playlist/TrackView.h"
+#include "playlist/PlaylistLargeItemDelegate.h" //TODO: make nice delegate for rooms!
+#include "playlist/PlayableProxyModel.h"
+#include "Source.h"
+#include "utils/TomahawkUtilsGui.h"
 
 #include <QtGui/QIcon>
 #include <QtGui/QLabel>
@@ -42,23 +45,40 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
     layout()->addWidget( m_body );
     TomahawkUtils::unmarginLayout( layout() );
 
-    m_header->setPixmap( QIcon( RESPATH "images/playlist-icon.png" )
-                         .pixmap( 64 ) );
-    m_header->setCaption( title() );
-    m_header->setDescription( description() );
-
-    //TODO: add listeners to header
-
     QVBoxLayout* bodyLayout = new QVBoxLayout;
     m_body->setLayout( bodyLayout );
     TomahawkUtils::unmarginLayout( bodyLayout );
 
-    QLabel* upcomingTracksLabel = new QLabel( m_body );
-    upcomingTracksLabel->setText( "Upcoming tracks:" );
+    //TODO: replace with a "currently playing track" widget
+    QLabel *placeholder = new QLabel( "Placeholder for\ncurrently playing track.", m_body );
+    bodyLayout->addWidget( placeholder );
+    placeholder->setFixedHeight( 80 );
+    placeholder->setAlignment( Qt::AlignCenter );
+
+    HeaderLabel* upcomingTracksLabel = new HeaderLabel( m_body );
+    upcomingTracksLabel->setText( "Upcoming tracks" );
     bodyLayout->addWidget( upcomingTracksLabel );
 
     m_view = new TrackView( m_body );
     bodyLayout->addWidget( m_view );
+
+    m_pixmap = QIcon( RESPATH "images/listeningroom.png" ).pixmap( 64 );
+
+    PlaylistLargeItemDelegate* delegate =
+            new PlaylistLargeItemDelegate( PlaylistLargeItemDelegate::LovedTracks,
+                                           m_view,
+                                           m_view->proxyModel() );
+    connect( delegate, SIGNAL( updateIndex( QModelIndex ) ),
+             m_view,   SLOT( update( QModelIndex ) ) );
+    m_view->setItemDelegate( delegate );
+    m_view->proxyModel()->setStyle( PlayableProxyModel::Large );
+}
+
+
+QString
+ListeningRoomWidget::title() const
+{
+     return m_view->title();
 }
 
 
@@ -66,8 +86,16 @@ QString
 ListeningRoomWidget::description() const
 {
     //TODO: implement!
-    return m_model->description();
+    return m_view->description();
 }
+
+
+QPixmap
+ListeningRoomWidget::pixmap() const
+{
+    return m_pixmap;
+}
+
 
 void
 ListeningRoomWidget::setModel( ListeningRoomModel* model )
@@ -78,5 +106,22 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
 
     m_model = model;
     m_view->setPlayableModel( model );
+    m_view->setSortingEnabled( false );
+
+    m_header->setCaption( model->title() );
+    m_header->setDescription( model->description() );
+    m_header->setPixmap( m_pixmap );
+    //TODO: hook something up to show listeners in header
+    m_view->setEmptyTip( tr( "This room is currently empty.\n"
+                             "Add some tracks to it and enjoy the music with your friends!" ) );
+
 }
+
+
+Tomahawk::playlistinterface_ptr
+ListeningRoomWidget::playlistInterface() const
+{
+    return Tomahawk::playlistinterface_ptr(); //TODO: implement
+}
+
 

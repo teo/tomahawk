@@ -57,9 +57,6 @@ ListeningRoomsCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
 {
     tDebug() << "Begin" << Q_FUNC_INFO;
 
-    //Why do I have to do this here? Shouldn't Q_DECLARE_METATYPE in ListeningRoom.h be enough?
-    qRegisterMetaType< Tomahawk::listeningroom_ptr >( "Tomahawk::listeningroom_ptr" );
-
     connect( src.data(), SIGNAL( listeningRoomAdded( Tomahawk::listeningroom_ptr ) ),
              SLOT( onListeningRoomAdded( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
 

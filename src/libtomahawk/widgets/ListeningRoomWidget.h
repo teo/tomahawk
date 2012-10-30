@@ -37,11 +37,11 @@ public:
     virtual ~ListeningRoomWidget() {}
 
     QWidget* widget() { return this; }
-    Tomahawk::playlistinterface_ptr playlistInterface() const { return Tomahawk::playlistinterface_ptr(); }
+    Tomahawk::playlistinterface_ptr playlistInterface() const;
 
-    QString title() const { return m_model->title(); }
-
+    QString title() const;
     QString description() const;
+    QPixmap pixmap() const;
 
     bool isTemporaryPage() const { return false; }
     bool showInfoBar() const { return false; } //we take care of our own header
@@ -66,6 +66,8 @@ private:
     QWidget* m_body;
     TrackView* m_view;
     ListeningRoomModel* m_model;
+
+    QPixmap m_pixmap;
 };
 
 #endif // LISTENINGROOMWIDGET_H

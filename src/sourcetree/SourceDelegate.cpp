@@ -137,11 +137,12 @@ SourceDelegate::paintDecorations( QPainter* painter, const QStyleOptionViewItem&
 
     // Paint the speaker icon next to the currently-playing playlist
     const bool playable = ( type == SourcesModel::StaticPlaylist ||
-        type == SourcesModel::AutomaticPlaylist ||
-        type == SourcesModel::Station ||
-        type == SourcesModel::TemporaryPage ||
-        type == SourcesModel::LovedTracksPage ||
-        type == SourcesModel::GenericPage );
+                            type == SourcesModel::AutomaticPlaylist ||
+                            type == SourcesModel::Station ||
+                            type == SourcesModel::TemporaryPage ||
+                            type == SourcesModel::LovedTracksPage ||
+                            type == SourcesModel::GenericPage ||
+                            type == SourcesModel::ListeningRoom );
     const bool playing = ( AudioEngine::instance()->isPlaying() || AudioEngine::instance()->isPaused() );
 
     if ( playable && playing && item->isBeingPlayed() )
@@ -448,9 +449,16 @@ SourceDelegate::paint( QPainter* painter, const QStyleOptionViewItem& option, co
     {
         paintCollection( painter, o, index );
     }
-    else if ( ( type == SourcesModel::StaticPlaylist || type == SourcesModel::CategoryAdd ) &&
+    else if ( ( type == SourcesModel::StaticPlaylist ||
+                type == SourcesModel::CategoryAdd ||
+                type == SourcesModel::ListeningRoom ) &&
               m_expandedMap.contains( index ) && m_expandedMap.value( index )->partlyExpanded() && dropTypeCount( item ) > 0 )
     {
+
+        //FIXME: something is fishy here, that breaks drop event geometry for ListeningRoom entries
+        //       and the CategoryAdd entry in the listening room category.
+        //       Remember to fix it! --Teo
+
         // Let Qt paint the original item. We add our stuff after it
         o.state &= ~QStyle::State_Selected;
         o.showDecorationSelected = false;

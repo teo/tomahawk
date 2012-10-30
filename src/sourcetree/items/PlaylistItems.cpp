@@ -406,6 +406,7 @@ PlaylistItem::setData( const QVariant& v, bool role )
     return false;
 }
 
+
 SourceTreeItem*
 PlaylistItem::activateCurrent()
 {

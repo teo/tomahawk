@@ -1,5 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
+ *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2012, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
@@ -21,25 +22,68 @@
 
 #include "playlist/PlayableModel.h"
 
-class ListeningRoomModel : public PlayableModel
+class DLLEXPORT ListeningRoomModel : public PlayableModel
 {
     Q_OBJECT
+
+    typedef struct {
+        int row;
+        QPersistentModelIndex parent;
+        Qt::DropAction action;
+    } DropStorageData;
+
 public:
     explicit ListeningRoomModel( QObject* parent = 0 );
     virtual ~ListeningRoomModel();
 
+    QMimeData* mimeData( const QModelIndexList& indexes ) const;
+    bool dropMimeData( const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent );
+
     Tomahawk::listeningroom_ptr listeningRoom() const { return m_listeningRoom; }
 
+public slots:    
     virtual void loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries = true );
+
+    void clear();
+
+    virtual void appendEntries( const QList< Tomahawk::lrentry_ptr >& entries );
+
+    void insertAlbums( const QList< Tomahawk::album_ptr >& albums, int row = 0 );
+    void insertArtists( const QList< Tomahawk::artist_ptr >& artists, int row = 0 );
+    void insertQueries( const QList< Tomahawk::query_ptr >& queries, int row = 0 );
+    void insertEntries( const QList< Tomahawk::lrentry_ptr >& entries, int row = 0 );
+
+    void removeIndex( const QModelIndex& index, bool moreToCome = false );
 
 signals:
     void listeningRoomDeleted();
     void listeningRoomChanged();
 
+protected:
+    QList<Tomahawk::lrentry_ptr> listeningRoomEntries() const;
+
+private slots:
+    void parsedDroppedTracks( QList<Tomahawk::query_ptr> );
+    void trackResolved( bool );
+    void reload();
+
 private:
+    void reloadRoomMetadata();
+
+    void beginRoomChanges();
+    void endRoomChanges();
+
     Tomahawk::listeningroom_ptr m_listeningRoom;
     
     bool m_isLoading;
+    bool m_changesOngoing;
+    QList< Tomahawk::Query* > m_waitingForResolved;
+
+    int m_savedInsertPos;
+    QList< Tomahawk::lrentry_ptr > m_savedInsertTracks;
+    QList< Tomahawk::query_ptr > m_savedRemoveTracks;
+
+    DropStorageData m_dropStorage;
 };
 
 #endif // LISTENINGROOMMODEL_H

@@ -25,12 +25,14 @@
 #include <QVariant>
 #include <QSharedPointer>
 #include <QQueue>
+#include "qobjecthelper.h"
 
 #include "Typedefs.h"
 #include "DllMacro.h"
 
 class SourceTreePopupDialog;
 class DatabaseCommand_ListeningRoomInfo;
+class ListeningRoomModel;
 
 namespace Tomahawk
 {
@@ -87,44 +89,18 @@ private:
     int                 m_myVote; //0=default, can be -1, 0, 1
 };
 
-struct ListeningRoomRevision
-{
-    QString revisionguid;
-    QString oldrevisionguid;
-    QList< lrentry_ptr > newlist;
-    QList< lrentry_ptr > added;
-    QList< lrentry_ptr > removed;
-    bool applied; // false if conflict
-};
-
-struct ListeningRoomRevisionQueueItem
-{
-    QString newRev;
-    QString oldRev;
-    QList< lrentry_ptr > entries;
-    bool applyToTip;
-
-    ListeningRoomRevisionQueueItem( const QString& nRev,
-                                    const QString& oRev,
-                                    const QList< lrentry_ptr >& e,
-                                    bool latest )
-        : newRev( nRev )
-        , oldRev( oRev)
-        , entries( e )
-        , applyToTip( latest )
-    {}
-};
 
 class DLLEXPORT ListeningRoom : public QObject
 {
     Q_OBJECT
     Q_PROPERTY( QString guid            READ guid               WRITE setGuid )
-    Q_PROPERTY( QString currentrevision READ currentrevision    WRITE setCurrentrevision )
     Q_PROPERTY( QString title           READ title              WRITE setTitle )
     Q_PROPERTY( QString creator         READ creator            WRITE setCreator )
     Q_PROPERTY( uint createdon          READ createdOn          WRITE setCreatedOn )
+    Q_PROPERTY( QVariantList entries    READ entriesV           WRITE setEntriesV )
 
     friend class ::DatabaseCommand_ListeningRoomInfo;
+    friend class ::ListeningRoomModel;
 
 public:
     virtual ~ListeningRoom();
@@ -140,34 +116,49 @@ public:
     static void remove( const listeningroom_ptr& room );
     void rename( const QString& title );
 
+    void updateFrom( const Tomahawk::listeningroom_ptr& other );
+
     source_ptr author() const       { return m_source; }
-    QString currentrevision() const { return m_currentrevision; }
     QString title() const           { return m_title; }
     QString creator() const         { return m_creator; }
     QString guid() const            { return m_guid; }
     uint lastmodified() const       { return m_lastmodified; }
     uint createdOn() const          { return m_createdOn; }
 
-    const QQueue< lrentry_ptr >& entries() { return m_entries; }
+    const QList< Tomahawk::lrentry_ptr >& entries() const { return m_entries; }
 
-    void addEntry( const Tomahawk::query_ptr& query,
-                   const QString& oldrev );
-    void addEntries( const QList< Tomahawk::query_ptr >& queries,
-                     const QString& oldrev );
+    // Even though lrentry_ptr is an honest QMetaObject registered type, and even though a QList of
+    // those can be a Q_PROPERTY, since a QList of pointers to QObjects is not a QObject it cannot
+    // be QVariantified automagically with QObjectHelper for JSON serialization.
+    // Trying to QVariantify it makes qobject2qvariant and the QJson serializer (wait for it...)
+    // FAIL SILENTLY just for kicks.
+    // For this reason, we must provide special getter/setters for a QVariantList converted version
+    // of m_entries.
+    QVariantList entriesV() const
+    {
+        QVariantList v;
+        foreach ( const Tomahawk::lrentry_ptr &e, m_entries )
+        {
+            v.append( QJson::QObjectHelper::qobject2qvariant( e.data() ) );
+        }
+        return v;
+    }
+
+    void addEntry( const Tomahawk::query_ptr& query );
+    void addEntries( const QList< Tomahawk::query_ptr >& queries );
     void insertEntries( const QList< Tomahawk::query_ptr >& queries,
-                        const int position,
-                        const QString& oldrev );
+                        const int position );
 
     // <IGNORE hack="true">
     // these need to exist and be public for the json serialization stuff
     // you SHOULD NOT call them.  They are used for an alternate CTOR method from json.
     // maybe friend QObjectHelper and make them private?
     explicit ListeningRoom( const source_ptr& author );
-    void setCurrentrevision( const QString& s ) { m_currentrevision = s; }
     void setCreator( const QString& s )         { m_creator = s; }
     void setGuid( const QString& s )            { m_guid = s; }
     void setCreatedOn( uint createdOn )         { m_createdOn = createdOn; }
     void setTitle(const QString& title );
+    void setEntriesV( const QVariantList& l );
     // </IGNORE>
 
 
@@ -177,7 +168,6 @@ public:
 
 signals:
     void created();
-    void revisionLoaded( Tomahawk::ListeningRoomRevision );
 
     void changed();
     void renamed( const QString& newTitle, const QString& oldTitle );
@@ -185,15 +175,18 @@ signals:
     void aboutToBeDeleted( const Tomahawk::listeningroom_ptr& lr );
     void deleted( const Tomahawk::listeningroom_ptr& lr );
 
+    /// Notification for tracks being inserted at a specific point
+    /// Contiguous range from startPosition
+    void tracksInserted( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
+
+    /// Notification for tracks being removed from the room
+    void tracksRemoved( const QList< Tomahawk::query_ptr >& tracks );
+
+    /// Notification for tracks being moved in a room. List is of new tracks, and new position of first track
+    /// Contiguous range from startPosition
+    void tracksMoved( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
+
 public slots:
-    // want to update the playlist from the model?
-    // generate a newrev using uuid() and call this:
-    void createNewRevision( const QString& newrev, const QString& oldrev, const QList< lrentry_ptr >& entries );
-
-    // Want to update some metadata of a plentry_ptr? this gets you a new revision too.
-    // entries should be <= entries(), with changed metadata.
-    void updateEntries( const QString& newrev, const QString& oldrev, const QList< lrentry_ptr >& entries );
-
     void reportCreated( const Tomahawk::listeningroom_ptr& self );
     void reportDeleted( const Tomahawk::listeningroom_ptr& self );
 
@@ -201,8 +194,11 @@ public slots:
 
     void setWeakSelf( QWeakPointer< ListeningRoom > self ) { m_weakSelf = self; }
 private slots:
-    void onResultsFound( const QList< Tomahawk::result_ptr >& results );
+    void pushUpdate();
+
+    void onResultsChanged();
     void onResolvingFinished();
+
     void onDeleteResult( SourceTreePopupDialog* dialog );
 
 private:
@@ -216,17 +212,18 @@ private:
     ListeningRoom();
     void init();
 
-    void checkRevisionQueue();
     QWeakPointer< ListeningRoom > m_weakSelf;
 
+    bool m_locallyChanged;
+    bool m_deleted;
+
     source_ptr m_source;
-    QString m_currentrevision;
     QString m_guid;
     QString m_title;
     QString m_creator;
     uint m_lastmodified;
     uint m_createdOn;
-    QQueue< lrentry_ptr > m_entries;
+    QList< Tomahawk::lrentry_ptr > m_entries;
     QList< lrentry_ptr > m_initEntries;
 
     Tomahawk::playlistinterface_ptr m_playlistInterface;
@@ -234,7 +231,8 @@ private:
 
 } //namespace Tomahawk
 
-Q_DECLARE_METATYPE( QSharedPointer< Tomahawk::ListeningRoom > )
-Q_DECLARE_METATYPE( QList< QSharedPointer< Tomahawk::ListeningRoomEntry > > )
+Q_DECLARE_METATYPE( Tomahawk::listeningroom_ptr )
+Q_DECLARE_METATYPE( Tomahawk::lrentry_ptr )
+Q_DECLARE_METATYPE( QList<Tomahawk::lrentry_ptr> )
 
 #endif // LISTENINGROOM_H

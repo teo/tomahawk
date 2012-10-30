@@ -182,6 +182,7 @@ set( libSources
     CountryUtils.cpp
     FuncTimeout.cpp
     ListeningRoom.cpp
+    ListeningRoomModel.cpp
     Playlist.cpp
     PlaylistPlaylistInterface.cpp
     Resolver.cpp
