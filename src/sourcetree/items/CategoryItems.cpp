@@ -419,14 +419,3 @@ CategoryItem::categoryType()
 {
     return m_category;
 }
-
-
-void
-GroupCategoryItem::checkExpandedState()
-{
-    if ( m_defaultExpanded )
-    {
-        m_defaultExpanded = false;
-        requestExpanding();
-    }
-}
