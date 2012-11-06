@@ -134,15 +134,7 @@ public:
     // FAIL SILENTLY just for kicks.
     // For this reason, we must provide special getter/setters for a QVariantList converted version
     // of m_entries.
-    QVariantList entriesV() const
-    {
-        QVariantList v;
-        foreach ( const Tomahawk::lrentry_ptr &e, m_entries )
-        {
-            v.append( QJson::QObjectHelper::qobject2qvariant( e.data() ) );
-        }
-        return v;
-    }
+    QVariantList entriesV() const;
 
     void addEntry( const Tomahawk::query_ptr& query );
     void addEntries( const QList< Tomahawk::query_ptr >& queries );

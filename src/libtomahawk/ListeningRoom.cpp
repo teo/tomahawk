@@ -208,18 +208,17 @@ ListeningRoom::updateFrom( const listeningroom_ptr& other )
         emit changed();
 }
 
-
-void
-ListeningRoom::setTitle( const QString& title )
+QVariantList
+ListeningRoom::entriesV() const
 {
-    if ( title == m_title )
-        return;
-
-    const QString oldTitle = m_title;
-    m_title = title;
-    emit changed();
-    emit renamed( m_title, oldTitle );
+    QVariantList v;
+    foreach ( const Tomahawk::lrentry_ptr &e, m_entries )
+    {
+        v.append( QJson::QObjectHelper::qobject2qvariant( e.data() ) );
+    }
+    return v;
 }
+
 
 void
 ListeningRoom::setEntriesV( const QVariantList& l )
@@ -233,6 +232,19 @@ ListeningRoom::setEntriesV( const QVariantList& l )
         if ( lre->isValid() )
             m_entries << lrentry_ptr( lre );
     }
+}
+
+
+void
+ListeningRoom::setTitle( const QString& title )
+{
+    if ( title == m_title )
+        return;
+
+    const QString oldTitle = m_title;
+    m_title = title;
+    emit changed();
+    emit renamed( m_title, oldTitle );
 }
 
 
