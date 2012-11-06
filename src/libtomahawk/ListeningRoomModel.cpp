@@ -99,6 +99,7 @@ ListeningRoomModel::dropMimeData( const QMimeData* data, Qt::DropAction action, 
 
     connect( dj, SIGNAL( tracks( QList< Tomahawk::query_ptr > ) ),
              SLOT( parsedDroppedTracks( QList< Tomahawk::query_ptr > ) ) );
+    dj->tracksFromMimeData( data );
 
     return true;
 }
