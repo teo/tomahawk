@@ -216,7 +216,6 @@ private:
     uint m_lastmodified;
     uint m_createdOn;
     QList< Tomahawk::lrentry_ptr > m_entries;
-    QList< lrentry_ptr > m_initEntries;
 
     Tomahawk::playlistinterface_ptr m_playlistInterface;
 };

@@ -79,7 +79,7 @@ ListeningRoom::ListeningRoom( const source_ptr& author,
     , m_creator( creator )
     , m_lastmodified( 0 )
     , m_createdOn( 0 ) //will be set later
-    , m_initEntries( entries )
+    , m_entries( entries )
 {
     init();
 }
@@ -113,17 +113,20 @@ ListeningRoom::create( const source_ptr& author,
         p->setDuration( query->duration() );
         p->setLastmodified( 0 );
         p->setQuery( query );
-
+        p->setScore( 0 );
         entries << p;
     }
 
     listeningroom_ptr listeningRoom( new ListeningRoom( author, guid, title, creator, entries ), &QObject::deleteLater );
     listeningRoom->setWeakSelf( listeningRoom.toWeakRef() );
 
+    // Since the listening room isn't added to Source and hooked up to a model yet, we must prepare
+    // the dbcmd manually rather than calling pushUpdate().
     DatabaseCommand_ListeningRoomInfo* cmd =
             DatabaseCommand_ListeningRoomInfo::RoomInfo( author, listeningRoom );
     connect( cmd, SIGNAL( finished() ), listeningRoom.data(), SIGNAL( created() ) );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+
     listeningRoom->reportCreated( listeningRoom );
 
     //This DBcmd has a postCommitHook in all peers which calls ViewManager::createListeningRoom and
@@ -388,6 +391,7 @@ ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, 
         e->setDuration( query->displayQuery()->duration() );
         e->setLastmodified( 0 );
         e->setQuery( query );
+        e->setScore( 0 );
         el << e;
     }
 
