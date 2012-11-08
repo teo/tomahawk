@@ -25,9 +25,13 @@
 #include "libtomahawk/ListeningRoom.h"
 #include "ViewPage.h"
 
+#include <QtGui/QIcon>
+
 class ListeningRoomHeader;
 class ListeningRoomModel;
 class TrackView;
+class QTimeLine;
+class QPushButton;
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
@@ -61,13 +65,30 @@ signals:
     
 public slots:
 
+private slots:
+    void toggleHistoryDrawer();
+    void onAnimationStep( int );
+    void onAnimationFinished();
+
 private:
     ListeningRoomHeader *m_header;
+    QWidget* m_historyDrawer;
+    QPushButton* m_previousTracksButton;
+    TrackView* m_historyView;
     QWidget* m_body;
     TrackView* m_view;
     ListeningRoomModel* m_model;
 
     QPixmap m_pixmap;
+
+    //history drawer animation
+    QTimeLine* m_timeline;
+    int m_drawerH;
+    bool m_drawerShown;
+    QIcon m_downArrow;
+    QIcon m_upArrow;
+    QString m_showTracksString;
+    QString m_hideTracksString;
 };
 
 #endif // LISTENINGROOMWIDGET_H

@@ -62,7 +62,7 @@ public:
     bool isLocal() const { return m_isLocal; }
     bool isOnline() const { return m_online || m_isLocal; }
 
-    QString userName() const { return m_username; }
+    QString userName() const { return m_username; } //This is actually a dbid!
     QString friendlyName() const;
     void setFriendlyName( const QString& fname );
 

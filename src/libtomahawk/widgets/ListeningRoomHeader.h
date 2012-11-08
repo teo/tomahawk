@@ -26,6 +26,7 @@
 #include <QtCore/QHash>
 
 class ListeningRoomWidget;
+class QBoxLayout;
 
 class ListeningRoomHeader : public BasicHeader
 {
@@ -35,13 +36,18 @@ public:
     virtual ~ListeningRoomHeader();
 
 public slots:
-    void addListener( const Tomahawk::source_ptr& source );
-    void removeListener( const Tomahawk::source_ptr& source );
+    void setListeners( const QStringList& listenerDbids );
 
 private:
+    void fillListeners();
+
     QList< Tomahawk::source_ptr > m_listeners;
 
-    
+    QWidget* m_listenersWidget;
+    QMap< QString, QLabel* > m_avatarLabels;
+    int m_unnamedListeners;
+    QBoxLayout* m_avatarsLayout;
+    QLabel* m_unnamedListenersLabel;
 };
 
 #endif // LISTENINGROOMHEADER_H

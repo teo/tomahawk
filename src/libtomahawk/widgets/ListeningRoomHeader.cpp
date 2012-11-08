@@ -19,17 +19,35 @@
 #include "ListeningRoomHeader.h"
 
 #include "ListeningRoomWidget.h"
+#include "SourceList.h"
+#include "utils/TomahawkUtilsGui.h"
 
-#include <QBoxLayout>
-#include <QLabel>
+#include <QtGui/QBoxLayout>
+#include <QtGui/QLabel>
+
 
 ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent ) :
     BasicHeader( parent )
 {
-    QLabel* placeholder = new QLabel( this );
-    placeholder->setText( "Placeholder!\nListeners go here!");
-    placeholder->setStyleSheet( "color: white" );
-    m_mainLayout->addWidget( placeholder );
+    m_listenersWidget = new QWidget( this );
+    m_mainLayout->addWidget( m_listenersWidget );
+
+    QBoxLayout* listenersWidgetLayout = new QVBoxLayout;
+    m_listenersWidget->setLayout( listenersWidgetLayout );
+    m_avatarsLayout = new QHBoxLayout; //avatars go in here!
+    m_avatarsLayout->setAlignment( Qt::AlignVCenter | Qt::AlignRight );
+    listenersWidgetLayout->addLayout( m_avatarsLayout );
+    m_unnamedListenersLabel = new QLabel( m_listenersWidget );
+    QPalette pal = palette();
+    pal.setColor( QPalette::Foreground, Qt::white );
+    m_unnamedListenersLabel->setPalette( pal );
+    QFont font = m_unnamedListenersLabel->font();
+    font.setPointSize( TomahawkUtils::defaultFontSize() + 1 );
+    m_unnamedListenersLabel->setFont( font );
+    m_unnamedListenersLabel->setAlignment( Qt::AlignVCenter | Qt::AlignRight );
+
+    listenersWidgetLayout->addWidget( m_unnamedListenersLabel );
+//TODO: unmargin maybe?
 }
 
 ListeningRoomHeader::~ListeningRoomHeader()
@@ -37,11 +55,36 @@ ListeningRoomHeader::~ListeningRoomHeader()
 }
 
 void
-ListeningRoomHeader::addListener( const Tomahawk::source_ptr& source )
+ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
 {
+    qDeleteAll( m_avatarLabels );
+    m_unnamedListeners = 0;
+    foreach ( const QString& dbid, listenerDbids )
+    {
+        const Tomahawk::source_ptr& s = SourceList::instance()->get( dbid );
+
+        if ( s.isNull() ) //means we don't know this listener
+        {
+            ++m_unnamedListeners;
+        }
+        else
+        {
+            QLabel* avatar = new QLabel( m_listenersWidget );
+            avatar->setPixmap( s->avatar( Tomahawk::Source::FancyStyle ) );
+            avatar->setToolTip( s->friendlyName() );
+            m_avatarLabels.insert( dbid, avatar );
+        }
+    }
+
+    fillListeners();
 }
 
 void
-ListeningRoomHeader::removeListener( const Tomahawk::source_ptr& source )
+ListeningRoomHeader::fillListeners()
 {
+    m_unnamedListenersLabel->setText( tr( "and %n other listener(s).", "", m_unnamedListeners ) );
+    foreach ( QLabel* avatar, m_avatarLabels )
+    {
+        m_avatarsLayout->addWidget( avatar );
+    }
 }
