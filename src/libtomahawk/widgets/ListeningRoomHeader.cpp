@@ -70,7 +70,14 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
         else
         {
             QLabel* avatar = new QLabel( m_listenersWidget );
-            avatar->setPixmap( s->avatar( Tomahawk::Source::FancyStyle ) );
+            QPixmap pxmp = s->avatar( Tomahawk::Source::FancyStyle );
+            if ( pxmp.isNull() )
+            {
+                if ( m_defaultAvatar.isNull() )
+                    m_defaultAvatar = TomahawkUtils::createAvatarFrame( QPixmap( RESPATH "images/user-avatar.png" ) );
+                pxmp = m_defaultAvatar;
+            }
+            avatar->setPixmap( pxmp );
             avatar->setToolTip( s->friendlyName() );
             m_avatarLabels.insert( dbid, avatar );
         }

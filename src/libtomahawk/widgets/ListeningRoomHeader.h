@@ -42,6 +42,7 @@ private:
     void fillListeners();
 
     QList< Tomahawk::source_ptr > m_listeners;
+    QPixmap m_defaultAvatar;
 
     QWidget* m_listenersWidget;
     QMap< QString, QLabel* > m_avatarLabels;
