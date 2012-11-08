@@ -38,6 +38,9 @@ public:
     virtual DropTypes supportedDropTypes(const QMimeData* data) const;
     virtual bool dropMimeData(const QMimeData* data, Qt::DropAction action);
 
+    void setEnabled( bool enabled ) { m_enabled = enabled; }
+    bool isEnabled() const { return m_enabled; }
+
 private slots:
     void parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks );
 
@@ -47,7 +50,7 @@ private slots:
 private:
     SourcesModel::CategoryType m_categoryType;
     QIcon m_icon;
-
+    bool m_enabled;
 };
 
 class CategoryItem : public SourceTreeItem
@@ -71,8 +74,11 @@ public:
 
     SourcesModel::CategoryType categoryType();
 
+    void setAddItemVisible( bool visible );
+
 protected:
     bool m_showAdd;
+    bool m_enableAdd;
 
 private:
     SourcesModel::CategoryType m_category;

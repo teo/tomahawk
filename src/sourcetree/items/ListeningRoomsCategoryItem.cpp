@@ -63,6 +63,9 @@ ListeningRoomsCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
     NewClosure( src.data(), SIGNAL( offline() ),
                 this, SLOT( onSourceRemoved( Tomahawk::source_ptr ) ), src );
 
+    connect( src.data(), SIGNAL( listeningRoomRemoved( Tomahawk::listeningroom_ptr ) ),
+             SLOT( onListeningRoomCountChanged() ) );
+
     tDebug() << "End" << Q_FUNC_INFO;
 }
 
@@ -116,6 +119,7 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
                  SLOT( onListeningRoomDeleted( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
 
     tDebug() << "listening room added to model." << p->title();
+    onListeningRoomCountChanged();
 }
 
 
@@ -137,5 +141,20 @@ ListeningRoomsCategoryItem::onListeningRoomDeleted( const Tomahawk::listeningroo
             delete lrItem;
             break;
         }
+    }
+    //onListeningRoomCountChanged() is called afterwards through a signal from Source
+}
+
+
+void
+ListeningRoomsCategoryItem::onListeningRoomCountChanged()
+{
+    if ( SourceList::instance()->getLocal()->hasListeningRooms() ) //if this change affects my own LR
+    {
+        setAddItemVisible( false );
+    }
+    else
+    {
+        setAddItemVisible( true );
     }
 }

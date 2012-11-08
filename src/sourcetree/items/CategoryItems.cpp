@@ -45,6 +45,7 @@ using namespace Tomahawk;
 CategoryAddItem::CategoryAddItem( SourcesModel* model, SourceTreeItem* parent, SourcesModel::CategoryType type )
     : SourceTreeItem( model, parent, SourcesModel::CategoryAdd )
     , m_categoryType( type )
+    , m_enabled( true )
 {
     m_icon = QIcon( RESPATH "images/add.png" );
 }
@@ -97,18 +98,25 @@ CategoryAddItem::activate()
 Qt::ItemFlags
 CategoryAddItem::flags() const
 {
-    switch ( m_categoryType )
+    if ( m_enabled )
     {
-        case SourcesModel::PlaylistsCategory:
-        case SourcesModel::ListeningRoomsCategory:
-            return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled;
+        switch ( m_categoryType )
+        {
+            case SourcesModel::PlaylistsCategory:
+            case SourcesModel::ListeningRoomsCategory:
+                return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled;
 
-        case SourcesModel::StationsCategory:
-            return Qt::ItemIsEnabled | Qt::ItemIsDropEnabled;
+            case SourcesModel::StationsCategory:
+                return Qt::ItemIsEnabled | Qt::ItemIsDropEnabled;
 
-        default:
-            return Qt::ItemIsEnabled;
-            break;
+            default:
+                return Qt::ItemIsEnabled;
+                break;
+        }
+    }
+    else
+    {
+        return 0;
     }
 }
 
@@ -350,12 +358,14 @@ CategoryItem::CategoryItem( SourcesModel* model,
     , m_addItem( 0 )
     , m_category( category )
     , m_showAdd( showAddItem )
+    , m_enableAdd( true )
 {
     // in the constructor we're still being added to the parent, so we don't exist to have rows addded yet. so this is safe.
     //     beginRowsAdded( 0, 0 );
     if ( m_showAdd )
     {
         m_addItem = new CategoryAddItem( model, this, m_category );
+        setAddItemVisible( m_enableAdd );
     }
     //     endRowsAdded();
 }
@@ -431,4 +441,14 @@ SourcesModel::CategoryType
 CategoryItem::categoryType()
 {
     return m_category;
+}
+
+void
+CategoryItem::setAddItemVisible( bool visible )
+{
+    if ( m_enableAdd != visible )
+    {
+        m_enableAdd = visible;
+        m_addItem->setEnabled( m_enableAdd );
+    }
 }

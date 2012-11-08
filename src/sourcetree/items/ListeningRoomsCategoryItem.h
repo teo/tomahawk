@@ -80,7 +80,7 @@ private slots:
     void onSourceAdded( const Tomahawk::source_ptr& src );
     void onListeningRoomAdded( const Tomahawk::listeningroom_ptr& p );
     void onListeningRoomDeleted( const Tomahawk::listeningroom_ptr& p );
-
+    void onListeningRoomCountChanged();
 };
 
 

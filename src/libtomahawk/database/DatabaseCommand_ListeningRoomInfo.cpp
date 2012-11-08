@@ -155,7 +155,7 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
             tDebug() << "The Listening Room does not exist or has already been disbanded.";
             return;
         }
-
+        source()->removeListeningRoom( room );
         room->reportDeleted( room );
     }
 }

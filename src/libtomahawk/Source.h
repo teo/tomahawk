@@ -76,6 +76,7 @@ public:
     void removeCollection( const Tomahawk::collection_ptr& c );
 
     Tomahawk::listeningroom_ptr listeningRoom( const QString& guid ) const;
+    bool hasListeningRooms() const { return !m_listeningRooms.isEmpty(); }
     void addListeningRoom( const Tomahawk::listeningroom_ptr& p );
     void removeListeningRoom( const Tomahawk::listeningroom_ptr& p );
 
