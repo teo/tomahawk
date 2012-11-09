@@ -89,7 +89,10 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
 void
 ListeningRoomHeader::fillListeners()
 {
-    m_unnamedListenersLabel->setText( tr( "and %n other listener(s).", "", m_unnamedListeners ) );
+    if ( m_unnamedListeners )
+        m_unnamedListenersLabel->setText( tr( "and %n other listener(s).", "", m_unnamedListeners ) );
+    else
+        m_unnamedListenersLabel->setText( "" );
     foreach ( QLabel* avatar, m_avatarLabels )
     {
         m_avatarsLayout->addWidget( avatar );
