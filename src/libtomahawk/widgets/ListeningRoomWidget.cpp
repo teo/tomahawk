@@ -27,6 +27,7 @@
 #include "Source.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "Typedefs.h"
+#include "utils/Closure.h"
 
 #include <QtCore/QTimeLine>
 #include <QtGui/QLabel>
@@ -125,14 +126,6 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
              m_view,   SLOT( update( QModelIndex ) ) );
     m_view->setItemDelegate( delegate );
     m_view->proxyModel()->setStyle( PlayableProxyModel::Large );
-
-    //TODO: testing LR header, remove this in favor of getting dbids from RoomInfo
-    QStringList dbids;
-    foreach ( const Tomahawk::source_ptr& s, SourceList::instance()->sources( true ) )
-    {
-        dbids << s->userName();
-    }
-    m_header->setListeners( dbids );
 }
 
 
@@ -176,10 +169,11 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
     m_header->setCaption( model->title() );
     m_header->setDescription( model->description() );
     m_header->setPixmap( m_pixmap );
-    //TODO: hook something up to show listeners in header
     m_view->setEmptyTip( tr( "This room is currently empty.\n"
                              "Add some tracks to it and enjoy the music with your friends!" ) );
 
+    connect( m_model, SIGNAL( listenersChanged() ),
+             this, SLOT( onListenersChanged() ) );
 }
 
 void
@@ -225,6 +219,17 @@ ListeningRoomWidget::onAnimationFinished()
     else
         m_historyDrawer->setFixedHeight( 0 );
     m_drawerH = -1;
+}
+
+
+void
+ListeningRoomWidget::onListenersChanged()
+{
+    if ( m_model && !m_model->listeningRoom().isNull() )
+    {
+        m_header->setListeners( m_model->listeningRoom()->listenerIds() );
+        m_header->setDescription( m_model->description() );
+    }
 }
 
 

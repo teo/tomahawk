@@ -174,6 +174,7 @@ ListeningRoom::rename( const QString& title )
     }
 }
 
+
 void
 ListeningRoom::updateFrom( const listeningroom_ptr& other )
 {
@@ -211,6 +212,7 @@ ListeningRoom::updateFrom( const listeningroom_ptr& other )
         emit changed();
 }
 
+
 QVariantList
 ListeningRoom::entriesV() const
 {
@@ -235,6 +237,34 @@ ListeningRoom::setEntriesV( const QVariantList& l )
         if ( lre->isValid() )
             m_entries << lrentry_ptr( lre );
     }
+}
+
+
+void
+ListeningRoom::setListenerIdsV( const QVariantList& v )
+{
+    m_listenerIds.clear();
+    foreach ( const QVariant &e, v )
+    {
+        QString listenerId = e.toString();
+
+        if ( !listenerId.isEmpty() )
+            m_listenerIds << listenerId;
+    }
+
+    emit listenersChanged();
+}
+
+
+QVariantList
+ListeningRoom::listenerIdsV() const
+{
+    QVariantList v;
+    foreach ( const QString &e, m_listenerIds )
+    {
+        v.append( QVariant::fromValue( e ) );
+    }
+    return v;
 }
 
 
@@ -359,6 +389,51 @@ ListeningRoom::insertEntries( const QList< query_ptr >& queries,
     //Notify listeners.
     qDebug() << "ListeningRoom got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
     emit tracksInserted( toInsert, position );
+}
+
+
+void
+ListeningRoom::addListener( const Tomahawk::source_ptr& listener )
+{
+    QString listenerId = listener->userName();
+    if ( m_listenerIds.contains( listenerId ) )
+        return;
+
+    m_listenerIds.append( listenerId );
+    m_listenerIds.sort();
+
+    pushUpdate();
+
+    connect( listener.data(), SIGNAL( offline() ), this, SLOT( onListenerOffline() ) );
+
+    emit listenersChanged();
+}
+
+
+void
+ListeningRoom::removeListener( const Tomahawk::source_ptr& listener )
+{
+    QString listenerId = listener->userName();
+    m_listenerIds.removeAll( listenerId );
+
+    pushUpdate();
+
+    disconnect( listener.data(), SIGNAL( offline() ), this, SLOT( onListenerOffline() ) );
+
+    emit listenersChanged();
+}
+
+
+void
+ListeningRoom::onListenerOffline()
+{
+    Source* s = qobject_cast< Source* >( sender() );
+    if ( s )
+    {
+        source_ptr sp = SourceList::instance()->get( s->id() );
+        Q_ASSERT( !sp.isNull() );
+        removeListener( sp );
+    }
 }
 
 

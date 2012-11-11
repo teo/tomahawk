@@ -69,6 +69,7 @@ private slots:
     void toggleHistoryDrawer();
     void onAnimationStep( int );
     void onAnimationFinished();
+    void onListenersChanged();
 
 private:
     ListeningRoomHeader *m_header;

@@ -60,8 +60,10 @@ ListeningRoomsCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
     connect( src.data(), SIGNAL( listeningRoomAdded( Tomahawk::listeningroom_ptr ) ),
              SLOT( onListeningRoomAdded( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
 
-    NewClosure( src.data(), SIGNAL( offline() ),
-                this, SLOT( onSourceRemoved( Tomahawk::source_ptr ) ), src );
+    _detail::Closure* srcRemovedClosure =
+        NewClosure( src.data(), SIGNAL( offline() ),
+                    this, SLOT( onSourceRemoved( Tomahawk::source_ptr ) ), src );
+    srcRemovedClosure->setAutoDelete( false );
 
     connect( src.data(), SIGNAL( listeningRoomRemoved( Tomahawk::listeningroom_ptr ) ),
              SLOT( onListeningRoomCountChanged() ) );

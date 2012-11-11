@@ -236,6 +236,15 @@ Source::removeCollection( const collection_ptr& c )
     emit collectionRemoved( c );
 }
 
+listeningroom_ptr
+Source::listeningRoom() const
+{
+    //TODO: remove this, just testing if a source never has more than one room
+    Q_ASSERT( m_listeningRooms.count() < 2 );
+
+    return m_listeningRooms.values().first();
+}
+
 
 listeningroom_ptr
 Source::listeningRoom( const QString& guid ) const
@@ -255,6 +264,7 @@ Source::addListeningRoom( const listeningroom_ptr& p )
     }
 
     m_listeningRooms.insert( p->guid(), p );
+
     emit listeningRoomAdded( p );
 }
 
@@ -544,13 +554,33 @@ Source::reportSocialAttributesChanged( DatabaseCommand_SocialAction* action )
     {
         const source_ptr to = SourceList::instance()->get( action->comment() );
         if ( !to.isNull() )
+        {
+            if ( to->isLocal() ) //somebody just latched onto me!
+            {
+                if ( to->hasListeningRooms() )
+                {
+                    to->listeningRoom()->addListener( SourceList::instance()->get( m_id ) );
+                }
+            }
+
             emit latchedOn( to );
+        }
     }
     else if ( action->action() == "latchOff" )
     {
         const source_ptr from = SourceList::instance()->get( action->comment() );
         if ( !from.isNull() )
+        {
+            if ( from->isLocal() ) //somebody just latched off from me!
+            {
+                if ( from->hasListeningRooms() )
+                {
+                    from->listeningRoom()->removeListener( SourceList::instance()->get( m_id ) );
+                }
+            }
+
             emit latchedOff( from );
+        }
     }
 }
 

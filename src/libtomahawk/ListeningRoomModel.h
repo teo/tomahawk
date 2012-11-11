@@ -58,6 +58,7 @@ public slots:
 signals:
     void listeningRoomDeleted();
     void listeningRoomChanged();
+    void listenersChanged();
 
 protected:
     QList<Tomahawk::lrentry_ptr> listeningRoomEntries() const;
@@ -66,10 +67,9 @@ private slots:
     void parsedDroppedTracks( QList<Tomahawk::query_ptr> );
     void trackResolved( bool );
     void reload();
-
-private:
     void reloadRoomMetadata();
 
+private:
     void beginRoomChanges();
     void endRoomChanges();
 

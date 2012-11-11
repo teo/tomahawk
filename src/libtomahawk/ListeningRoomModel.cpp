@@ -240,6 +240,8 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
                     this, SLOT( insertEntries( QList< Tomahawk::lrentry_ptr>, int ) ) );
         disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
                     this, SLOT( reload() ) );
+        disconnect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
+                    this, SLOT( reloadRoomMetadata() ) );
     }
 
     m_isLoading = true;
@@ -256,6 +258,8 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
              this, SLOT( insertEntries( QList< Tomahawk::lrentry_ptr>, int ) ) );
     connect( m_listeningRoom.data(), SIGNAL( changed() ),
              this, SLOT( reload() ) );
+    connect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
+             this, SLOT( reloadRoomMetadata() ) );
 
     setReadOnly( !m_listeningRoom->author()->isLocal() );
 
@@ -280,16 +284,15 @@ ListeningRoomModel::reloadRoomMetadata()
 
     //set the description
     QString desc;
+    int n = m_listeningRoom->listenerIds().count();
     if ( m_listeningRoom->author()->isLocal() )
-        desc = tr( "A room you are hosting, with %1 listeners." )
-               .arg( "over 9000" /*placeholder*/);
+        desc = tr( "A room you are hosting, with %n listener(s).", "", n );
     else
-        desc = tr( "A room hosted by %1, with %2 listeners." )
-               .arg( m_listeningRoom->author()->friendlyName() )
-               .arg( "over 9000" /*placeholder*/);
+        desc = tr( "A room hosted by %1, with %n listener(s).", "", n )
+               .arg( m_listeningRoom->author()->friendlyName() );
     setDescription( desc );
 
-    emit listeningRoomChanged();
+    emit listenersChanged();
 }
 
 void
@@ -305,6 +308,8 @@ ListeningRoomModel::reload()
 
     clear();
     appendEntries( entries );
+
+    emit listeningRoomChanged();
 
     m_isLoading = false;
 }

@@ -58,6 +58,7 @@ void
 ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
 {
     qDeleteAll( m_avatarLabels );
+    m_avatarLabels.clear();
     m_unnamedListeners = 0;
     foreach ( const QString& dbid, listenerDbids )
     {

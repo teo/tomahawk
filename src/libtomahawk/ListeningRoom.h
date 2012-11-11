@@ -98,6 +98,7 @@ class DLLEXPORT ListeningRoom : public QObject
     Q_PROPERTY( QString creator         READ creator            WRITE setCreator )
     Q_PROPERTY( uint createdon          READ createdOn          WRITE setCreatedOn )
     Q_PROPERTY( QVariantList entries    READ entriesV           WRITE setEntriesV )
+    Q_PROPERTY( QVariantList listenerIds READ listenerIdsV      WRITE setListenerIdsV )
 
     friend class ::DatabaseCommand_ListeningRoomInfo;
     friend class ::ListeningRoomModel;
@@ -151,8 +152,11 @@ public:
     void setCreatedOn( uint createdOn )         { m_createdOn = createdOn; }
     void setTitle(const QString& title );
     void setEntriesV( const QVariantList& l );
+    void setListenerIdsV( const QVariantList& v );
+    QVariantList listenerIdsV() const;
     // </IGNORE>
 
+    QStringList listenerIds() const { return m_listenerIds; }
 
     QList< lrentry_ptr > entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, bool clearFirst = false );
 
@@ -178,14 +182,23 @@ signals:
     /// Contiguous range from startPosition
     void tracksMoved( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
 
+    void listenersChanged();
+
 public slots:
     void reportCreated( const Tomahawk::listeningroom_ptr& self );
     void reportDeleted( const Tomahawk::listeningroom_ptr& self );
+
+    // Only ever used by the LR host. Listeners do not add or remove themselves here, they just
+    // latch on/off and the host takes care of adding them here and notifying everybody.
+    void addListener( const Tomahawk::source_ptr& listener );
+    void removeListener( const Tomahawk::source_ptr& listener );
+    void onListenerOffline();
 
     void resolve();
 
     void setWeakSelf( QWeakPointer< ListeningRoom > self ) { m_weakSelf = self; }
 private slots:
+    // Only ever used by the LR host!
     void pushUpdate();
 
     void onResultsChanged();
@@ -216,6 +229,7 @@ private:
     uint m_lastmodified;
     uint m_createdOn;
     QList< Tomahawk::lrentry_ptr > m_entries;
+    QStringList m_listenerIds;
 
     Tomahawk::playlistinterface_ptr m_playlistInterface;
 };
