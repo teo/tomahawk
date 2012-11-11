@@ -208,6 +208,10 @@ ListeningRoom::updateFrom( const listeningroom_ptr& other )
     m_entries.append( other->m_entries );
     isChanged = true;
 
+    m_listenerIds.clear();
+    m_listenerIds.append( other->m_listenerIds );
+    isChanged = true;
+
     if ( isChanged )
         emit changed();
 }
@@ -440,13 +444,13 @@ ListeningRoom::onListenerOffline()
 void
 ListeningRoom::pushUpdate()
 {
-    Tomahawk::listeningroom_ptr me =
+    Tomahawk::listeningroom_ptr thisRoom =
             SourceList::instance()->getLocal()->listeningRoom( guid() );
 
-    if ( !me.isNull() )
+    if ( !thisRoom.isNull() && SourceList::instance()->getLocal() == author() ) //only the DJ can push updates!
     {
         DatabaseCommand_ListeningRoomInfo* cmd =
-                DatabaseCommand_ListeningRoomInfo::RoomInfo( author(), me );
+                DatabaseCommand_ListeningRoomInfo::RoomInfo( author(), thisRoom );
         Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
     }
 }
