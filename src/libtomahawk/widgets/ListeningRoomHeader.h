@@ -27,19 +27,38 @@
 
 class ListeningRoomWidget;
 class QBoxLayout;
+class QPushButton;
 
 class ListeningRoomHeader : public BasicHeader
 {
     Q_OBJECT
 public:
+    enum ButtonState
+    {
+        Join,
+        Leave,
+        Disband
+    };
+
     explicit ListeningRoomHeader( ListeningRoomWidget* parent );
     virtual ~ListeningRoomHeader();
 
 public slots:
     void setListeners( const QStringList& listenerDbids );
+    void setButtonState( ButtonState state );
+
+signals:
+    void joinLeaveButtonClicked( ListeningRoomHeader::ButtonState );
+
+private  slots:
+    void onJoinLeaveButtonClicked();
 
 private:
     void fillListeners();
+
+    ButtonState m_buttonState;
+    QMap< ButtonState, QIcon >   m_buttonIcons;
+    QMap< ButtonState, QString > m_buttonStrings;
 
     QList< Tomahawk::source_ptr > m_listeners;
     QPixmap m_defaultAvatar;
@@ -49,6 +68,8 @@ private:
     int m_unnamedListeners;
     QBoxLayout* m_avatarsLayout;
     QLabel* m_unnamedListenersLabel;
+
+    QPushButton* m_joinLeaveButton;
 };
 
 #endif // LISTENINGROOMHEADER_H

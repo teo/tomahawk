@@ -19,7 +19,6 @@
 #include "ListeningRoomWidget.h"
 
 #include "HeaderLabel.h"
-#include "ListeningRoomHeader.h"
 #include "ListeningRoomModel.h"
 #include "playlist/TrackView.h"
 #include "playlist/PlaylistLargeItemDelegate.h" //TODO: make nice delegate for rooms!
@@ -28,6 +27,9 @@
 #include "utils/TomahawkUtilsGui.h"
 #include "Typedefs.h"
 #include "utils/Closure.h"
+#include "database/Database.h"
+#include "database/DatabaseImpl.h"
+#include "LatchManager.h"
 
 #include <QtCore/QTimeLine>
 #include <QtGui/QLabel>
@@ -126,6 +128,9 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
              m_view,   SLOT( update( QModelIndex ) ) );
     m_view->setItemDelegate( delegate );
     m_view->proxyModel()->setStyle( PlayableProxyModel::Large );
+
+    connect( m_header, SIGNAL( joinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ),
+             this, SLOT( onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ) );
 }
 
 
@@ -174,6 +179,7 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
 
     connect( m_model, SIGNAL( listenersChanged() ),
              this, SLOT( onListenersChanged() ) );
+    onListenersChanged();
 }
 
 void
@@ -227,8 +233,58 @@ ListeningRoomWidget::onListenersChanged()
 {
     if ( m_model && !m_model->listeningRoom().isNull() )
     {
-        m_header->setListeners( m_model->listeningRoom()->listenerIds() );
+        Tomahawk::listeningroom_ptr lr = m_model->listeningRoom();
+
+        m_header->setListeners( lr->listenerIds() );
         m_header->setDescription( m_model->description() );
+
+        // If I'm the DJ
+        if ( lr->author() == SourceList::instance()->getLocal() )
+        {
+            m_header->setButtonState( ListeningRoomHeader::Disband );
+        }
+        // If I'm one of the listeners
+        else
+        {
+            // I need to ask the DatabaseImpl directly because Source::userName() answers just
+            // "My Collection" instead of the dbid if the source is local.
+            // This is probably a FIXME.
+            if ( lr->listenerIds().contains( Database::instance()->impl()->dbid() ) )
+            {
+                m_header->setButtonState( ListeningRoomHeader::Leave );
+            }
+            else
+            {
+                m_header->setButtonState( ListeningRoomHeader::Join );
+            }
+        }
+    }
+}
+
+
+void
+ListeningRoomWidget::onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState state )
+{
+    Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
+    Tomahawk::source_ptr lrSource = m_model->listeningRoom()->author();
+
+    switch ( state )
+    {
+    case ListeningRoomHeader::Join:
+        if ( lman->isLatched( lrSource ) )
+            lman->catchUpRequest();
+        else
+            lman->latchRequest( lrSource );
+
+        lman->latchModeChangeRequest( lrSource, true /*we always latch on realtime if we are a LR*/ );
+
+        break;
+    case ListeningRoomHeader::Leave:
+        lman->unlatchRequest( lrSource );
+        break;
+    case ListeningRoomHeader::Disband:
+        qDebug() << "Doing delete of listening room:" << m_model->listeningRoom()->title();
+        Tomahawk::ListeningRoom::remove( m_model->listeningRoom() );
     }
 }
 

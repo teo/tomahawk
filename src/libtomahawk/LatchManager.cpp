@@ -28,7 +28,24 @@
 #include "database/DatabaseCommand_SocialAction.h"
 #include "SourcePlaylistInterface.h"
 
+
 using namespace Tomahawk;
+
+LatchManager* LatchManager::s_instance = 0;
+
+
+LatchManager*
+LatchManager::instance()
+{
+    if ( !s_instance )
+    {
+        s_instance = new LatchManager();
+    }
+
+    return s_instance;
+}
+
+
 
 LatchManager::LatchManager( QObject* parent )
     : QObject( parent )
@@ -37,10 +54,12 @@ LatchManager::LatchManager( QObject* parent )
     connect( AudioEngine::instance(), SIGNAL( playlistChanged( Tomahawk::playlistinterface_ptr ) ), this, SLOT( playlistChanged( Tomahawk::playlistinterface_ptr ) ) );
 }
 
+
 LatchManager::~LatchManager()
 {
 
 }
+
 
 bool
 LatchManager::isLatched( const source_ptr& src )
@@ -60,6 +79,7 @@ LatchManager::latchRequest( const source_ptr& source )
     m_waitingForLatch = source;
     AudioEngine::instance()->playItem( source->playlistInterface(), source->playlistInterface()->nextItem() );
 }
+
 
 void
 LatchManager::playlistChanged( Tomahawk::playlistinterface_ptr )

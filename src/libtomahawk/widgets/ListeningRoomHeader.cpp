@@ -24,13 +24,33 @@
 
 #include <QtGui/QBoxLayout>
 #include <QtGui/QLabel>
+#include <QtGui/QPushButton>
 
 
-ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent ) :
-    BasicHeader( parent )
+ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent )
+    : BasicHeader( parent )
+    , m_buttonState( Disband ) //just so the first setting gets applied
 {
     m_listenersWidget = new QWidget( this );
     m_mainLayout->addWidget( m_listenersWidget );
+    QHBoxLayout* controlsLayout = new QHBoxLayout;
+    m_verticalLayout->addLayout( controlsLayout );
+    m_joinLeaveButton = new QPushButton( this );
+    controlsLayout->addWidget( m_joinLeaveButton );
+    controlsLayout->addStretch();
+
+    m_buttonStrings[ Join ]    = tr( "Join", "Button for a listener to join a listening room" );
+    m_buttonStrings[ Leave ]   = tr( "Leave", "Button for a listener to leave a listening room" );
+    m_buttonStrings[ Disband ] = tr( "Disband", "Button for a DJ to disband a listening room" );
+
+    m_buttonIcons[ Join ]    = QIcon( RESPATH "images/list-add.png" );
+    m_buttonIcons[ Leave ]   = QIcon( RESPATH "images/list-remove.png" );
+    m_buttonIcons[ Disband ] = QIcon( RESPATH "images/delete.png" );
+
+    setButtonState( Join );
+
+    connect( m_joinLeaveButton, SIGNAL( clicked() ),
+             this, SLOT( onJoinLeaveButtonClicked() ) );
 
     QBoxLayout* listenersWidgetLayout = new QVBoxLayout;
     m_listenersWidget->setLayout( listenersWidgetLayout );
@@ -87,6 +107,18 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
     fillListeners();
 }
 
+void ListeningRoomHeader::setButtonState( ListeningRoomHeader::ButtonState state )
+{
+    if ( state == m_buttonState )
+        return;
+
+    m_buttonState = state;
+
+    m_joinLeaveButton->setText( m_buttonStrings[ state ] );
+    m_joinLeaveButton->setIcon( m_buttonIcons[ state ] );
+}
+
+
 void
 ListeningRoomHeader::fillListeners()
 {
@@ -98,4 +130,11 @@ ListeningRoomHeader::fillListeners()
     {
         m_avatarsLayout->addWidget( avatar );
     }
+}
+
+
+void
+ListeningRoomHeader::onJoinLeaveButtonClicked()
+{
+    emit joinLeaveButtonClicked( m_buttonState );
 }

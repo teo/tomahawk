@@ -35,7 +35,7 @@ class DLLEXPORT LatchManager : public QObject
 {
     Q_OBJECT
 public:
-    explicit LatchManager( QObject* parent = 0 );
+    static LatchManager* instance();
     virtual ~LatchManager();
 
     bool isLatched( const source_ptr& src );
@@ -50,6 +50,8 @@ private slots:
     void playlistChanged( Tomahawk::playlistinterface_ptr );
     
 private:
+    explicit LatchManager( QObject* parent = 0 );
+
     enum State {
         NotLatched =  0,
         Latching,
@@ -60,6 +62,8 @@ private:
     source_ptr m_latchedOnTo;
     source_ptr m_waitingForLatch;
     playlistinterface_ptr m_latchedInterface;
+
+    static LatchManager* s_instance;
 };
 
 }

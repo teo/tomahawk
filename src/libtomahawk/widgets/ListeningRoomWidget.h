@@ -23,6 +23,7 @@
 
 #include "libtomahawk/Typedefs.h"
 #include "libtomahawk/ListeningRoom.h"
+#include "ListeningRoomHeader.h"
 #include "ViewPage.h"
 
 #include <QtGui/QIcon>
@@ -61,8 +62,6 @@ public:
      */
     void setModel( ListeningRoomModel* model );
     
-signals:
-    
 public slots:
 
 private slots:
@@ -70,6 +69,7 @@ private slots:
     void onAnimationStep( int );
     void onAnimationFinished();
     void onListenersChanged();
+    void onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState );
 
 private:
     ListeningRoomHeader *m_header;

@@ -62,9 +62,10 @@ using namespace Tomahawk;
 
 SourceTreeView::SourceTreeView( QWidget* parent )
     : QTreeView( parent )
-    , m_latchManager( new LatchManager( this ) )
     , m_dragging( false )
 {
+    m_latchManager = LatchManager::instance();
+
     setProperty( "flattenBranches", QVariant( true ) );
 
     setFrameShape( QFrame::NoFrame );
