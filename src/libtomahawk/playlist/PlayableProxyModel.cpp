@@ -37,6 +37,8 @@ PlayableProxyModel::PlayableProxyModel( QObject* parent )
     , m_hideDupeItems( false )
     , m_maxVisibleItems( -1 )
     , m_style( Detailed )
+    , m_cutoffDirection( ShowAfter )
+    , m_cutoffRow( -1 )
 {
     setFilterCaseSensitivity( Qt::CaseInsensitive );
     setSortCaseSensitivity( Qt::CaseInsensitive );
@@ -107,6 +109,18 @@ PlayableProxyModel::setSourcePlayableModel( PlayableModel* sourceModel )
 bool
 PlayableProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourceParent ) const
 {
+    // Before applying further filtering, we check if the cutoff lets this row through.
+    switch ( m_cutoffDirection )
+    {
+    case ShowBefore:
+        if ( sourceRow >= m_cutoffRow )
+            return false;
+        break;
+    case ShowAfter:
+        if ( sourceRow <= m_cutoffRow )
+            return false;
+    }
+
     PlayableItem* pi = itemFromIndex( sourceModel()->index( sourceRow, 0, sourceParent ) );
     if ( !pi )
         return false;
@@ -604,6 +618,26 @@ PlayableProxyModel::updateDetailedInfo( const QModelIndex& index )
     {
         item->query()->loadSocialActions();
     }
+}
+
+
+void
+PlayableProxyModel::setFilterCutoff( PlayableProxyModel::CutoffDirection direction, int row )
+{
+    Q_ASSERT( row >= -1 && row <= m_model->rowCount( QModelIndex() ) );
+    bool isChanged = false;
+    if ( direction != m_cutoffDirection )
+    {
+        m_cutoffDirection = direction;
+        isChanged = true;
+    }
+    if ( row != m_cutoffRow )
+    {
+        m_cutoffRow = row;
+        isChanged = true;
+    }
+    if ( isChanged  )
+        invalidateFilter();
 }
 
 

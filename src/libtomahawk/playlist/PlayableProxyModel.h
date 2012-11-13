@@ -38,6 +38,9 @@ public:
     enum PlayableProxyModelRole
     { StyleRole = Qt::UserRole + 1 };
 
+    enum CutoffDirection
+    { ShowBefore, ShowAfter };
+
     explicit PlayableProxyModel ( QObject* parent = 0 );
     virtual ~PlayableProxyModel() {}
 
@@ -82,6 +85,22 @@ public:
     virtual void setFilter( const QString& pattern );
     virtual void updateDetailedInfo( const QModelIndex& index );
 
+    /**
+     * @brief setFilterRange sets an interval of rows that should be let through by the proxy.
+     * The range criterion is applied before other filtering criteria, i.e. the row number refers to
+     * the base model.
+     * This filter method effectively chops off the lower OR the upper part of a model, splitting it
+     * in two.
+     * @param direction either ShowBefore or ShowAfter, to choose whether to let through the first
+     * or the last portion of the base model.
+     * @param row the row number at which to cut off the model.
+     * @note The CutoffDirection is to be intended as a strict less-than or greater-than. Thus, e.g.
+     * in a model with 10 rows, ( ShowAfter, 3 ) lets through rows 4-9 and ( ShowBefore, 3 ) lets
+     * through rows 0-2.
+     * By default, the filter cutoff is ( ShowAfter, -1 ) to let everything through.
+     */
+    virtual void setFilterCutoff( CutoffDirection direction, int row );
+
 signals:
     void filterChanged( const QString& filter );
 
@@ -108,6 +127,9 @@ private:
 
     QHash< PlayableItemStyle, QList<PlayableModel::Columns> > m_headerStyle;
     PlayableItemStyle m_style;
+
+    CutoffDirection m_cutoffDirection;
+    int m_cutoffRow;
 };
 
 #endif // TRACKPROXYMODEL_H
