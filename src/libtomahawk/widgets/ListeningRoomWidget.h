@@ -30,9 +30,11 @@
 
 class ListeningRoomHeader;
 class ListeningRoomModel;
+class ListeningRoomCurrentTrackWidget;
 class TrackView;
 class QTimeLine;
 class QPushButton;
+class QModelIndex;
 
 class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
 {
@@ -71,12 +73,16 @@ private slots:
     void onListenersChanged();
     void onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState );
 
+    void onDataChanged( const QModelIndex&, const QModelIndex& );
+
 private:
     ListeningRoomHeader *m_header;
     QWidget* m_historyDrawer;
     QPushButton* m_previousTracksButton;
     TrackView* m_historyView;
     QWidget* m_body;
+    ListeningRoomCurrentTrackWidget* m_currentTrackWidget;
+
     TrackView* m_view;
     ListeningRoomModel* m_model;
 
@@ -90,6 +96,8 @@ private:
     QIcon m_upArrow;
     QString m_showTracksString;
     QString m_hideTracksString;
+
+    int m_currentRow;
 };
 
 #endif // LISTENINGROOMWIDGET_H

@@ -30,10 +30,12 @@
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "LatchManager.h"
+#include "widgets/ListeningRoomCurrentTrackWidget.h"
 
 #include <QtCore/QTimeLine>
 #include <QtGui/QLabel>
 #include <QtGui/QBoxLayout>
+#include <QtGui/QLineEdit>
 #include <QtGui/QListView>
 #include <QtGui/QPushButton>
 
@@ -45,6 +47,7 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
     , m_drawerShown( false )
     , m_downArrow( QIcon( RESPATH "images/arrow-down-double.png" ) )
     , m_upArrow( QIcon( RESPATH "images/arrow-up-double.png" ) )
+    , m_currentRow( -1 )
 {
     setLayout( new QVBoxLayout );
 
@@ -105,10 +108,9 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
     previousTracksLayout->addStretch();
     previousTracksLayout->addWidget( m_previousTracksButton );
 
-    QLabel *placeholder = new QLabel( "Placeholder for\ncurrently playing track.", m_body );
-    bodyLayout->addWidget( placeholder );
-    placeholder->setFixedHeight( 80 );
-    placeholder->setAlignment( Qt::AlignCenter );
+    m_currentTrackWidget = new ListeningRoomCurrentTrackWidget( m_body );
+    bodyLayout->addWidget( m_currentTrackWidget );
+    m_currentTrackWidget->setFixedHeight( 80 + 2*8 );
 
     HeaderLabel* upcomingTracksLabel = new HeaderLabel( m_body );
     upcomingTracksLabel->setText( tr( "Upcoming tracks" ) );
@@ -180,6 +182,9 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
     connect( m_model, SIGNAL( listenersChanged() ),
              this, SLOT( onListenersChanged() ) );
     onListenersChanged();
+
+    connect( m_model, SIGNAL( dataChanged( QModelIndex, QModelIndex ) ),
+             this, SLOT( onDataChanged( QModelIndex, QModelIndex ) ) );
 }
 
 void
@@ -289,10 +294,29 @@ ListeningRoomWidget::onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState 
 }
 
 
+void
+ListeningRoomWidget::onDataChanged( const QModelIndex& topLeft, const QModelIndex& bottomRight )
+{
+    Q_UNUSED( topLeft );
+    Q_UNUSED( bottomRight );
+
+    if ( m_model->currentItem().row() != m_currentRow )
+    {
+        m_currentRow = m_model->currentItem().row();
+        m_view->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowAfter, m_currentRow );
+        m_historyView->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowBefore, m_currentRow );
+        m_currentTrackWidget->setItem( m_model->currentItem() );
+    }
+}
+
+
 Tomahawk::playlistinterface_ptr
 ListeningRoomWidget::playlistInterface() const
 {
-    return Tomahawk::playlistinterface_ptr(); //TODO: implement
+    if ( !m_model )
+        return Tomahawk::playlistinterface_ptr();
+    else
+        return m_view->proxyModel()->playlistInterface();
 }
 
 

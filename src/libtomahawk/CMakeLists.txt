@@ -153,6 +153,7 @@ set( libGuiSources
     widgets/SourceTreePopupDialog.cpp
     widgets/ListeningRoomWidget.cpp
     widgets/ListeningRoomHeader.cpp
+    widgets/ListeningRoomCurrentTrackWidget.cpp
     widgets/infowidgets/SourceInfoWidget.cpp
     widgets/infowidgets/ArtistInfoWidget.cpp
     widgets/infowidgets/AlbumInfoWidget.cpp
