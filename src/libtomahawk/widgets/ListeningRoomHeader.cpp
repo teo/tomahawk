@@ -74,7 +74,7 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
             if ( pxmp.isNull() )
             {
                 if ( m_defaultAvatar.isNull() )
-                    m_defaultAvatar = TomahawkUtils::createAvatarFrame( QPixmap( RESPATH "images/user-avatar.png" ) );
+                    m_defaultAvatar = TomahawkUtils::createRoundedImage( QPixmap( RESPATH "images/user-avatar.png" ), QSize( 32, 32 ) );
                 pxmp = m_defaultAvatar;
             }
             avatar->setPixmap( pxmp );
