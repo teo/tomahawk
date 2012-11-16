@@ -21,8 +21,8 @@
 
 #include <QtGui/QWidget>
 
-#include "libtomahawk/Typedefs.h"
-#include "libtomahawk/ListeningRoom.h"
+#include "Typedefs.h"
+#include "ListeningRoom.h"
 #include "ListeningRoomHeader.h"
 #include "ViewPage.h"
 

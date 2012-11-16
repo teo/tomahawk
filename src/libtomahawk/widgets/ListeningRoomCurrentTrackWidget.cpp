@@ -20,7 +20,7 @@
 
 #include "ElidedLabel.h"
 #include "ListeningRoomModel.h"
-#include "PlayableItem.h"
+#include "playlist/PlayableItem.h"
 #include "Album.h"
 #include "Artist.h"
 #include "utils/TomahawkUtilsGui.h"

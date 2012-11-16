@@ -24,7 +24,7 @@
 #include "DropJob.h"
 #include "ListeningRoom.h"
 #include "Pipeline.h"
-#include "PlayableItem.h"
+#include "playlist/PlayableItem.h"
 #include "Source.h"
 #include "SourceList.h"
 #include "utils/TomahawkUtils.h"
