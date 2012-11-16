@@ -102,10 +102,14 @@ ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
     m_trackLabel->setText( q->track() );
     m_artistLabel->setText( q->artist() );
 
+    QPixmap albumArtPixmap;
+    QSize aaSize = QSize( 80, 80 );
     if ( item->query()->coverLoaded() )
-        m_albumArtLabel->setPixmap( item->query()->cover( QSize( 80, 80 ) ) );
+        albumArtPixmap = TomahawkUtils::createRoundedImage( q->cover( aaSize ), aaSize );
     else
-        m_albumArtLabel->setPixmap( m_albumArtPlaceholder );
+        albumArtPixmap = TomahawkUtils::createRoundedImage( m_albumArtPlaceholder, aaSize );
+
+    m_albumArtLabel->setPixmap( albumArtPixmap );
 
     QString lovesString = item->query()->socialActionDescription( "Love", Tomahawk::Query::Detailed );
     m_lovesLabel->setText( lovesString );
