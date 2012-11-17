@@ -23,6 +23,7 @@
 #include "playlist/TrackView.h"
 #include "playlist/PlaylistLargeItemDelegate.h" //TODO: make nice delegate for rooms!
 #include "playlist/PlayableProxyModel.h"
+#include "playlist/PlayableItem.h"
 #include "Source.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "Typedefs.h"
@@ -31,6 +32,7 @@
 #include "database/DatabaseImpl.h"
 #include "LatchManager.h"
 #include "widgets/ListeningRoomCurrentTrackWidget.h"
+#include "ListeningRoom.h"
 
 #include <QtCore/QTimeLine>
 #include <QtGui/QLabel>
@@ -80,6 +82,9 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
              m_historyView,   SLOT( update( QModelIndex ) ) );
     m_historyView->setItemDelegate( historyDelegate );
     m_historyView->proxyModel()->setStyle( PlayableProxyModel::Large );
+    m_historyView->setReadOnly( true );
+    connect ( m_historyView, SIGNAL( itemActivated( QModelIndex ) ),
+              this, SLOT( onHistoryItemActivated( QModelIndex ) ) );
 
     // m_body
     QVBoxLayout* bodyLayout = new QVBoxLayout;
@@ -319,6 +324,35 @@ ListeningRoomWidget::onDataChanged( const QModelIndex& topLeft, const QModelInde
         m_view->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowAfter, m_currentRow );
         m_historyView->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowBefore, m_currentRow );
         m_currentTrackWidget->setItem( m_model->currentItem() );
+    }
+}
+
+
+void
+ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
+{
+    Q_ASSERT( !m_model->listeningRoom().isNull() );
+    Q_ASSERT( !m_model->listeningRoom()->author().isNull() );
+
+    if ( m_model->listeningRoom()->author()->isLocal() )
+    {
+        PlayableItem* item = m_model->itemFromIndex( m_historyView->proxyModel()->mapToSource( idx ) );
+        if ( !item->lrentry().isNull() )
+        {
+            QList< Tomahawk::lrentry_ptr > entries;
+            const Tomahawk::lrentry_ptr& lrentry = item->lrentry();
+            entries.append( lrentry );
+            m_model->insertEntries( entries, m_currentRow + 1 );
+            playlistInterface()->nextItem();
+        }
+    }
+    else
+    {
+        Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
+        if ( !lman->isLatched( m_model->listeningRoom()->author() ) )
+        {
+            onJoinLeaveButtonClicked( ListeningRoomHeader::Join );
+        }
     }
 }
 

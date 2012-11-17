@@ -84,6 +84,9 @@ public:
     // Starts playing from the beginning if resolved, or waits until a track is playable
     void startPlayingFromStart();
 
+    void setReadOnly( bool readOnly = true );
+    bool isReadOnly() const { return m_readOnly; }
+
 public slots:
     virtual void onItemActivated( const QModelIndex& index );
 
@@ -143,6 +146,7 @@ private:
     bool m_resizing;
     bool m_dragging;
     QRect m_dropRect;
+    bool m_readOnly;
 
     bool m_updateContextView;
 

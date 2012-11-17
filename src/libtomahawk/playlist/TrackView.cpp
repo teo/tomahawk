@@ -57,6 +57,7 @@ TrackView::TrackView( QWidget* parent )
     , m_dragging( false )
     , m_updateContextView( true )
     , m_contextMenu( new ContextMenu( this ) )
+    , m_readOnly( false )
 {
     setFrameShape( QFrame::NoFrame );
     setAttribute( Qt::WA_MacShowFocusRect, 0 );
@@ -227,6 +228,12 @@ TrackView::startPlayingFromStart()
     startAutoPlay( index );
 }
 
+void
+TrackView::setReadOnly( bool readOnly )
+{
+    m_readOnly = readOnly;
+}
+
 
 void
 TrackView::autoPlayResolveFinished( const query_ptr& query, int row )
@@ -274,7 +281,8 @@ TrackView::onItemActivated( const QModelIndex& index )
     if ( !index.isValid() )
         return;
 
-    tryToPlayItem( index );
+    if ( !m_readOnly )
+        tryToPlayItem( index );
     emit itemActivated( index );
 }
 
@@ -400,7 +408,7 @@ TrackView::dragMoveEvent( QDragMoveEvent* event )
 {
     QTreeView::dragMoveEvent( event );
 
-    if ( model()->isReadOnly() )
+    if ( model()->isReadOnly() || m_readOnly )
     {
         event->ignore();
         return;
@@ -456,7 +464,7 @@ TrackView::dropEvent( QDropEvent* event )
             tDebug() << Q_FUNC_INFO << "Drop Event accepted at row:" << index.row();
             event->acceptProposedAction();
 
-            if ( !model()->isReadOnly() )
+            if ( !model()->isReadOnly() && !m_readOnly ) //both model and view must be non-readOnly
             {
                 model()->dropMimeData( event->mimeData(), event->proposedAction(), index.row(), 0, index.parent() );
             }
@@ -574,7 +582,7 @@ TrackView::onCustomContextMenu( const QPoint& pos )
     if ( !idx.isValid() )
         return;
 
-    if ( model() && !model()->isReadOnly() )
+    if ( model() && !model()->isReadOnly() && !m_readOnly )
         m_contextMenu->setSupportedActions( m_contextMenu->supportedActions() | ContextMenu::ActionDelete );
 
     QList<query_ptr> queries;
@@ -776,7 +784,7 @@ TrackView::setFilter( const QString& filter )
 void
 TrackView::deleteSelectedItems()
 {
-    if ( !model()->isReadOnly() )
+    if ( !model()->isReadOnly() && !m_readOnly )
     {
         proxyModel()->removeIndexes( selectedIndexes() );
     }

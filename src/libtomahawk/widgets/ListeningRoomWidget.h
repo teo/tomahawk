@@ -76,6 +76,8 @@ private slots:
 
     void onDataChanged( const QModelIndex&, const QModelIndex& );
 
+    void onHistoryItemActivated( const QModelIndex& idx );
+
 private:
     ListeningRoomHeader *m_header;
     QWidget* m_historyDrawer;
