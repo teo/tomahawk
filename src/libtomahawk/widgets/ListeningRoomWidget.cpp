@@ -138,6 +138,8 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
              m_view,   SLOT( update( QModelIndex ) ) );
     m_view->setItemDelegate( delegate );
     m_view->proxyModel()->setStyle( PlayableProxyModel::Large );
+    connect( m_view, SIGNAL( itemActivated( QModelIndex ) ),
+             this, SLOT( onMainViewItemActivated( QModelIndex ) ) );
 
     connect( m_header, SIGNAL( joinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ),
              this, SLOT( onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ) );
@@ -180,6 +182,14 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
 
     m_view->setPlayableModel( model );
     m_view->setSortingEnabled( false );
+    if ( m_model->listeningRoom()->author()->isLocal() )
+    {
+        m_view->setManualProgression( true );
+    }
+    else
+    {
+        m_view->setReadOnly( true );
+    }
 
     m_header->setCaption( model->title() );
     m_header->setDescription( model->description() );
@@ -344,6 +354,35 @@ ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
             entries.append( lrentry );
             m_model->insertEntries( entries, m_currentRow + 1 );
             playlistInterface()->nextItem();
+        }
+    }
+    else
+    {
+        Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
+        if ( !lman->isLatched( m_model->listeningRoom()->author() ) )
+        {
+            onJoinLeaveButtonClicked( ListeningRoomHeader::Join );
+        }
+    }
+}
+
+void
+ListeningRoomWidget::onMainViewItemActivated( const QModelIndex& idx )
+{
+    Q_ASSERT( !m_model->listeningRoom().isNull() );
+    Q_ASSERT( !m_model->listeningRoom()->author().isNull() );
+
+    if ( m_model->listeningRoom()->author()->isLocal() )
+    {
+        PlayableItem* item = m_model->itemFromIndex( m_view->proxyModel()->mapToSource( idx ) );
+        if ( !item->lrentry().isNull() )
+        {
+            QList< Tomahawk::lrentry_ptr > entries;
+            const Tomahawk::lrentry_ptr& lrentry = item->lrentry();
+            entries.append( lrentry );
+            m_model->insertEntries( entries, m_currentRow + 1 );
+            m_view->startPlayingFromStart();
+            m_model->removeIndex( m_view->proxyModel()->mapToSource( idx ) );
         }
     }
     else

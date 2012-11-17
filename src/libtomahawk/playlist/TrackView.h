@@ -84,8 +84,11 @@ public:
     // Starts playing from the beginning if resolved, or waits until a track is playable
     void startPlayingFromStart();
 
-    void setReadOnly( bool readOnly = true );
+    void setReadOnly( bool readOnly = true ); //default: false, used by listening room history view
     bool isReadOnly() const { return m_readOnly; }
+
+    void setManualProgression( bool manual = true ); //default: false, used by listening room main view
+    bool isManualProgression() const { return m_manualProgression; }
 
 public slots:
     virtual void onItemActivated( const QModelIndex& index );
@@ -147,6 +150,7 @@ private:
     bool m_dragging;
     QRect m_dropRect;
     bool m_readOnly;
+    bool m_manualProgression;
 
     bool m_updateContextView;
 

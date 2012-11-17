@@ -58,6 +58,7 @@ TrackView::TrackView( QWidget* parent )
     , m_updateContextView( true )
     , m_contextMenu( new ContextMenu( this ) )
     , m_readOnly( false )
+    , m_manualProgression( false )
 {
     setFrameShape( QFrame::NoFrame );
     setAttribute( Qt::WA_MacShowFocusRect, 0 );
@@ -234,6 +235,12 @@ TrackView::setReadOnly( bool readOnly )
     m_readOnly = readOnly;
 }
 
+void
+TrackView::setManualProgression( bool manual )
+{
+    m_manualProgression = manual;
+}
+
 
 void
 TrackView::autoPlayResolveFinished( const query_ptr& query, int row )
@@ -281,7 +288,7 @@ TrackView::onItemActivated( const QModelIndex& index )
     if ( !index.isValid() )
         return;
 
-    if ( !m_readOnly )
+    if ( !m_readOnly && !m_manualProgression )
         tryToPlayItem( index );
     emit itemActivated( index );
 }
