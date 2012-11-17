@@ -53,12 +53,12 @@ ListeningRoomCurrentTrackWidget::ListeningRoomCurrentTrackWidget( QWidget* paren
 
     QFont font = m_trackLabel->font();
     font.setBold( true );
-    font.setPointSize( TomahawkUtils::defaultFontSize() + 2 );
+    font.setPointSize( TomahawkUtils::defaultFontSize() + 5 );
     m_trackLabel->setFont( font );
 
     font = m_artistLabel->font();
     font.setBold( true );
-    font.setPointSize( TomahawkUtils::defaultFontSize() - 1 );
+    font.setPointSize( TomahawkUtils::defaultFontSize() + 2 );
     m_artistLabel->setFont( font );
 
     vLayout->addWidget( m_trackLabel );
