@@ -64,7 +64,8 @@ public:
      */
     void setModel( ListeningRoomModel* model );
     
-public slots:
+protected:
+    void resizeEvent( QResizeEvent* e );
 
 private slots:
     void toggleHistoryDrawer();

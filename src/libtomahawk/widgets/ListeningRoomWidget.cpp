@@ -49,16 +49,20 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
     , m_upArrow( QIcon( RESPATH "images/arrow-up-double.png" ) )
     , m_currentRow( -1 )
 {
-    setLayout( new QVBoxLayout );
+    QBoxLayout* mainLayout = new QVBoxLayout;
+    setLayout( mainLayout );
 
     m_header = new ListeningRoomHeader( this );
     m_historyDrawer = new QWidget( this );
     m_body = new QWidget( this );
 
-    layout()->addWidget( m_header );
-    layout()->addWidget( m_historyDrawer );
-    layout()->addWidget( m_body );
-    TomahawkUtils::unmarginLayout( layout() );
+    mainLayout->addWidget( m_header );
+    mainLayout->addWidget( m_historyDrawer );
+    mainLayout->addWidget( m_body );
+
+    m_historyDrawer->setMaximumHeight( 0 );
+
+    TomahawkUtils::unmarginLayout( mainLayout );
 
     // m_historyDrawer
     QVBoxLayout* historyLayout = new QVBoxLayout;
@@ -76,7 +80,6 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
              m_historyView,   SLOT( update( QModelIndex ) ) );
     m_historyView->setItemDelegate( historyDelegate );
     m_historyView->proxyModel()->setStyle( PlayableProxyModel::Large );
-    m_historyDrawer->setFixedHeight( 0 );
 
     // m_body
     QVBoxLayout* bodyLayout = new QVBoxLayout;
@@ -187,11 +190,21 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
              this, SLOT( onDataChanged( QModelIndex, QModelIndex ) ) );
 }
 
+
+void
+ListeningRoomWidget::resizeEvent( QResizeEvent* e )
+{
+    QWidget::resizeEvent( e );
+    if ( m_drawerShown )
+        m_historyDrawer->setFixedHeight( height() * 0.3 );
+}
+
+
 void
 ListeningRoomWidget::toggleHistoryDrawer()
 {
     m_timeline->setEasingCurve( QEasingCurve::OutBack );
-    m_timeline->setFrameRange( 0, m_historyDrawer->sizeHint().height() );
+    m_timeline->setFrameRange( 0, height() * 0.3 );
 
     if ( !m_drawerShown )
     {
