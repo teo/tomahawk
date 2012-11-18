@@ -355,10 +355,10 @@ CategoryItem::CategoryItem( SourcesModel* model,
                             bool showAddItem,
                             int peerSortValue )
     : SourceTreeItem( model, parent, SourcesModel::Category, peerSortValue )
-    , m_addItem( 0 )
-    , m_category( category )
     , m_showAdd( showAddItem )
     , m_enableAdd( true )
+    , m_category( category )
+    , m_addItem( 0 )
 {
     // in the constructor we're still being added to the parent, so we don't exist to have rows addded yet. so this is safe.
     //     beginRowsAdded( 0, 0 );
