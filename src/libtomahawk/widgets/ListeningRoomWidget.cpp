@@ -143,8 +143,22 @@ ListeningRoomWidget::ListeningRoomWidget( QWidget* parent )
 
     connect( m_header, SIGNAL( joinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ),
              this, SLOT( onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState ) ) );
+
+    QPushButton* dbgbtn = new QPushButton( "Debug ListeningRoom contents", m_body );
+    connect( dbgbtn, SIGNAL(clicked()),SLOT(debugSlot()));
 }
 
+void ListeningRoomWidget::debugSlot()
+{
+    QLabel* l = new QLabel;
+    l->setWindowFlags( Qt::Dialog );
+    const QList< Tomahawk::lrentry_ptr >& entries = m_model->listeningRoom()->entries();
+    QString s;
+    foreach ( const Tomahawk::lrentry_ptr& e, entries )
+        s.append( e->query()->track() + "\n" );
+    l->setText( s );
+    l->showNormal();
+}
 
 QString
 ListeningRoomWidget::title() const
@@ -350,9 +364,9 @@ ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
         if ( !item->lrentry().isNull() )
         {
             QList< Tomahawk::lrentry_ptr > entries;
-            const Tomahawk::lrentry_ptr& lrentry = item->lrentry();
-            entries.append( lrentry );
-            m_model->insertEntries( entries, m_currentRow + 1 );
+            const Tomahawk::lrentry_ptr& lre = item->lrentry();
+            entries.append( lre );
+            m_model->insertEntriesFromView( entries, m_currentRow + 1 );
             playlistInterface()->nextItem();
         }
     }
@@ -378,11 +392,12 @@ ListeningRoomWidget::onMainViewItemActivated( const QModelIndex& idx )
         if ( !item->lrentry().isNull() )
         {
             QList< Tomahawk::lrentry_ptr > entries;
-            const Tomahawk::lrentry_ptr& lrentry = item->lrentry();
-            entries.append( lrentry );
-            m_model->insertEntries( entries, m_currentRow + 1 );
-            m_view->startPlayingFromStart();
+            const Tomahawk::lrentry_ptr& lre = item->lrentry();
+            entries.append( lre );
+
             m_model->removeIndex( m_view->proxyModel()->mapToSource( idx ) );
+            m_model->insertEntriesFromView( entries, m_currentRow + 1 );
+            m_view->startPlayingFromStart();
         }
     }
     else

@@ -164,7 +164,6 @@ ListeningRoomModel::endRoomChanges()
         Q_ASSERT( false );
     }
 
-    QList< lrentry_ptr > l = listeningRoomEntries();
 
     if ( m_savedInsertPos >= 0 && !m_savedInsertTracks.isEmpty() &&
          !m_savedRemoveTracks.isEmpty() )
@@ -186,7 +185,7 @@ ListeningRoomModel::endRoomChanges()
             if ( item->lrentry() == m_savedInsertTracks.first() )
             {
                 // Found our index
-                emit m_listeningRoom->tracksMoved( m_savedInsertTracks, i );
+                m_listeningRoom->moveEntries( m_savedInsertTracks, i );
                 break;
             }
         }
@@ -194,15 +193,21 @@ ListeningRoomModel::endRoomChanges()
         m_savedInsertTracks.clear();
         m_savedRemoveTracks.clear();
     }
-    else if ( m_savedInsertPos >= 0 )
+    else if ( m_savedInsertPos >= 0 ) //only insertion
     {
-        emit m_listeningRoom->tracksInserted( m_savedInsertTracks, m_savedInsertPos );
+        QList< query_ptr > qs;
+        foreach ( const lrentry_ptr& e, m_savedInsertTracks )
+        {
+            qs.append( e->query() );
+        }
+
+        m_listeningRoom->insertEntries( qs, m_savedInsertPos );
         m_savedInsertPos = -1;
         m_savedInsertTracks.clear();
     }
     else if ( !m_savedRemoveTracks.isEmpty() )
     {
-        emit m_listeningRoom->tracksRemoved( m_savedRemoveTracks );
+        m_listeningRoom->removeEntries( m_savedRemoveTracks );
         m_savedRemoveTracks.clear();
     }
 }
@@ -236,8 +241,6 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
                     this, SIGNAL( listeningRoomDeleted() ) );
         disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
                     this, SIGNAL( listeningRoomChanged() ) );
-        disconnect( m_listeningRoom.data(), SIGNAL( tracksInserted( QList< Tomahawk::lrentry_ptr >, int ) ),
-                    this, SLOT( insertEntries( QList< Tomahawk::lrentry_ptr>, int ) ) );
         disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
                     this, SLOT( reload() ) );
         disconnect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
@@ -254,8 +257,6 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
              this, SIGNAL( listeningRoomDeleted() ) );
     connect( m_listeningRoom.data(), SIGNAL( changed() ),
              this, SIGNAL( listeningRoomChanged() ) );
-    connect( m_listeningRoom.data(), SIGNAL( tracksInserted( QList< Tomahawk::lrentry_ptr >, int ) ),
-             this, SLOT( insertEntries( QList< Tomahawk::lrentry_ptr>, int ) ) );
     connect( m_listeningRoom.data(), SIGNAL( changed() ),
              this, SLOT( reload() ) );
     connect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
@@ -326,7 +327,7 @@ ListeningRoomModel::clear()
 void
 ListeningRoomModel::appendEntries( const QList< lrentry_ptr >& entries )
 {
-    insertEntries( entries, rowCount( QModelIndex() ) );
+    insertEntriesPrivate( entries, rowCount( QModelIndex() ) );
 }
 
 
@@ -379,12 +380,24 @@ ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
         entries << entry;
     }
 
-    insertEntries( entries, row );
+    insertEntriesPrivate( entries, row );
 }
 
 
 void
-ListeningRoomModel::insertEntries( const QList< lrentry_ptr >& entries, int row )
+ListeningRoomModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, int row )
+{
+    if ( entries.isEmpty() || !m_listeningRoom->author()->isLocal() )
+        return;
+
+    beginRoomChanges();
+    insertEntriesPrivate( entries, row );
+    endRoomChanges();
+}
+
+
+void
+ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, int row )
 {
     if ( !entries.count() )
     {
@@ -480,18 +493,10 @@ ListeningRoomModel::removeIndex( const QModelIndex& index, bool moreToCome )
         beginRoomChanges();
 
     if ( item && !m_isLoading )
-        m_savedRemoveTracks << item->query();
+        m_savedRemoveTracks << item->lrentry();
 
     PlayableModel::removeIndex( index, moreToCome );
 
     if ( !moreToCome )
         endRoomChanges();
 }
-
-
-
-
-
-
-
-

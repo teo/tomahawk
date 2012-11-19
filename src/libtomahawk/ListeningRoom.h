@@ -137,10 +137,15 @@ public:
     // of m_entries.
     QVariantList entriesV() const;
 
-    void addEntry( const Tomahawk::query_ptr& query );
+    void insertEntry( const Tomahawk::query_ptr& query, int position );
     void addEntries( const QList< Tomahawk::query_ptr >& queries );
     void insertEntries( const QList< Tomahawk::query_ptr >& queries,
                         const int position );
+
+    void moveEntries( const QList< Tomahawk::lrentry_ptr >& entries, int position );
+
+    void removeEntries( const QList< Tomahawk::lrentry_ptr >& entries );
+
 
     // <IGNORE hack="true">
     // these need to exist and be public for the json serialization stuff
@@ -176,7 +181,7 @@ signals:
     void tracksInserted( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
 
     /// Notification for tracks being removed from the room
-    void tracksRemoved( const QList< Tomahawk::query_ptr >& tracks );
+    void tracksRemoved( const QList< Tomahawk::lrentry_ptr >& tracks );
 
     /// Notification for tracks being moved in a room. List is of new tracks, and new position of first track
     /// Contiguous range from startPosition

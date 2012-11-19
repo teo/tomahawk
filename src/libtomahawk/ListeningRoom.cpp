@@ -343,12 +343,12 @@ ListeningRoom::onResolvingFinished()
 
 
 void
-ListeningRoom::addEntry( const query_ptr& query )
+ListeningRoom::insertEntry( const query_ptr& query, int position )
 {
     QList< query_ptr > queries;
     queries << query;
 
-    addEntries( queries );
+    insertEntries( queries, position );
 }
 
 
@@ -393,6 +393,37 @@ ListeningRoom::insertEntries( const QList< query_ptr >& queries,
     //Notify listeners.
     qDebug() << "ListeningRoom got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
     emit tracksInserted( toInsert, position );
+}
+
+
+void
+ListeningRoom::moveEntries( const QList<lrentry_ptr>& entries, int position )
+{
+    QList< lrentry_ptr > buffer;
+    foreach ( const lrentry_ptr& e, entries )
+    {
+        int i = m_entries.indexOf( e );
+        if ( i < position )
+            position--;
+        m_entries.removeAt( i );
+        buffer.append( e );
+    }
+    foreach ( const lrentry_ptr& e, buffer )
+    {
+        m_entries.insert( position, e );
+        position++;
+    }
+    pushUpdate();
+}
+
+
+void ListeningRoom::removeEntries( const QList< lrentry_ptr >& entries )
+{
+    foreach ( const lrentry_ptr& e, entries )
+    {
+        m_entries.removeAll( e );
+    }
+    pushUpdate();
 }
 
 

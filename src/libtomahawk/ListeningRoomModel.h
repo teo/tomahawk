@@ -51,7 +51,7 @@ public slots:
     void insertAlbums( const QList< Tomahawk::album_ptr >& albums, int row = 0 );
     void insertArtists( const QList< Tomahawk::artist_ptr >& artists, int row = 0 );
     void insertQueries( const QList< Tomahawk::query_ptr >& queries, int row = 0 );
-    void insertEntries( const QList< Tomahawk::lrentry_ptr >& entries, int row = 0 );
+    void insertEntriesFromView( const QList< Tomahawk::lrentry_ptr >& entries, int row = 0 );
 
     void removeIndex( const QModelIndex& index, bool moreToCome = false );
 
@@ -68,6 +68,7 @@ private slots:
     void trackResolved( bool );
     void reload();
     void reloadRoomMetadata();
+    void insertEntriesPrivate( const QList< Tomahawk::lrentry_ptr >& entries, int row = 0 );
 
 private:
     void beginRoomChanges();
@@ -81,7 +82,7 @@ private:
 
     int m_savedInsertPos;
     QList< Tomahawk::lrentry_ptr > m_savedInsertTracks;
-    QList< Tomahawk::query_ptr > m_savedRemoveTracks;
+    QList< Tomahawk::lrentry_ptr > m_savedRemoveTracks;
 
     DropStorageData m_dropStorage;
 };
