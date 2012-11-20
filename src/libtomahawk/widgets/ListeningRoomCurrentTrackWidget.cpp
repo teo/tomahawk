@@ -116,6 +116,10 @@ ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
 
     unsigned int duration = q->duration();
 
+    // the following doesn't really work as it should, maybe because the model is reloaded on changes,
+    // and queries resolved again and again which doesn't leave enough time before the next track is
+    // popped up to this widget
+    // TODO: investigate
     if ( !q->results().isEmpty() &&
          !q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) ).isNull() )
     {

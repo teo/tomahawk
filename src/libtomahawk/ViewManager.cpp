@@ -162,18 +162,9 @@ ViewManager::createPageForListeningRoom( const listeningroom_ptr& room )
     ListeningRoomModel* model = new ListeningRoomModel();
 
     model->loadListeningRoom( room );
-    if ( model->currentItem() != QModelIndex() )
-        tDebug() << Q_FUNC_INFO << "current row is "<< model->currentItem().row();
-    else
-        tDebug() << Q_FUNC_INFO << "current row is null";
-
     w->setModel( model );
     room->resolve();
 
-    if ( !w->playlistInterface().isNull() && !w->playlistInterface()->currentItem().isNull() )
-        tDebug() << Q_FUNC_INFO << "current track is "<< w->playlistInterface()->currentItem()->track();
-    else
-        tDebug() << Q_FUNC_INFO << "current track is null";
     return w;
 }
 
@@ -227,16 +218,7 @@ ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
     {
         w = m_listeningRoomWidgets.value( listeningRoom ).data();
     }
-    if ( !w->playlistInterface().isNull() && !w->playlistInterface()->currentItem().isNull() )
-        tDebug() << Q_FUNC_INFO << "current track is "<< w->playlistInterface()->currentItem()->track();
-    else
-        tDebug() << Q_FUNC_INFO << "current track is null";
     setPage( w );
-    tDebug() << Q_FUNC_INFO << "setPage done!";
-    if ( !w->playlistInterface().isNull() && !w->playlistInterface()->currentItem().isNull() )
-        tDebug() << Q_FUNC_INFO << "current track is "<< w->playlistInterface()->currentItem()->track();
-    else
-        tDebug() << Q_FUNC_INFO << "current track is null";
     return w;
 }
 

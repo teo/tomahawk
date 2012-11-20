@@ -95,7 +95,6 @@ PlayableProxyModelPlaylistInterface::siblingItem( int itemsAway, bool readOnly )
         return result_ptr();
 
     PlayableProxyModel* proxyModel = m_proxyModel.data();
-    tDebug() << "current item is "<< proxyModel->sourceModel()->currentItem().row();
 
     while ( m_shuffleHistory.count() && m_shuffleHistory.count() >= proxyModel->rowCount() )
     {
@@ -166,7 +165,6 @@ PlayableProxyModelPlaylistInterface::siblingItem( int itemsAway, bool readOnly )
             }
         }
     }
-    tDebug() << "current item is "<< proxyModel->sourceModel()->currentItem().row();
 
     if ( !idx.isValid() && m_repeatMode == PlaylistModes::RepeatAll )
     {
@@ -182,7 +180,6 @@ PlayableProxyModelPlaylistInterface::siblingItem( int itemsAway, bool readOnly )
             idx = proxyModel->index( proxyModel->rowCount() - 1, 0 );
         }
     }
-    tDebug() << "current item is "<< proxyModel->sourceModel()->currentItem().row();
 
     // Try to find the next available PlaylistItem (with results)
     while ( idx.isValid() )
@@ -197,18 +194,15 @@ PlayableProxyModelPlaylistInterface::siblingItem( int itemsAway, bool readOnly )
                 m_shuffleHistory << item->query();
                 m_shuffleCache = QPersistentModelIndex();
             }
-            tDebug() << "current item before return is "<< proxyModel->sourceModel()->currentItem().row();
 
             return item->query()->results().at( 0 );
         }
 
         idx = proxyModel->index( idx.row() + ( itemsAway > 0 ? 1 : -1 ), 0 );
     }
-    tDebug() << "current item is "<< proxyModel->sourceModel()->currentItem().row();
 
     if ( !readOnly )
         proxyModel->setCurrentIndex( QModelIndex() );
-    tDebug() << "current item is "<< proxyModel->sourceModel()->currentItem().row();
 
     return result_ptr();
 }

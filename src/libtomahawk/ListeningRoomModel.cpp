@@ -235,7 +235,6 @@ ListeningRoomModel::listeningRoomEntries() const
 void
 ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries )
 {
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
     if ( !m_listeningRoom.isNull() ) //NOTE: LR already loaded, does this ever happen?
     {
         disconnect( m_listeningRoom.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
@@ -271,14 +270,12 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
     }
 
     reload();
-    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
 void
 ListeningRoomModel::reloadRoomMetadata()
 {
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
     setTitle( m_listeningRoom->title() );
     QString age = TomahawkUtils::ageToString( QDateTime::fromTime_t( m_listeningRoom->createdOn() ), true );
 
@@ -293,13 +290,11 @@ ListeningRoomModel::reloadRoomMetadata()
     setDescription( desc );
 
     emit listenersChanged();
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
 }
 
 void
 ListeningRoomModel::reload()
 {
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
     m_isLoading = true;
 
     reloadRoomMetadata();
@@ -350,13 +345,11 @@ ListeningRoomModel::reload()
     {
         clear();
         appendEntries( entries ); //emits signals and stuff
-        tDebug() << "done with appendEntries call from LRM::reload()";
     }
 
     bool hasRowChanged = false;
     if ( currentItem().row() != m_listeningRoom->currentRow() )
     {
-        tDebug() << "CHANGING ROW to " << m_listeningRoom->currentRow();
         hasRowChanged = true;
         int row = m_listeningRoom->currentRow();
         if ( row >= 0 && row < rowCount( QModelIndex() ) )
@@ -367,7 +360,6 @@ ListeningRoomModel::reload()
         emit currentRowChanged();
 
     m_isLoading = false;
-    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -421,7 +413,6 @@ ListeningRoomModel::insertArtists( const QList< artist_ptr >& artists, int row )
 void
 ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
 {
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
     QList< Tomahawk::lrentry_ptr > entries;
     foreach ( const query_ptr& query, queries )
     {
@@ -437,7 +428,6 @@ ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
     }
 
     insertEntriesPrivate( entries, row );
-    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -456,7 +446,6 @@ ListeningRoomModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, 
 void
 ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, int row )
 {
-    tDebug() << "BEGIN" << Q_FUNC_INFO;
     if ( !entries.count() )
     {
         emit trackCountChanged( rowCount( QModelIndex() ) );
@@ -504,11 +493,9 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
         emit loadingStarted();
     }
 
-    tDebug() << "some emissions in" << Q_FUNC_INFO;
     emit endInsertRows();
     emit trackCountChanged( rowCount( QModelIndex() ) );
     finishLoading();
-    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
