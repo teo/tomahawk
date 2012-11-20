@@ -235,12 +235,11 @@ ListeningRoomModel::listeningRoomEntries() const
 void
 ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries )
 {
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     if ( !m_listeningRoom.isNull() ) //NOTE: LR already loaded, does this ever happen?
     {
         disconnect( m_listeningRoom.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
                     this, SIGNAL( listeningRoomDeleted() ) );
-        disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
-                    this, SIGNAL( listeningRoomChanged() ) );
         disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
                     this, SLOT( reload() ) );
         disconnect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
@@ -255,8 +254,6 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
     m_listeningRoom = room;
     connect( m_listeningRoom.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
              this, SIGNAL( listeningRoomDeleted() ) );
-    connect( m_listeningRoom.data(), SIGNAL( changed() ),
-             this, SIGNAL( listeningRoomChanged() ) );
     connect( m_listeningRoom.data(), SIGNAL( changed() ),
              this, SLOT( reload() ) );
     connect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
@@ -274,12 +271,14 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
     }
 
     reload();
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
 void
 ListeningRoomModel::reloadRoomMetadata()
 {
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     setTitle( m_listeningRoom->title() );
     QString age = TomahawkUtils::ageToString( QDateTime::fromTime_t( m_listeningRoom->createdOn() ), true );
 
@@ -294,11 +293,13 @@ ListeningRoomModel::reloadRoomMetadata()
     setDescription( desc );
 
     emit listenersChanged();
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
 }
 
 void
 ListeningRoomModel::reload()
 {
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     m_isLoading = true;
 
     reloadRoomMetadata();
@@ -307,12 +308,66 @@ ListeningRoomModel::reload()
     foreach ( const lrentry_ptr& p, entries )
         tDebug() << p->guid() << p->query()->track() << p->query()->artist();
 
-    clear();
-    appendEntries( entries );
+    // Since LR dbcmds are all singletons, they give all listeners the complete LR data every time,
+    // even if the actual list of tracks has not changed.
+    // To avoid unnecessary model/view reload, we make sure that we only reload if stuff has changed.
+    // It is an expensive O(n) entry-by-entry search for changes, but it surely beats clearing and
+    // reloading the whole model and view every time.
+    bool hasChanged = false;
+    if ( entries.count() != rowCount( QModelIndex() ) )
+    {
+        hasChanged = true;
+    }
+    else //could be unchanged
+    {
+        for ( int i = 0; i < entries.count(); ++i )
+        {
+            QModelIndex idx = index( i, 0, QModelIndex() );
+            if ( !idx.isValid() )
+            {
+                hasChanged = true;
+                break;
+            }
 
-    emit listeningRoomChanged();
+            PlayableItem* item = itemFromIndex( idx );
+            if ( item && !item->lrentry().isNull() )
+            {
+                if ( item->lrentry()->query() != entries.at( i )->query() )
+                {
+                    hasChanged = true;
+                    break;
+                }
+            }
+            else
+            {
+                hasChanged = true;
+                break;
+            }
+        }
+    }
+
+    if ( hasChanged )
+    {
+        clear();
+        appendEntries( entries ); //emits signals and stuff
+        tDebug() << "done with appendEntries call from LRM::reload()";
+    }
+
+    bool hasRowChanged = false;
+    if ( currentItem().row() != m_listeningRoom->currentRow() )
+    {
+        tDebug() << "CHANGING ROW to " << m_listeningRoom->currentRow();
+        hasRowChanged = true;
+        int row = m_listeningRoom->currentRow();
+        if ( row >= 0 && row < rowCount( QModelIndex() ) )
+            setCurrentItem( index( row, 0, QModelIndex() ) );
+    }
+
+    if ( hasChanged || hasRowChanged )
+        emit currentRowChanged();
 
     m_isLoading = false;
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -366,6 +421,7 @@ ListeningRoomModel::insertArtists( const QList< artist_ptr >& artists, int row )
 void
 ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
 {
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     QList< Tomahawk::lrentry_ptr > entries;
     foreach ( const query_ptr& query, queries )
     {
@@ -381,6 +437,7 @@ ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
     }
 
     insertEntriesPrivate( entries, row );
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -399,6 +456,7 @@ ListeningRoomModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, 
 void
 ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, int row )
 {
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     if ( !entries.count() )
     {
         emit trackCountChanged( rowCount( QModelIndex() ) );
@@ -446,9 +504,11 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
         emit loadingStarted();
     }
 
+    tDebug() << "some emissions in" << Q_FUNC_INFO;
     emit endInsertRows();
     emit trackCountChanged( rowCount( QModelIndex() ) );
     finishLoading();
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -499,4 +559,16 @@ ListeningRoomModel::removeIndex( const QModelIndex& index, bool moreToCome )
 
     if ( !moreToCome )
         endRoomChanges();
+}
+
+
+void
+ListeningRoomModel::setCurrentItem( const QModelIndex& index )
+{
+    PlayableModel::setCurrentItem( index );
+    if ( !m_listeningRoom.isNull() && m_listeningRoom->author() == SourceList::instance()->getLocal() )
+    {
+        m_listeningRoom->setCurrentRow( index.row() );
+        m_listeningRoom->pushUpdate();
+    }
 }

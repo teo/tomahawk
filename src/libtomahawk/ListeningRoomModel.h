@@ -55,9 +55,11 @@ public slots:
 
     void removeIndex( const QModelIndex& index, bool moreToCome = false );
 
+    void setCurrentItem( const QModelIndex& index );
+
 signals:
     void listeningRoomDeleted();
-    void listeningRoomChanged();
+    void currentRowChanged();
     void listenersChanged();
 
 protected:

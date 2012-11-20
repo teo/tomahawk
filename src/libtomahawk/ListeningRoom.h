@@ -99,6 +99,7 @@ class DLLEXPORT ListeningRoom : public QObject
     Q_PROPERTY( uint createdon          READ createdOn          WRITE setCreatedOn )
     Q_PROPERTY( QVariantList entries    READ entriesV           WRITE setEntriesV )
     Q_PROPERTY( QVariantList listenerIds READ listenerIdsV      WRITE setListenerIdsV )
+    Q_PROPERTY( int currentRow          READ currentRow         WRITE setCurrentRow )
 
     friend class ::DatabaseCommand_ListeningRoomInfo;
     friend class ::ListeningRoomModel;
@@ -125,6 +126,7 @@ public:
     QString guid() const            { return m_guid; }
     uint lastmodified() const       { return m_lastmodified; }
     uint createdOn() const          { return m_createdOn; }
+    int currentRow() const          { return m_currentRow; }
 
     const QList< Tomahawk::lrentry_ptr >& entries() const { return m_entries; }
 
@@ -159,6 +161,7 @@ public:
     void setEntriesV( const QVariantList& l );
     void setListenerIdsV( const QVariantList& v );
     QVariantList listenerIdsV() const;
+    void setCurrentRow( int row )               { m_currentRow = row; }
     // </IGNORE>
 
     QStringList listenerIds() const { return m_listenerIds; }
@@ -235,6 +238,7 @@ private:
     uint m_createdOn;
     QList< Tomahawk::lrentry_ptr > m_entries;
     QStringList m_listenerIds;
+    int m_currentRow;
 
     Tomahawk::playlistinterface_ptr m_playlistInterface;
 };

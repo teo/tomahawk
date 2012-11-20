@@ -156,6 +156,7 @@ void ListeningRoomWidget::debugSlot()
     QString s;
     foreach ( const Tomahawk::lrentry_ptr& e, entries )
         s.append( e->query()->track() + "\n" );
+    s.append( "\n\n current row is " + QString::number( m_model->listeningRoom()->currentRow() ) );
     l->setText( s );
     l->showNormal();
 }
@@ -186,6 +187,7 @@ void
 ListeningRoomWidget::setModel( ListeningRoomModel* model )
 {
     Q_ASSERT( !m_model ); //TODO: does it ever happen that m_model is already assigned?
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
     if ( m_model )
         delete m_model;
 
@@ -217,6 +219,7 @@ ListeningRoomWidget::setModel( ListeningRoomModel* model )
 
     connect( m_model, SIGNAL( dataChanged( QModelIndex, QModelIndex ) ),
              this, SLOT( onDataChanged( QModelIndex, QModelIndex ) ) );
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -341,14 +344,17 @@ ListeningRoomWidget::onDataChanged( const QModelIndex& topLeft, const QModelInde
 {
     Q_UNUSED( topLeft );
     Q_UNUSED( bottomRight );
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
 
     if ( m_model->currentItem().row() != m_currentRow )
     {
-        m_currentRow = m_model->currentItem().row();
+        tDebug() << "about to update LRW::m_currentRow";
+        m_currentRow = ( m_model->currentItem() == QModelIndex() ) ? -1 : m_model->currentItem().row();
         m_view->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowAfter, m_currentRow );
         m_historyView->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowBefore, m_currentRow );
         m_currentTrackWidget->setItem( m_model->currentItem() );
     }
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -357,6 +363,7 @@ ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
 {
     Q_ASSERT( !m_model->listeningRoom().isNull() );
     Q_ASSERT( !m_model->listeningRoom()->author().isNull() );
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
 
     if ( m_model->listeningRoom()->author()->isLocal() )
     {
@@ -378,6 +385,7 @@ ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
             onJoinLeaveButtonClicked( ListeningRoomHeader::Join );
         }
     }
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 void
@@ -385,6 +393,7 @@ ListeningRoomWidget::onMainViewItemActivated( const QModelIndex& idx )
 {
     Q_ASSERT( !m_model->listeningRoom().isNull() );
     Q_ASSERT( !m_model->listeningRoom()->author().isNull() );
+    tDebug() << "BEGIN" << Q_FUNC_INFO;
 
     if ( m_model->listeningRoom()->author()->isLocal() )
     {
@@ -408,6 +417,7 @@ ListeningRoomWidget::onMainViewItemActivated( const QModelIndex& idx )
             onJoinLeaveButtonClicked( ListeningRoomHeader::Join );
         }
     }
+    tDebug() << "END" << Q_FUNC_INFO;
 }
 
 
@@ -415,9 +425,15 @@ Tomahawk::playlistinterface_ptr
 ListeningRoomWidget::playlistInterface() const
 {
     if ( !m_model )
+    {
+        tDebug() << Q_FUNC_INFO << "returning null";
         return Tomahawk::playlistinterface_ptr();
+    }
     else
+    {
+        tDebug() << Q_FUNC_INFO << "returning main view's proxy playlist interface";
         return m_view->proxyModel()->playlistInterface();
+    }
 }
 
 

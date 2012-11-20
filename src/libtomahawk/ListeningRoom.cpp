@@ -80,6 +80,7 @@ ListeningRoom::ListeningRoom( const source_ptr& author,
     , m_lastmodified( 0 )
     , m_createdOn( 0 ) //will be set later
     , m_entries( entries )
+    , m_currentRow( -1 )
 {
     init();
 }
@@ -200,6 +201,12 @@ ListeningRoom::updateFrom( const listeningroom_ptr& other )
     if ( m_createdOn != other->m_createdOn )
     {
         setCreatedOn( other->m_createdOn );
+        isChanged = true;
+    }
+
+    if ( m_currentRow != other->m_currentRow )
+    {
+        setCurrentRow( other->m_currentRow );
         isChanged = true;
     }
 
@@ -361,6 +368,7 @@ ListeningRoom::addEntries( const QList< query_ptr >& queries )
     const int prevSize = m_entries.size();
 
     m_entries.append( el );
+    emit changed();
 
     pushUpdate();
 

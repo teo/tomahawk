@@ -826,6 +826,7 @@ AudioEngine::setPlaylist( Tomahawk::playlistinterface_ptr playlist )
         emit playlistChanged( playlist );
         return;
     }
+    tDebug() << Q_FUNC_INFO <<( (!playlist->currentItem().isNull())? playlist->currentItem()->track() : "" );
 
     m_playlist = playlist;
     m_stopAfterTrack.clear();

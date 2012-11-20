@@ -116,8 +116,12 @@ ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
 
     unsigned int duration = q->duration();
 
-    const QPixmap sourceIcon = q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) );
-    m_avatarLabel->setPixmap( sourceIcon );
+    if ( !q->results().isEmpty() &&
+         !q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) ).isNull() )
+    {
+        const QPixmap sourceIcon = q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) );
+        m_avatarLabel->setPixmap( sourceIcon );
+    }
 
     if ( duration > 0 )
     {
