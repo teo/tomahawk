@@ -781,7 +781,6 @@ SourceTreeView::dragMoveEvent( QDragMoveEvent* event )
                 switch ( model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() )
                 {
                     case SourcesModel::StaticPlaylist:
-                    case SourcesModel::ListeningRoom:
                     case SourcesModel::CategoryAdd:
                         m_delegate->hovered( index, event->mimeData() );
                         dataChanged( index, index );
@@ -828,11 +827,11 @@ SourceTreeView::dropEvent( QDropEvent* event )
     tDebug() << Q_FUNC_INFO;
     const QPoint pos = event->pos();
     const QModelIndex index = indexAt( pos );
+    tDebug() << "Dropped on item " << itemFromIndex< SourceTreeItem >( index )->text();
 
     if ( model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::StaticPlaylist
          || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::LovedTracksPage
-         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::CategoryAdd
-         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::ListeningRoom )
+         || model()->data( index, SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::CategoryAdd )
     {
         SourceTreeItem* item = itemFromIndex< SourceTreeItem >( index );
         Q_ASSERT( item );

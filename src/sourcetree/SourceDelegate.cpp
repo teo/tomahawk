@@ -450,8 +450,7 @@ SourceDelegate::paint( QPainter* painter, const QStyleOptionViewItem& option, co
         paintCollection( painter, o, index );
     }
     else if ( ( type == SourcesModel::StaticPlaylist ||
-                type == SourcesModel::CategoryAdd ||
-                type == SourcesModel::ListeningRoom ) &&
+                type == SourcesModel::CategoryAdd ) &&
               m_expandedMap.contains( index ) && m_expandedMap.value( index )->partlyExpanded() && dropTypeCount( item ) > 0 )
     {
 
