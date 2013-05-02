@@ -213,6 +213,8 @@ list(APPEND libSources
     accounts/spotify/SpotifyAccountConfig.cpp
     accounts/spotify/SpotifyPlaylistUpdater.cpp
     accounts/spotify/SpotifyInfoPlugin.cpp
+    
+    accountstorage/AccountStoragePlugin.cpp
 
     audio/AudioEngine.cpp
 
@@ -350,6 +352,14 @@ IF(LIBLASTFM_FOUND)
         accounts/lastfm/LastFmInfoPlugin.cpp
     )
 ENDIF(LIBLASTFM_FOUND)
+
+if( ACCOUNTSQT_FOUND )
+    include_directories( ${ACCOUNTSQT_INCLUDE_DIRS} )
+    list(APPEND LINK_LIBRARIES ${ACCOUNTSQT_LIBRARIES} )
+    list(APPEND libSources
+        accountstorage/accountssso/AccountsSsoAccountStoragePlugin.cpp
+    )
+endif( ACCOUNTSQT_FOUND )
 
 set( libUI ${libUI}
     widgets/PlaylistTypeSelectorDialog.ui

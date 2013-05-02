@@ -21,7 +21,7 @@ set(ACCOUNTSQT_INCLUDE_DIRS ${ACCOUNTSQT_INCLUDE_DIR} )
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set  ACCOUNTSQT_FOUND to TRUE
 # if all listed variables are TRUE
-find_package_handle_standard_args(libaccounts-qt  DEFAULT_MSG
+find_package_handle_standard_args(AccountsQt  DEFAULT_MSG
                                   ACCOUNTSQT_LIBRARY ACCOUNTSQT_INCLUDE_DIR)
 
 mark_as_advanced(ACCOUNTSQT_INCLUDE_DIR ACCOUNTSQT_LIBRARY )
