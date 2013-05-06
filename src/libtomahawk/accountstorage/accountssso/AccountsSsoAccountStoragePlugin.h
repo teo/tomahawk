@@ -20,21 +20,31 @@
 #define ACCOUNTSSSOACCOUNTSTORAGEPLUGIN_H
 
 #include "accountstorage/AccountStoragePlugin.h"
+#include "accountstorage/AccountStorageDllMacro.h"
 
 #include <accounts-qt/Accounts/accountscommon.h>
 #include <accounts-qt/Accounts/manager.h>
 
+#include <QStringList>
 
-class AccountsSsoAccountStoragePlugin : public AccountStoragePlugin
+namespace Tomahawk
+{
+
+class ACCOUNTSTORAGEDLLEXPORT AccountsSsoAccountStoragePlugin : public AccountStoragePlugin
 {
     Q_OBJECT
+    Q_INTERFACES( Tomahawk::AccountStoragePlugin )
+
 public:
     explicit AccountsSsoAccountStoragePlugin( QObject* parent = 0 );
     
 signals:
     
 public slots:
+    virtual QStringList accounts() const;
     
 };
+
+}
 
 #endif // ACCOUNTSSSOACCOUNTSTORAGEPLUGIN_H

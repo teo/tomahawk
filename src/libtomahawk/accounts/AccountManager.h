@@ -117,6 +117,9 @@ private:
     Account* loadPlugin( const QString &accountId );
     void hookupAccount( Account* ) const;
 
+    QStringList findAccountStoragePlugins();
+    QList< QDir > findPluginDirs() const;
+
     QList< Account* > m_accounts;
     QList< Account* > m_enabledAccounts;
     QList< Account* > m_connectedAccounts;

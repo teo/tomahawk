@@ -354,10 +354,15 @@ IF(LIBLASTFM_FOUND)
 ENDIF(LIBLASTFM_FOUND)
 
 if( ACCOUNTSQT_FOUND )
-    include_directories( ${ACCOUNTSQT_INCLUDE_DIRS} )
-    list(APPEND LINK_LIBRARIES ${ACCOUNTSQT_LIBRARIES} )
-    list(APPEND libSources
-        accountstorage/accountssso/AccountsSsoAccountStoragePlugin.cpp
+    include_directories( ${ACCOUNTSQT_INCLUDE_DIR} )
+    tomahawk_add_plugin( accountssso
+        TYPE accountstorage
+        EXPORT_MACRO ACCOUNTSTORAGEDLLEXPORT_PRO
+        SOURCES
+            accountstorage/accountssso/AccountsSsoAccountStoragePlugin.cpp
+        LINK_LIBRARIES
+            ${TOMAHAWK_LIBRARIES}
+            ${ACCOUNTSQT_LIBRARY}
     )
 endif( ACCOUNTSQT_FOUND )
 
@@ -518,6 +523,7 @@ file( GLOB rootHeaders "*.h" )
 file( GLOB accountsHeaders "accounts/*.h" )
 file( GLOB accountsLastfmHeaders "accounts/lastfm/*.h" )
 file( GLOB accountsSpotifyHeaders "accounts/spotify/*.h" )
+file( GLOB accountStorageAccountsSsoHeaders "accountstorage/accountssso/*.h" )
 file( GLOB audioHeaders "audio/*.h" )
 file( GLOB collectionHeaders "collection/*.h" )
 file( GLOB contextHeaders "context/*.h" )
@@ -548,6 +554,7 @@ install( FILES ${rootHeaders} DESTINATION include/libtomahawk )
 install( FILES ${accountsHeaders} DESTINATION include/libtomahawk/accounts )
 install( FILES ${accountsLastfmHeaders} DESTINATION include/libtomahawk/accounts/lastfm )
 install( FILES ${accountsSpotifyHeaders} DESTINATION include/libtomahawk/accounts/spotify )
+install( FILES ${accountStorageAccountsSsoHeaders} DESTINATION include/libtomahawk/accountstorage/accountssso )
 install( FILES ${audioHeaders} DESTINATION include/libtomahawk/audio )
 install( FILES ${collectionHeaders} DESTINATION include/libtomahawk/collection )
 install( FILES ${contextHeaders} DESTINATION include/libtomahawk/context )

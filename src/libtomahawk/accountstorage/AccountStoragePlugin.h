@@ -21,7 +21,12 @@
 
 #include <QObject>
 
-class AccountStoragePlugin : public QObject
+#include "DllMacro.h"
+
+namespace Tomahawk
+{
+
+class DLLEXPORT AccountStoragePlugin : public QObject
 {
     Q_OBJECT
 public:
@@ -30,7 +35,12 @@ public:
 signals:
     
 public slots:
+    virtual QStringList accounts() const = 0;
     
 };
+
+}
+
+Q_DECLARE_INTERFACE( Tomahawk::AccountStoragePlugin, "tomahawk.AccountStoragePlugin/1.0" )
 
 #endif // ACCOUNTSTORAGEPLUGIN_H

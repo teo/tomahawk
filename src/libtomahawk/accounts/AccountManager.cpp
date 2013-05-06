@@ -18,6 +18,7 @@
  */
 
 #include "AccountManager.h"
+#include "accountstorage/AccountStoragePlugin.h"
 #include "config.h"
 #include "SourceList.h"
 #include "TomahawkSettings.h"
@@ -90,10 +91,9 @@ AccountManager::init()
 }
 
 
-QStringList
-AccountManager::findPluginFactories()
+QList< QDir >
+AccountManager::findPluginDirs() const
 {
-    QStringList paths;
     QList< QDir > pluginDirs;
 
     QDir appDir( qApp->applicationDirPath() );
@@ -114,10 +114,21 @@ AccountManager::findPluginFactories()
     lib64Dir.cd( "lib64" );
 
     pluginDirs << appDir << libDir << lib64Dir << QDir( qApp->applicationDirPath() );
-    foreach ( const QDir& pluginDir, pluginDirs )
+    return pluginDirs;
+}
+
+
+QStringList
+AccountManager::findPluginFactories()
+{
+    QStringList paths;
+
+    foreach ( const QDir& pluginDir, findPluginDirs() )
     {
         tDebug() << Q_FUNC_INFO << "Checking directory for plugins:" << pluginDir;
-        foreach ( QString fileName, pluginDir.entryList( QStringList() << "*tomahawk_account_*.so" << "*tomahawk_account_*.dylib" << "*tomahawk_account_*.dll", QDir::Files ) )
+        foreach ( QString fileName, pluginDir.entryList( QStringList() << "*tomahawk_account_*.so"
+                                                                       << "*tomahawk_account_*.dylib"
+                                                                       << "*tomahawk_account_*.dll", QDir::Files ) )
         {
             if ( fileName.startsWith( "libtomahawk_account" ) )
             {
@@ -127,6 +138,33 @@ AccountManager::findPluginFactories()
             }
         }
     }
+
+    return paths;
+}
+
+
+QStringList
+AccountManager::findAccountStoragePlugins()
+{
+    QStringList paths;
+
+    foreach ( const QDir& pluginDir, findPluginDirs() )
+    {
+        tDebug() << Q_FUNC_INFO << "Checking directory for account storage plugins:" << pluginDir;
+        foreach ( QString fileName, pluginDir.entryList( QStringList() << "*tomahawk_accountstorage_*.so"
+                                                                       << "*tomahawk_accountstorage_*.dylib"
+                                                                       << "*tomahawk_accountstorage_*.dll", QDir::Files ) )
+        {
+            if ( fileName.startsWith( "libtomahawk_accountstorage" ) )
+            {
+                const QString path = pluginDir.absoluteFilePath( fileName );
+                if ( !paths.contains( path ) )
+                    paths << path;
+            }
+        }
+    }
+
+    tDebug() << "File paths:" << paths;
 
     return paths;
 }
@@ -275,6 +313,7 @@ AccountManager::toggleAccountsConnected()
 void
 AccountManager::loadFromConfig()
 {
+    // First we try to get all the accounts stored in TomahawkSettings
     QStringList accountIds = TomahawkSettings::instance()->accounts();
     qDebug() << "LOADING ALL ACCOUNTS" << accountIds;
     foreach ( const QString& accountId, accountIds )
@@ -284,6 +323,44 @@ AccountManager::loadFromConfig()
         {
             Account* account = loadPlugin( accountId );
             addAccount( account );
+        }
+    }
+
+    tDebug() << "Here's some accountIds from TomahawkSettings" << accountIds;
+
+    // Neat. Now let's see if there's anything worth loading in the system's global account storage.
+    // Presently this means just the Accounts & SSO store on some Linux distros.
+    // This also ignores dupes, giving precedence to TomahawkSettings accounts.
+
+    QStringList storagePlugins = findAccountStoragePlugins();
+    foreach ( QString storagePluginPath, storagePlugins )
+    {
+        AccountStoragePlugin* storage;
+        QPluginLoader* loader = new QPluginLoader( this );
+        if ( !QLibrary::isLibrary( storagePluginPath ) )
+            continue;
+
+        loader->setFileName( storagePluginPath );
+        if ( !loader->load() )
+        {
+            tDebug() << loader->errorString() << loader->staticInstances().count();
+            continue;
+        }
+
+        storage = qobject_cast< AccountStoragePlugin* >( loader->instance() );
+        if ( !storage )
+            continue;
+
+        QStringList ssoAccountIds = storage->accounts();
+        tDebug() << "LOADING ALL ACCOUNTS FROM STORAGE" << ssoAccountIds;
+        foreach ( const QString& accountId, ssoAccountIds )
+        {
+            QString pluginFactory = factoryFromId( accountId ); //TODO: make this get the factory correctly. depends on AccStorage I guess?
+            if ( m_accountFactories.contains( pluginFactory ) )
+            {
+                Account* account = loadPlugin( accountId );
+                addAccount( account );
+            }
         }
     }
 }

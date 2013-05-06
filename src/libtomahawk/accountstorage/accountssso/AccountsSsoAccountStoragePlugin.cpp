@@ -17,8 +17,20 @@
  */
 
 #include "AccountsSsoAccountStoragePlugin.h"
+#include <QtPlugin>
 
-AccountsSsoAccountStoragePlugin::AccountsSsoAccountStoragePlugin( QObject* parent )
-    : AccountStoragePlugin( parent )
+
+Tomahawk::AccountsSsoAccountStoragePlugin::AccountsSsoAccountStoragePlugin( QObject* parent )
+    : Tomahawk::AccountStoragePlugin( parent )
 {
 }
+
+
+QStringList
+Tomahawk::AccountsSsoAccountStoragePlugin::accounts() const
+{
+    return QStringList(); //dummy
+}
+
+
+Q_EXPORT_PLUGIN2( Tomahawk::AccountStoragePlugin, Tomahawk::AccountsSsoAccountStoragePlugin )

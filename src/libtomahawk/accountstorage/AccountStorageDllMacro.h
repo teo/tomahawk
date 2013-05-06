@@ -1,6 +1,8 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2013, Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -16,9 +18,17 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "AccountStoragePlugin.h"
+#ifndef ACCOUNTSTORAGEDLLMACRO_H
+#define ACCOUNTSTORAGEDLLMACRO_H
 
-Tomahawk::AccountStoragePlugin::AccountStoragePlugin(QObject *parent)
-    : QObject( parent )
-{
-}
+#include <QtCore/qglobal.h>
+
+#ifndef ACCOUNTSTORAGEDLLEXPORT
+# if defined (ACCOUNTSTORAGEDLLEXPORT_PRO)
+#  define ACCOUNTSTORAGEDLLEXPORT Q_DECL_EXPORT
+# else
+#  define ACCOUNTSTORAGEDLLEXPORT Q_DECL_IMPORT
+# endif
+#endif
+
+#endif
