@@ -21,12 +21,9 @@
 
 #include "network/Servent.h"
 #include "Source.h"
+#include "SourceList.h"
 #include "Party.h"
 #include "utils/Logger.h"
-
-#ifndef ENABLE_HEADLESS
-#include "ViewManager.h"
-#endif
 
 #include <QDateTime>
 
@@ -134,7 +131,7 @@ DatabaseCommand_PartyInfo::postCommitHook()
             // db commands run on separate threads, which is good!
             // But one must be careful what he does there, so to create something on the main thread,
             // you either emit a signal or do a queued invoke.
-            QMetaObject::invokeMethod( ViewManager::instance(),
+            QMetaObject::invokeMethod( SourceList::instance(),
                                       "createParty",
                                        Qt::BlockingQueuedConnection,
                                        QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
