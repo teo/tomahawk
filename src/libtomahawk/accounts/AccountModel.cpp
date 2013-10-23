@@ -24,6 +24,7 @@
 #include "AtticaManager.h"
 #include "ResolverAccount.h"
 #include "TomahawkSettings.h"
+#include "utils/Logger.h"
 
 #ifndef ENABLE_HEADLESS
 #include <QMessageBox>
@@ -34,11 +35,24 @@
 using namespace Tomahawk;
 using namespace Accounts;
 
-#define ACCOUNTMODEL_DEBUG 0
+#define ACCOUNTMODEL_DEBUG 1
 
 AccountModel::AccountModel( QObject* parent )
     : QAbstractListModel( parent )
     , m_waitingForAtticaLoaded( true )
+{
+    tDebug() << "Creating AccountModel";
+    if ( !AccountManager::instance()->isReady() )
+    {
+        connect( AccountManager::instance(), SIGNAL( ready() ), SLOT( init() ) );
+    }
+    else
+        init();
+}
+
+
+void
+AccountModel::init()
 {
     connect( AtticaManager::instance(), SIGNAL( resolversLoaded( Attica::Content::List ) ), this, SLOT( atticaLoaded() ) );
     connect( AtticaManager::instance(), SIGNAL( startedInstalling( QString ) ), this, SLOT( onStartedInstalling( QString ) ) );
@@ -73,6 +87,7 @@ AccountModel::loadData()
     QList< AccountFactory* > factories = AccountManager::instance()->factories();
     QList< Account* > allAccounts = AccountManager::instance()->accounts();
 #if ACCOUNTMODEL_DEBUG
+    qDebug() << Q_FUNC_INFO;
     qDebug() << "All accounts:";
     foreach ( Account* acct, allAccounts )
         qDebug() << acct->accountFriendlyName() << "\t" << acct->accountId();
@@ -332,11 +347,17 @@ AccountModel::data( const QModelIndex& index, int role ) const
                 switch ( role )
                 {
                 case Qt::DisplayRole:
-                    return acct->accountFriendlyName();
+                    return !acct->accountFriendlyName().isEmpty() ? acct->accountFriendlyName() : node->factory->prettyName();
                 case Qt::DecorationRole:
                     return acct->icon();
                 case DescriptionRole:
-                    return node->factory ? node->factory->description() : QString();
+                    return node->factory ?
+                              ( !node->factory->description().isEmpty() ? node->factory->description() : acct->description() )
+                              : acct->description();
+                case AuthorRole:
+                    return acct->author();
+                case VersionRole:
+                    return acct->version();
                 case Qt::CheckStateRole:
                     return acct->enabled() ? Qt::Checked : Qt::Unchecked;
                 case AccountData:
@@ -653,7 +674,7 @@ AccountModel::accountAdded( Account* account )
     // Ok, just a plain resolver. add it at the end
     if ( ResolverAccount* resolver = qobject_cast< ResolverAccount* >( account ) )
     {
-        qDebug() << "Plain old manual resolver added, appending at end";
+        qDebug() << "Plain old manual resolver added, appending at end" << resolver->accountId() << resolver->accountServiceName() << resolver->accountFriendlyName();
         if ( !m_waitingForAtticaLoaded )
             Q_ASSERT( qobject_cast< AtticaResolverAccount* >( account ) == 0 ); // should NOT get attica accounts here, should be caught above
         const int count = m_accounts.size();

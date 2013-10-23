@@ -23,11 +23,16 @@
 #include "audio/AudioEngine.h"
 #include "database/Database.h"
 
-#include <QtGui/QAction>
 #include "SourceList.h"
 #include "database/DatabaseCommand_SocialAction.h"
 #include "SourcePlaylistInterface.h"
 
+#include <QAction>
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "Result.h"
+#endif
 
 using namespace Tomahawk;
 
@@ -52,6 +57,7 @@ LatchManager::LatchManager( QObject* parent )
     , m_state( NotLatched )
 {
     connect( AudioEngine::instance(), SIGNAL( playlistChanged( Tomahawk::playlistinterface_ptr ) ), this, SLOT( playlistChanged( Tomahawk::playlistinterface_ptr ) ) );
+    connect( AudioEngine::instance(), SIGNAL( paused() ), SLOT( audioPaused() ) );
 }
 
 
@@ -77,7 +83,7 @@ LatchManager::latchRequest( const source_ptr& source )
 
     m_state = Latching;
     m_waitingForLatch = source;
-    AudioEngine::instance()->playItem( source->playlistInterface(), source->playlistInterface()->nextItem() );
+    AudioEngine::instance()->playItem( source->playlistInterface(), source->playlistInterface()->nextResult() );
 }
 
 
@@ -98,9 +104,9 @@ LatchManager::playlistChanged( Tomahawk::playlistinterface_ptr )
         DatabaseCommand_SocialAction* cmd = new DatabaseCommand_SocialAction();
         cmd->setSource( SourceList::instance()->getLocal() );
         cmd->setAction( "latchOn");
-        cmd->setComment( m_latchedOnTo->userName() );
+        cmd->setComment( m_latchedOnTo->nodeId() );
         cmd->setTimestamp( QDateTime::currentDateTime().toTime_t() );
-        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+        Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 
         QAction *latchOnAction = ActionCollection::instance()->getAction( "latchOn" );
         latchOnAction->setText( tr( "&Catch Up" ) );
@@ -113,14 +119,14 @@ LatchManager::playlistChanged( Tomahawk::playlistinterface_ptr )
     // We're current latched, and the user changed playlist, so stop
     SourcePlaylistInterface* origsourcepi = dynamic_cast< SourcePlaylistInterface* >( m_latchedInterface.data() );
     Q_ASSERT( origsourcepi );
-    const source_ptr source = origsourcepi->source();
+    const source_ptr source = SourceList::instance()->get( origsourcepi->source()->id() );
 
     DatabaseCommand_SocialAction* cmd = new DatabaseCommand_SocialAction();
     cmd->setSource( SourceList::instance()->getLocal() );
     cmd->setAction( "latchOff");
-    cmd->setComment( source->userName() );
+    cmd->setComment( source->nodeId() );
     cmd->setTimestamp( QDateTime::currentDateTime().toTime_t() );
-    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 
     if ( !m_waitingForLatch.isNull() &&
           m_waitingForLatch != m_latchedOnTo )
@@ -142,6 +148,18 @@ LatchManager::playlistChanged( Tomahawk::playlistinterface_ptr )
     QAction *latchOnAction = ActionCollection::instance()->getAction( "latchOn" );
     latchOnAction->setText( tr( "&Listen Along" ) );
     latchOnAction->setIcon( QIcon( RESPATH "images/headphones-sidebar.png" ) );
+}
+
+
+void
+LatchManager::audioPaused()
+{
+    if ( !m_latchedOnTo.isNull() )
+    {
+        SourcePlaylistInterface* plInterface = qobject_cast< SourcePlaylistInterface* >( m_latchedOnTo->playlistInterface().data() );
+        Q_ASSERT( plInterface );
+        plInterface->audioPaused();
+    }
 }
 
 

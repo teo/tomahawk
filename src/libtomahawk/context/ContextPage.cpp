@@ -21,8 +21,15 @@
 #include <QGraphicsLinearLayout>
 
 #include "PlaylistInterface.h"
-#include "utils/StyleHelper.h"
+#include "utils/TomahawkStyle.h"
 #include "utils/TomahawkUtilsGui.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "collection/Collection.h"
+    #include "Source.h"
+#endif
+
 
 using namespace Tomahawk;
 
@@ -33,8 +40,8 @@ ContextProxyPage::paint( QPainter* painter, const QStyleOptionGraphicsItem* opti
     painter->save();
 
     painter->setRenderHint( QPainter::Antialiasing, true );
-    painter->setPen( StyleHelper::headerHighlightColor() );
-    painter->setBrush( StyleHelper::headerHighlightColor() );
+    painter->setPen( TomahawkStyle::HEADER_HIGHLIGHT );
+    painter->setBrush( TomahawkStyle::HEADER_HIGHLIGHT );
     painter->drawRoundedRect( option->rect, 4.0, 4.0 );
 
     QFont f( font() );

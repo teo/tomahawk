@@ -1,33 +1,35 @@
-/*
- *    Copyright (C) 2011  Leo Franchi <lfranchi@kde.org>
+/* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *    This program is free software; you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation; either version 2 of the License, or
- *    (at your option) any later version.
+ *   Copyright 2011, Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
+ *   Tomahawk is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
  *
- *    You should have received a copy of the GNU General Public License along
- *    with this program; if not, write to the Free Software Foundation, Inc.,
- *    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *   Tomahawk is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
-
 
 #ifndef RECENTLPLAYLISTSMODEL_H
 #define RECENTLPLAYLISTSMODEL_H
-
-#include <QModelIndex>
-#include <QTimer>
 
 #include "Playlist.h"
 #include "Source.h"
 #include "database/DatabaseCommand_LoadAllSortedPlaylists.h"
 
-class RecentPlaylistsModel : public QAbstractListModel
+#include <QModelIndex>
+#include <QTimer>
+
+#include "DllMacro.h"
+
+class DLLEXPORT RecentPlaylistsModel : public QAbstractListModel
 {
     Q_OBJECT
 public:
@@ -42,13 +44,13 @@ public slots:
 
 signals:
     void emptinessChanged( bool isEmpty );
-    
+
     void loadingStarted();
     void loadingFinished();
 
 private slots:
     void onRefresh();
-    void playlistsLoaded( const QList<DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair>& playlistGuids );
+    void playlistsLoaded( const QList<Tomahawk::DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair>& playlistGuids );
 
     void onPlaylistsRemoved( QList< Tomahawk::playlist_ptr > playlists );
     void onDynPlaylistsRemoved( QList< Tomahawk::dynplaylist_ptr > playlists );

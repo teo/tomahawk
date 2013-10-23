@@ -20,13 +20,14 @@
 #ifndef ADIUMPLUGIN_H
 #define ADIUMPLUGIN_H
 
-#include "infoplugins/InfoPluginDllMacro.h"
+#include "../../InfoPluginDllMacro.h"
+
 #include "infosystem/InfoSystem.h"
 
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QVariant>
-#include <QWeakPointer>
+#include <QPointer>
 
 class QTimer;
 
@@ -36,6 +37,7 @@ namespace InfoSystem {
 
 class INFOPLUGINDLLEXPORT AdiumPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 
@@ -80,7 +82,7 @@ private:
     QUrl m_currentLongUrl;
 
     QTimer* m_pauseTimer;
-    QWeakPointer<QNetworkAccessManager> m_nam;
+    QPointer<QNetworkAccessManager> m_nam;
 
 };
 

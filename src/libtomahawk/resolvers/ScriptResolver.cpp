@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi            <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac           <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,17 +20,24 @@
 
 #include "ScriptResolver.h"
 
-#include <QtEndian>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkProxy>
+#include "accounts/AccountConfigWidget.h"
+#include "utils/TomahawkUtilsGui.h"
+#include "utils/Logger.h"
+#include "utils/NetworkAccessManager.h"
+#include "utils/NetworkProxyFactory.h"
 
 #include "Artist.h"
 #include "Album.h"
 #include "Pipeline.h"
+#include "Result.h"
+#include "ScriptCollection.h"
 #include "SourceList.h"
+#include "Track.h"
 
-#include "utils/TomahawkUtils.h"
-#include "utils/Logger.h"
+#include <QtEndian>
+#include <QFileInfo>
+#include <QNetworkAccessManager>
+#include <QNetworkProxy>
 
 #ifdef Q_OS_WIN
 #include <shlwapi.h>
@@ -52,14 +60,14 @@ ScriptResolver::ScriptResolver( const QString& exe )
 
     startProcess();
 
-    if ( !TomahawkUtils::nam() )
+    if ( !Tomahawk::Utils::nam() )
         return;
 
     // set the name to the binary, if we launch properly we'll get the name the resolver reports
     m_name = QFileInfo( filePath() ).baseName();
 
     // set the icon, if we launch properly we'll get the icon the resolver reports
-    m_icon.load( RESPATH "images/resolver-default.png" );
+    m_icon = TomahawkUtils::defaultPixmap( TomahawkUtils::DefaultResolver, TomahawkUtils::Original, QSize( 128, 128 ) );
 }
 
 
@@ -92,8 +100,10 @@ ScriptResolver::~ScriptResolver()
 
 
 Tomahawk::ExternalResolver*
-ScriptResolver::factory( const QString& exe )
+ScriptResolver::factory( const QString& exe, const QStringList& unused )
 {
+    Q_UNUSED( unused )
+
     ExternalResolver* res = 0;
 
     const QFileInfo fi( exe );
@@ -129,7 +139,11 @@ ScriptResolver::sendConfig()
 
     m_configSent = true;
 
-    TomahawkUtils::NetworkProxyFactory* factory = dynamic_cast<TomahawkUtils::NetworkProxyFactory*>( TomahawkUtils::nam()->proxyFactory() );
+    tDebug() << "Nam is:" << Tomahawk::Utils::nam();
+    tDebug() << "Nam proxy is:" << Tomahawk::Utils::nam()->proxyFactory();
+    Tomahawk::Utils::nam()->proxyFactory()->queryProxy();
+    Tomahawk::Utils::NetworkProxyFactory* factory = dynamic_cast<Tomahawk::Utils::NetworkProxyFactory*>( Tomahawk::Utils::nam()->proxyFactory() );
+    tDebug() << "Factory is:" << factory;
     QNetworkProxy proxy = factory->proxy();
     QString proxyType = ( proxy.type() == QNetworkProxy::Socks5Proxy ? "socks5" : "none" );
     m.insert( "proxytype", proxyType );
@@ -268,24 +282,30 @@ ScriptResolver::handleMsg( const QByteArray& msg )
         {
             QVariantMap m = rv.toMap();
             tDebug( LOGVERBOSE ) << "Found result:" << m;
-            if ( m.value( "artist" ).toString().trimmed().isEmpty() || m.value( "track" ).toString().trimmed().isEmpty() )
-                continue;
 
             Tomahawk::result_ptr rp = Tomahawk::Result::get( m.value( "url" ).toString() );
-            Tomahawk::artist_ptr ap = Tomahawk::Artist::get( m.value( "artist" ).toString(), false );
-            rp->setArtist( ap );
-            rp->setAlbum( Tomahawk::Album::get( ap, m.value( "album" ).toString(), false ) );
-            rp->setAlbumPos( m.value( "albumpos" ).toUInt() );
-            rp->setTrack( m.value( "track" ).toString() );
-            rp->setDuration( m.value( "duration" ).toUInt() );
+            if ( !rp )
+                continue;
+
+            Tomahawk::track_ptr track = Tomahawk::Track::get( m.value( "artist" ).toString(), m.value( "track" ).toString(), m.value( "album" ).toString(), m.value( "duration" ).toUInt(), QString(), m.value( "albumpos" ).toUInt(), m.value( "discnumber" ).toUInt() );
+            if ( !track )
+                continue;
+
+            rp->setTrack( track );
             rp->setBitrate( m.value( "bitrate" ).toUInt() );
             rp->setSize( m.value( "size" ).toUInt() );
             rp->setRID( uuid() );
             rp->setFriendlySource( m_name );
             rp->setPurchaseUrl( m.value( "purchaseUrl" ).toString() );
             rp->setLinkUrl( m.value( "linkUrl" ).toString() );
-            rp->setYear( m.value( "year").toUInt() );
-            rp->setDiscNumber( m.value( "discnumber" ).toUInt() );
+
+            //FIXME
+            if ( m.contains( "year" ) )
+            {
+                QVariantMap attr;
+                attr[ "releaseyear" ] = m.value( "year" );
+//                rp->track()->setAttributes( attr );
+            }
 
             rp->setMimetype( m.value( "mimetype" ).toString() );
             if ( rp->mimetype().isEmpty() )
@@ -349,14 +369,13 @@ ScriptResolver::resolve( const Tomahawk::query_ptr& query )
     if ( query->isFullTextQuery() )
     {
         m.insert( "fulltext", query->fullTextQuery() );
-        m.insert( "artist", query->artist() );
         m.insert( "track", query->fullTextQuery() );
         m.insert( "qid", query->id() );
     }
     else
     {
-        m.insert( "artist", query->artist() );
-        m.insert( "track", query->track() );
+        m.insert( "artist", query->queryTrack()->artist() );
+        m.insert( "track", query->queryTrack()->track() );
         m.insert( "qid", query->id() );
 
         if ( !query->resultHint().isEmpty() )
@@ -376,10 +395,38 @@ ScriptResolver::doSetup( const QVariantMap& m )
     m_name    = m.value( "name" ).toString();
     m_weight  = m.value( "weight", 0 ).toUInt();
     m_timeout = m.value( "timeout", 5 ).toUInt() * 1000;
-    QString iconPath = QFileInfo( filePath() ).path() + "/" + m.value( "icon" ).toString();
-    int success = m_icon.load( iconPath );
+    bool compressed = m.value( "compressed", "false" ).toString() == "true";
 
-    qDebug() << "SCRIPT" << filePath() << "READY," << "name" << m_name << "weight" << m_weight << "timeout" << m_timeout << "icon" << iconPath << "icon found" << success;
+    bool ok = 0;
+    int intCap = m.value( "capabilities" ).toInt( &ok );
+    if ( !ok )
+        m_capabilities = NullCapability;
+    else
+        m_capabilities = static_cast< Capabilities >( intCap );
+
+    QByteArray icoData = m.value( "icon" ).toByteArray();
+    if( compressed )
+        icoData = qUncompress( QByteArray::fromBase64( icoData ) );
+    else
+        icoData = QByteArray::fromBase64( icoData );
+    QPixmap ico;
+    ico.loadFromData( icoData );
+
+    bool success = false;
+    if ( !ico.isNull() )
+    {
+        m_icon = ico.scaled( m_icon.size(), Qt::IgnoreAspectRatio );
+        success = true;
+    }
+    // see if the resolver sent an icon path to not break the old (unofficial) api.
+    // TODO: remove this and publish a definitive api
+    if ( !success )
+    {
+        QString iconPath = QFileInfo( filePath() ).path() + "/" + m.value( "icon" ).toString();
+        success = m_icon.load( iconPath );
+    }
+
+    qDebug() << "SCRIPT" << filePath() << "READY," << "name" << m_name << "weight" << m_weight << "timeout" << m_timeout << "icon received" << success;
 
     m_ready = true;
     m_configSent = false;
@@ -406,7 +453,7 @@ ScriptResolver::setupConfWidget( const QVariantMap& m )
 
     if ( m.contains( "images" ) )
         uiData = fixDataImagePaths( uiData, compressed, m[ "images" ].toMap() );
-    m_configWidget = QWeakPointer< QWidget >( widgetFromData( uiData, 0 ) );
+    m_configWidget = QPointer< AccountConfigWidget >( widgetFromData( uiData, 0 ) );
 
     emit changed();
 }
@@ -493,7 +540,7 @@ ScriptResolver::setIcon( const QPixmap& icon )
 }
 
 
-QWidget*
+AccountConfigWidget*
 ScriptResolver::configUI() const
 {
     if ( m_configWidget.isNull() )
@@ -507,5 +554,12 @@ void
 ScriptResolver::stop()
 {
     m_stopped = true;
+
+    foreach ( const Tomahawk::collection_ptr& collection, m_collections )
+    {
+        emit collectionRemoved( collection );
+    }
+    m_collections.clear();
+
     Tomahawk::Pipeline::instance()->removeResolver( this );
 }

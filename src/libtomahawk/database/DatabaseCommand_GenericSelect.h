@@ -29,6 +29,9 @@
 
 #include "DllMacro.h"
 
+namespace Tomahawk
+{
+
 /**
  * This dbcmd takes a generic SELECT command that operates on the database and returns a list of query_ptrs
  *  that match.
@@ -82,6 +85,11 @@ private:
     bool m_raw;
 };
 
-Q_DECLARE_METATYPE(QList<QStringList>);
+}
+
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    // Qt5 automatically generated this Metatype
+    Q_DECLARE_METATYPE(QList<QStringList>)
+#endif
 
 #endif // DATABASECOMMAND_GENERICSELECT_H

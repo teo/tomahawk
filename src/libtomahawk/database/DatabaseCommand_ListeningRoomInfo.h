@@ -26,6 +26,9 @@
 
 #include "DllMacro.h"
 
+namespace Tomahawk
+{
+
 class DLLEXPORT DatabaseCommand_ListeningRoomInfo : public DatabaseCommandLoggable
 {
     Q_OBJECT
@@ -85,5 +88,7 @@ private:
     Tomahawk::listeningroom_ptr m_listeningRoom;
     Action m_action;
 };
+
+} //ns
 
 #endif // DATABASECOMMAND_LISTENINGROOMINFO_H

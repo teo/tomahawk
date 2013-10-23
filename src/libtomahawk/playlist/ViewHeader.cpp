@@ -32,10 +32,15 @@ ViewHeader::ViewHeader( QAbstractItemView* parent )
     , m_sigmap( new QSignalMapper( this ) )
     , m_init( false )
 {
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    setSectionResizeMode( QHeaderView::Interactive );
+    setSectionsMovable( true );
+#else
     setResizeMode( QHeaderView::Interactive );
+    setMovable( true );
+#endif
     setMinimumSectionSize( 60 );
     setDefaultAlignment( Qt::AlignLeft );
-    setMovable( true );
     setStretchLastSection( true );
 
 //    m_menu->addAction( tr( "Resize columns to fit window" ), this, SLOT( onToggleResizeColumns() ) );
@@ -76,18 +81,17 @@ ViewHeader::checkState()
     disconnect( this, SIGNAL( sectionResized( int, int, int ) ), this, SLOT( onSectionsChanged() ) );
 
     QByteArray state;
-    tDebug( LOGVERBOSE ) << "Restoring columns state for view:" << m_guid;
-
     if ( !m_guid.isEmpty() )
         state = TomahawkSettings::instance()->playlistColumnSizes( m_guid );
 
     if ( !state.isEmpty() )
     {
+        tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Restoring columns state for view:" << m_guid;
         restoreState( state );
     }
     else
     {
-        tDebug( LOGVERBOSE ) << "Giving columns initial weighting:" << m_columnWeights;
+        tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Giving columns of view" << m_guid << "initial weighting:" << m_columnWeights << "for" << count() << "columns";
         for ( int i = 0; i < count() - 1; i++ )
         {
             if ( isSectionHidden( i ) )

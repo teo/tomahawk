@@ -22,9 +22,11 @@
 #include <QKeyEvent>
 
 #include "ViewManager.h"
-#include "utils/Logger.h"
 #include "PlaylistUpdaterInterface.h"
 #include "Source.h"
+#include "utils/TomahawkUtilsGui.h"
+#include "utils/Logger.h"
+#include "utils/DpiScaler.h"
 
 using namespace Tomahawk;
 
@@ -33,7 +35,6 @@ PlaylistView::PlaylistView( QWidget* parent )
     : TrackView( parent )
     , m_model( 0 )
 {
-    connect( contextMenu(), SIGNAL( triggered( int ) ), SLOT( onMenuTriggered( int ) ) );
 }
 
 
@@ -134,7 +135,6 @@ PlaylistView::onChanged()
             setEmptyTip( tr( "This playlist is currently empty." ) );
         else
             setEmptyTip( tr( "This playlist is currently empty. Add some tracks to it and enjoy the music!" ) );
-        m_model->finishLoading();
 
         setGuid( proxyModel()->guid() );
 
@@ -154,9 +154,20 @@ PlaylistView::isTemporaryPage() const
 void
 PlaylistView::onMenuTriggered( int action )
 {
+    TrackView::onMenuTriggered( action );
+
     switch ( action )
     {
         default:
             break;
     }
+}
+
+
+QPixmap
+PlaylistView::pixmap() const
+{
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::Playlist,
+                                         TomahawkUtils::Original,
+                                         TomahawkUtils::DpiScaler::scaled( this, 80, 80 ) );
 }

@@ -111,7 +111,7 @@ ListeningRoom::create( const source_ptr& author,
     {
         lrentry_ptr p( new ListeningRoomEntry );
         p->setGuid( uuid() );
-        p->setDuration( query->duration() );
+        p->setDuration( query->track()->duration() );
         p->setLastmodified( 0 );
         p->setQuery( query );
         p->setScore( 0 );
@@ -438,7 +438,7 @@ void ListeningRoom::removeEntries( const QList< lrentry_ptr >& entries )
 void
 ListeningRoom::addListener( const Tomahawk::source_ptr& listener )
 {
-    QString listenerId = listener->userName();
+    QString listenerId = listener->nodeId();
     if ( m_listenerIds.contains( listenerId ) )
         return;
 
@@ -456,7 +456,7 @@ ListeningRoom::addListener( const Tomahawk::source_ptr& listener )
 void
 ListeningRoom::removeListener( const Tomahawk::source_ptr& listener )
 {
-    QString listenerId = listener->userName();
+    QString listenerId = listener->nodeId();
     m_listenerIds.removeAll( listenerId );
 
     pushUpdate();
@@ -506,7 +506,7 @@ ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, 
     {
         lrentry_ptr e( new ListeningRoomEntry() );
         e->setGuid( uuid() );
-        e->setDuration( query->displayQuery()->duration() );
+        e->setDuration( query->queryTrack()->duration() );
         e->setLastmodified( 0 );
         e->setQuery( query );
         e->setScore( 0 );

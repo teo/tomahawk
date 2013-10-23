@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2012, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2012, Hugo Lindström <hugolm84@gmail.com>
+ *   Copyright 2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,11 +21,12 @@
 #include "SpotifyPlaylistUpdater.h"
 
 #include "accounts/AccountManager.h"
-#include "SpotifyAccount.h"
 #include "utils/TomahawkUtils.h"
+#include "SpotifyAccount.h"
+#include "Track.h"
 
-#include <QMessageBox>
 #include <QApplication>
+#include <QMessageBox>
 
 using namespace Tomahawk;
 using namespace Accounts;
@@ -51,7 +53,7 @@ SpotifyUpdaterFactory::create( const Tomahawk::playlist_ptr& pl, const QVariantH
 
     if ( m_account.isNull() )
     {
-        qWarning() << "Found a spotify updater with no spotify account... ignoreing for now!!";
+        qWarning() << "Found a spotify updater with no spotify account... ignoring for now!!";
         return 0;
     }
 
@@ -98,12 +100,16 @@ SpotifyPlaylistUpdater::SpotifyPlaylistUpdater( SpotifyAccount* acct, const QStr
 void
 SpotifyPlaylistUpdater::init()
 {
-
-    connect( playlist().data(), SIGNAL( tracksInserted( QList<Tomahawk::plentry_ptr>, int ) ), this, SLOT( tomahawkTracksInserted( QList<Tomahawk::plentry_ptr>, int ) ) );
-    connect( playlist().data(), SIGNAL( tracksRemoved( QList<Tomahawk::query_ptr> ) ), this, SLOT( tomahawkTracksRemoved( QList<Tomahawk::query_ptr> ) ) );
-    connect( playlist().data(), SIGNAL( tracksMoved( QList<Tomahawk::plentry_ptr>, int ) ), this, SLOT( tomahawkTracksMoved( QList<Tomahawk::plentry_ptr>, int ) ) );
-    connect( playlist().data(), SIGNAL( renamed( QString, QString ) ), this, SLOT( tomahawkPlaylistRenamed( QString, QString ) ) );
-    connect( playlist().data(), SIGNAL( revisionLoaded( Tomahawk::PlaylistRevision ) ), this, SLOT( playlistRevisionLoaded() ), Qt::QueuedConnection ); // Queued so that in Playlist.cpp:443 we let the playlist clear its own queue first
+    connect( playlist().data(), SIGNAL( tracksInserted( QList<Tomahawk::plentry_ptr>, int ) ),
+                                  SLOT( tomahawkTracksInserted( QList<Tomahawk::plentry_ptr>, int ) ) );
+    connect( playlist().data(), SIGNAL( tracksRemoved( QList<Tomahawk::query_ptr> ) ),
+                                  SLOT( tomahawkTracksRemoved( QList<Tomahawk::query_ptr> ) ) );
+    connect( playlist().data(), SIGNAL( tracksMoved( QList<Tomahawk::plentry_ptr>, int ) ),
+                                  SLOT( tomahawkTracksMoved( QList<Tomahawk::plentry_ptr>, int ) ) );
+    connect( playlist().data(), SIGNAL( renamed( QString, QString ) ),
+                                  SLOT( tomahawkPlaylistRenamed( QString, QString ) ) );
+    connect( playlist().data(), SIGNAL( revisionLoaded( Tomahawk::PlaylistRevision ) ),
+                                  SLOT( playlistRevisionLoaded() ), Qt::QueuedConnection ); // Queued so that in Playlist.cpp:443 we let the playlist clear its own queue first
     // TODO reorders in a playlist
 
     saveToSettings();
@@ -216,6 +222,7 @@ SpotifyPlaylistUpdater::typeIcon() const
 }
 #endif
 
+
 void
 SpotifyPlaylistUpdater::setSync( bool sync )
 {
@@ -235,6 +242,7 @@ SpotifyPlaylistUpdater::sync() const
     return m_sync;
 }
 
+
 void
 SpotifyPlaylistUpdater::setOwner( bool owner )
 {
@@ -247,11 +255,13 @@ SpotifyPlaylistUpdater::setOwner( bool owner )
     emit changed();
 }
 
+
 bool
 SpotifyPlaylistUpdater::owner() const
 {
     return m_isOwner;
 }
+
 
 void
 SpotifyPlaylistUpdater::setCollaborative( bool collab )
@@ -265,11 +275,13 @@ SpotifyPlaylistUpdater::setCollaborative( bool collab )
     emit changed();
 }
 
+
 bool
 SpotifyPlaylistUpdater::collaborative() const
 {
     return m_collaborative;
 }
+
 
 void
 SpotifyPlaylistUpdater::setSubscribedStatus( bool subscribed )
@@ -320,6 +332,7 @@ SpotifyPlaylistUpdater::canSubscribe() const
     return m_canSubscribe;
 }
 
+
 void
 SpotifyPlaylistUpdater::setSubscribers( int numSubscribers )
 {
@@ -331,6 +344,7 @@ SpotifyPlaylistUpdater::setSubscribers( int numSubscribers )
     saveToSettings();
     emit changed();
 }
+
 
 PlaylistDeleteQuestions
 SpotifyPlaylistUpdater::deleteQuestions() const
@@ -354,7 +368,11 @@ SpotifyPlaylistUpdater::setQuestionResults( const QMap< int, bool > results )
 void
 SpotifyPlaylistUpdater::spotifyTracksAdded( const QVariantList& tracks, const QString& startPosId, const QString& newRev, const QString& oldRev )
 {
-    if( playlist()->busy() )
+    if ( !playlist()->loaded() )
+    {
+        playlist()->loadRevision();
+    }
+    if ( playlist()->busy() || !playlist()->loaded() )
     {
         // We might still be waiting for a add/remove tracks command to finish, so the entries we get here might be stale
         // wait for any to be complete
@@ -388,14 +406,18 @@ SpotifyPlaylistUpdater::spotifyTracksAdded( const QVariantList& tracks, const QS
     qDebug() << Q_FUNC_INFO << "inserting tracks at position:" << pos << "(playlist has current size:" << entries << ")";
 
     m_blockUpdatesForNextRevision = true;
-    playlist()->insertEntries( queries, pos, playlist()->currentrevision() );
+    playlist()->insertEntries( queries, pos );
 }
 
 
 void
 SpotifyPlaylistUpdater::spotifyTracksRemoved( const QVariantList& trackIds, const QString& newRev, const QString& oldRev )
 {
-    if( playlist()->busy() )
+    if ( !playlist()->loaded() )
+    {
+        playlist()->loadRevision();
+    }
+    if ( playlist()->busy() || !playlist()->loaded() )
     {
         // We might still be waiting for a add/remove tracks command to finish, so the entries we get here might be stale
         // wait for any to be complete
@@ -431,7 +453,6 @@ SpotifyPlaylistUpdater::spotifyTracksRemoved( const QVariantList& trackIds, cons
         }
     }
 
-
     // Now remove them all
     foreach( const plentry_ptr& torm, toRemove )
         entries.removeAll( torm );
@@ -448,10 +469,11 @@ SpotifyPlaylistUpdater::spotifyTracksRemoved( const QVariantList& trackIds, cons
     }
 }
 
+
 void
 SpotifyPlaylistUpdater::spotifyPlaylistRenamed( const QString& title, const QString& newRev, const QString& oldRev )
 {
-    if( playlist()->busy() )
+    if ( playlist()->busy() )
     {
         // We might still be waiting for a add/remove tracks command to finish, so the entries we get here might be stale
         // wait for any to be complete
@@ -463,11 +485,11 @@ SpotifyPlaylistUpdater::spotifyPlaylistRenamed( const QString& title, const QStr
     Q_UNUSED( oldRev );
     /// @note to self: should do some checking before trying to update
     playlist()->rename( title );
-
 }
 
+
 void
-SpotifyPlaylistUpdater::tomahawkPlaylistRenamed(const QString &newT, const QString &oldT)
+SpotifyPlaylistUpdater::tomahawkPlaylistRenamed( const QString &newT, const QString &oldT )
 {
     qDebug() << Q_FUNC_INFO;
     QVariantMap msg;
@@ -481,10 +503,15 @@ SpotifyPlaylistUpdater::tomahawkPlaylistRenamed(const QString &newT, const QStri
     m_spotify.data()->sendMessage( msg, this, "onPlaylistRename" );
 }
 
+
 void
 SpotifyPlaylistUpdater::spotifyTracksMoved( const QVariantList& tracks, const QString& newStartPos, const QString& newRev, const QString& oldRev )
 {
-    if( playlist()->busy() )
+    if ( !playlist()->loaded() )
+    {
+        playlist()->loadRevision();
+    }
+    if ( playlist()->busy() || !playlist()->loaded() )
     {
         // We might still be waiting for a add/remove tracks command to finish, so the entries we get here might be stale
         // wait for any to be complete
@@ -492,13 +519,11 @@ SpotifyPlaylistUpdater::spotifyTracksMoved( const QVariantList& tracks, const QS
         return;
     }
 
-
     qDebug() << "Moving some tracks in a spotify-synced playlist, tracks:" << tracks << "to new startpos:" << newStartPos;
     // Uh oh, dont' want to get out of sync!!
     //     Q_ASSERT( m_latestRev == oldRev );
     //     m_latestRev = newRev;
     QList< plentry_ptr > entries = playlist()->entries();
-
     QList< plentry_ptr > toMove;
     for ( QList< plentry_ptr >::iterator iter = entries.begin(); iter != entries.end(); )
     {
@@ -514,7 +539,6 @@ SpotifyPlaylistUpdater::spotifyTracksMoved( const QVariantList& tracks, const QS
 
         ++iter;
     }
-
 
     // Find the position of the track to insert from
     if ( newStartPos.isEmpty() )
@@ -533,7 +557,7 @@ SpotifyPlaylistUpdater::spotifyTracksMoved( const QVariantList& tracks, const QS
                 {
                     qDebug() << "Adding moved track to playlist at pos (end:" << (iter == entries.end());
                     if ( iter != entries.end() )
-                        qDebug() << (*iter)->query()->track() << (*iter)->query()->artist();
+                        qDebug() << (*iter)->query()->queryTrack()->toString();
                     iter = entries.insert( iter, toMove.takeLast() );
                 }
 
@@ -575,7 +599,6 @@ SpotifyPlaylistUpdater::tomahawkTracksInserted( const QList< plentry_ptr >& trac
     m_waitingForIds = tracks;
 
     msg[ "playlistid" ] = m_spotifyId;
-
     msg[ "tracks" ] = plentryToVariant( tracks );
 
     m_spotify.data()->sendMessage( msg, this, "onTracksInsertedReturn" );
@@ -625,7 +648,6 @@ SpotifyPlaylistUpdater::onTracksInsertedReturn( const QString& msgType, const QV
     qDebug() << Q_FUNC_INFO << "GOT RETURN FOR tracksInserted call from spotify!" << msgType << msg << "Succeeded?" << success;
     m_latestRev = msg.value( "revid" ).toString();
 
-
     const QVariantList trackPositionsInserted = msg.value( "trackPosInserted" ).toList();
     const QVariantList trackIdsInserted = msg.value( "trackIdInserted" ).toList();
 
@@ -661,7 +683,7 @@ SpotifyPlaylistUpdater::onTracksInsertedReturn( const QString& msgType, const QV
             continue;
         }
 
-        qDebug() << "Setting annotation for track:" << m_waitingForIds[ pos ]->query()->track() << m_waitingForIds[ pos ]->query()->artist() << trackIdsInserted.at( i ).toString();
+        qDebug() << "Setting annotation for track:" << m_waitingForIds[ pos ]->query()->queryTrack()->toString() << trackIdsInserted.at( i ).toString();
         m_waitingForIds[ pos ]->setAnnotation( trackIdsInserted.at( i ).toString() );
         changed << m_waitingForIds[ pos ];
     }
@@ -673,7 +695,6 @@ SpotifyPlaylistUpdater::onTracksInsertedReturn( const QString& msgType, const QV
 
     // Update with latest rev when/if we use it
 //    saveToSettings();
-
 }
 
 
@@ -714,7 +735,7 @@ SpotifyPlaylistUpdater::onTracksRemovedReturn( const QString& msgType, const QVa
 void
 SpotifyPlaylistUpdater::tomahawkTracksMoved( const QList< plentry_ptr >& tracks, int position )
 {
-    if( playlist()->busy() )
+    if ( playlist()->busy() )
     {
         // the playlist has had the new revision set, but it might not be finished, if it's not finished, playlist()->entries() still
         // contains the *old* order, so we get the wrong data
@@ -723,9 +744,9 @@ SpotifyPlaylistUpdater::tomahawkTracksMoved( const QList< plentry_ptr >& tracks,
     }
 
     qDebug() << Q_FUNC_INFO << "Got tracks moved at position:" << position;
-    foreach ( const plentry_ptr ple, tracks )
+    foreach ( const plentry_ptr& ple, tracks )
     {
-        qDebug() << ple->query()->track() << ple->query()->artist();
+        qDebug() << ple->query()->queryTrack()->toString();
     }
 
     qDebug() << Q_FUNC_INFO  << "updating spotify resolver with moved tracks to:" << position;
@@ -743,7 +764,6 @@ SpotifyPlaylistUpdater::tomahawkTracksMoved( const QList< plentry_ptr >& tracks,
 
     msg[ "startPosition" ] = startPos;
     msg[ "playlistid" ] = m_spotifyId;
-
     msg[ "tracks" ] = plentryToVariant( tracks );
 
     m_spotify.data()->sendMessage( msg, this, "onTracksMovedReturn" );
@@ -780,9 +800,9 @@ QVariant
 SpotifyPlaylistUpdater::queryToVariant( const query_ptr& query )
 {
     QVariantMap m;
-    m[ "track" ] = query->track();
-    m[ "artist" ] = query->artist();
-    m[ "album" ] = query->album();
+    m[ "track" ] = query->queryTrack()->track();
+    m[ "artist" ] = query->queryTrack()->artist();
+    m[ "album" ] = query->queryTrack()->album();
 
     if ( !query->property( "annotation" ).isNull() )
         m[ "id" ] = query->property( "annotation" );

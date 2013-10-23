@@ -20,7 +20,6 @@
 #ifndef GLOBALACTIONMANAGER_H
 #define GLOBALACTIONMANAGER_H
 
-#include "Query.h"
 #include "Playlist.h"
 #include "playlist/dynamic/DynamicPlaylist.h"
 #include "DllMacro.h"
@@ -29,8 +28,6 @@
 #include <QNetworkReply>
 #include <QObject>
 #include <QUrl>
-#include <QWeakPointer>
-
 
 /**
  * Handles global actions such as parsing and creation of links, mime data handling, etc
@@ -50,9 +47,13 @@ public:
     QUrl openLink( const QString& title, const QString& artist, const QString& album ) const;
 
 public slots:
-    void shortenLink( const QUrl& url, const QVariant &callbackObj = QVariant() );
 
 #ifndef ENABLE_HEADLESS
+
+    /**
+     * Try to open a URL as Playlist/Album/Artist/Track
+     */
+    bool openUrl( const QString& url );
 
     /// Takes a spotify link and performs the default open action on it
     bool openSpotifyLink( const QString& link );
@@ -68,7 +69,6 @@ public slots:
     void savePlaylistToFile( const Tomahawk::playlist_ptr& playlist, const QString& filename );
 
     bool parseTomahawkLink( const QString& link );
-    void getShortLink( const Tomahawk::playlist_ptr& playlist );
     void waitingForResolved( bool );
 
     Tomahawk::dynplaylist_ptr loadDynamicPlaylist( const QUrl& url, bool station );
@@ -79,17 +79,11 @@ public slots:
     void handlePlayTrack( const Tomahawk::query_ptr& qry );
 #endif
 
-signals:
-    void shortLinkReady( const QUrl& longUrl, const QUrl& shortUrl, const QVariant& callbackObj );
-
 private slots:
-    void shortenLinkRequestFinished();
-    void shortenLinkRequestError( QNetworkReply::NetworkError );
-
-    void bookmarkPlaylistCreated( const Tomahawk::playlist_ptr& pl );
+    void informationForUrl( const QString& url, const QSharedPointer<QObject>& information );
+    void copyToClipboardReady( const QUrl& longUrl, const QUrl& shortUrl, const QVariant& callbackObj );
 
 #ifndef ENABLE_HEADLESS
-    void postShortenFinished();
     void showPlaylist();
 
     void playlistCreatedToShow( const Tomahawk::playlist_ptr& pl );
@@ -103,7 +97,6 @@ private slots:
 
 private:
     explicit GlobalActionManager( QObject* parent = 0 );
-    void doBookmark( const Tomahawk::playlist_ptr& pl, const Tomahawk::query_ptr& q );
 
     /// handle opening of urls
 #ifndef ENABLE_HEADLESS
@@ -124,19 +117,16 @@ private:
 
     bool handleCollectionCommand( const QUrl& url );
     bool handlePlayCommand( const QUrl& url );
-    bool handleBookmarkCommand( const QUrl& url );
     bool handleOpenCommand( const QUrl& url );
 
     void createPlaylistFromUrl( const QString& type, const QString& url, const QString& title );
 
     QString hostname() const;
 
-    inline QByteArray percentEncode( const QUrl& url ) const;
-
     Tomahawk::playlist_ptr m_toShow;
-    Tomahawk::query_ptr m_waitingToBookmark;
     Tomahawk::query_ptr m_waitingToPlay;
     QUrl m_clipboardLongUrl;
+    QString m_queuedUrl;
 
     static GlobalActionManager* s_instance;
 };

@@ -24,7 +24,6 @@
 #include <QCryptographicHash>
 #include <QNetworkConfiguration>
 #include <QNetworkReply>
-#include <QtPlugin>
 
 #include "Album.h"
 #include "Typedefs.h"
@@ -32,6 +31,7 @@
 #include "utils/TomahawkUtils.h"
 #include "infosystem/InfoSystemWorker.h"
 #include "utils/Logger.h"
+#include "utils/NetworkAccessManager.h"
 #include "Source.h"
 
 #define HYPEM_URL "http://hypem.com/playlist/"
@@ -176,7 +176,7 @@ HypemPlugin::fetchChart( Tomahawk::InfoSystem::InfoRequestData requestData )
     criteria["chart_source"] = hash["chart_source"];
     /// @todo
     /// set cache time based on wether requested type is 3day, lastweek or recent.
-    emit getCachedInfo( criteria, 86400000, requestData );
+    emit getCachedInfo( criteria, Q_INT64_C(86400000), requestData );
 }
 
 void
@@ -189,7 +189,7 @@ HypemPlugin::fetchChartCapabilities( Tomahawk::InfoSystem::InfoRequestData reque
     }
 
     Tomahawk::InfoSystem::InfoStringHash criteria;
-    emit getCachedInfo( criteria, 0, requestData );
+    emit getCachedInfo( criteria, Q_INT64_C(0), requestData );
 }
 
 void
@@ -205,7 +205,7 @@ HypemPlugin::notInCacheSlot( QHash<QString, QString> criteria, Tomahawk::InfoSys
             QUrl url = QUrl( QString( HYPEM_URL "%1/%2" ).arg( criteria["chart_id"].toLower() ).arg(HYPEM_END_URL) );
             qDebug() << Q_FUNC_INFO << "Getting chart url" << url;
 
-            QNetworkReply* reply = TomahawkUtils::nam()->get( QNetworkRequest( url ) );
+            QNetworkReply* reply = Tomahawk::Utils::nam()->get( QNetworkRequest( url ) );
             reply->setProperty( "requestData", QVariant::fromValue< Tomahawk::InfoSystem::InfoRequestData >( requestData ) );
             connect( reply, SIGNAL( finished() ), SLOT( chartReturned() ) );
             return;
@@ -394,7 +394,7 @@ HypemPlugin::chartReturned()
         criteria[ "chart_source" ] = origData[ "chart_source" ];
         /// @todo
         /// set cache time based on wether requested type is 3day, lastweek or recent.
-        emit updateCache( criteria, 86400000, requestData.type, returnedData );
+        emit updateCache( criteria, Q_INT64_C(86400000), requestData.type, returnedData );
     }
     else
         qDebug() << "Network error in fetching chart:" << reply->url().toString();

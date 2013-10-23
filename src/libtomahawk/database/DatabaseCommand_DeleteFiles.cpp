@@ -21,15 +21,17 @@
 
 #include <QtSql/QSqlQuery>
 
-#include "Artist.h"
-#include "Album.h"
-#include "Collection.h"
-#include "Source.h"
+#include "collection/Collection.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
 #include "utils/TomahawkUtils.h"
+
+#include "Artist.h"
+#include "Album.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
 
 using namespace Tomahawk;
 
@@ -43,7 +45,7 @@ DatabaseCommand_DeleteFiles::postCommitHook()
 
     // make the collection object emit its tracksAdded signal, so the
     // collection browser will update/fade in etc.
-    Collection* coll = source()->collection().data();
+    Collection* coll = source()->dbCollection().data();
 
     connect( this, SIGNAL( notify( QList<unsigned int> ) ),
              coll,   SLOT( delTracks( QList<unsigned int> ) ), Qt::QueuedConnection );
@@ -136,5 +138,5 @@ DatabaseCommand_DeleteFiles::exec( DatabaseImpl* dbi )
     if ( m_idList.count() )
         source()->updateIndexWhenSynced();
 
-    emit done( m_idList, source()->collection() );
+    emit done( m_idList, source()->dbCollection() );
 }

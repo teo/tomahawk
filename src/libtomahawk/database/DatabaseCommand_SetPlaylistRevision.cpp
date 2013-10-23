@@ -18,13 +18,20 @@
 
 #include "DatabaseCommand_SetPlaylistRevision.h"
 
-#include <QSqlQuery>
-
-#include "Source.h"
-#include "DatabaseImpl.h"
-#include "TomahawkSqlQuery.h"
+#include "collection/Collection.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
+
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
+#include "TomahawkSqlQuery.h"
+#include "Track.h"
+
+#include <qjson/parser.h>
+#include <qjson/serializer.h>
+
+#include <QSqlQuery>
 
 using namespace Tomahawk;
 
@@ -38,6 +45,7 @@ DatabaseCommand_SetPlaylistRevision::DatabaseCommand_SetPlaylistRevision(
                       const QList<plentry_ptr>& addedentries,
                       const QList<plentry_ptr>& entries )
     : DatabaseCommandLoggable( s )
+    , m_failed( false )
     , m_applied( false )
     , m_newrev( newrev )
     , m_oldrev( oldrev )
@@ -66,6 +74,7 @@ DatabaseCommand_SetPlaylistRevision::DatabaseCommand_SetPlaylistRevision(
                         const QStringList& orderedguids,
                         const QList<plentry_ptr>& entriesToUpdate )
     : DatabaseCommandLoggable( s )
+    , m_failed( false )
     , m_applied( false )
     , m_newrev( newrev )
     , m_oldrev( oldrev )
@@ -87,7 +96,7 @@ DatabaseCommand_SetPlaylistRevision::DatabaseCommand_SetPlaylistRevision(
 void
 DatabaseCommand_SetPlaylistRevision::postCommitHook()
 {
-    qDebug() << Q_FUNC_INFO;
+    tDebug() << Q_FUNC_INFO;
     if ( m_localOnly )
         return;
 
@@ -96,19 +105,22 @@ DatabaseCommand_SetPlaylistRevision::postCommitHook()
         orderedentriesguids << v.toString();
 
     // private, but we are a friend. will recall itself in its own thread:
-    playlist_ptr playlist = source()->collection()->playlist( m_playlistguid );
-    if ( playlist.isNull() )
-    {
-        Q_ASSERT( !playlist.isNull() );
+    playlist_ptr playlist = source()->dbCollection()->playlist( m_playlistguid );
+//    Q_ASSERT( !playlist.isNull() );
+    if ( !playlist )
         return;
-    }
 
-    playlist->setRevision( m_newrev,
-                           orderedentriesguids,
-                           m_previous_rev_orderedguids,
-                           true, // this *is* the newest revision so far
-                           m_addedmap,
-                           m_applied );
+    if ( playlist->loaded() )
+    {
+        playlist->setRevision( m_newrev,
+                            orderedentriesguids,
+                            m_previous_rev_orderedguids,
+                            true, // this *is* the newest revision so far
+                            m_addedmap,
+                            m_applied );
+    }
+    else
+        playlist->setCurrentrevision( m_newrev );
 
     if ( source()->isLocal() )
         Servent::instance()->triggerDBSync();
@@ -118,20 +130,22 @@ DatabaseCommand_SetPlaylistRevision::postCommitHook()
 void
 DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
 {
+    QString currentRevision;
     // get the current revision for this playlist
     // this also serves to check the playlist exists.
     TomahawkSqlQuery chkq = lib->newquery();
     chkq.prepare( "SELECT currentrevision FROM playlist WHERE guid = ?" );
     chkq.addBindValue( m_playlistguid );
-    if( chkq.exec() && chkq.next() )
+    if ( chkq.exec() && chkq.next() )
     {
-        m_currentRevision = chkq.value( 0 ).toString();
-        qDebug() << Q_FUNC_INFO << "pl guid" << m_playlistguid << "- curr rev" << m_currentRevision;
+        currentRevision = chkq.value( 0 ).toString();
+        tDebug() << Q_FUNC_INFO << "pl guid" << m_playlistguid << "- curr rev" << currentRevision << source()->friendlyName() << source()->id();
     }
     else
     {
-        tDebug() << "Playlist:" << m_playlistguid << m_currentRevision << source()->friendlyName() << source()->id();
-        Q_ASSERT_X( false, "DatabaseCommand_SetPlaylistRevision::exec", "No such playlist, WTF?" );
+        tDebug() << "ERROR: No such playlist:" << m_playlistguid << currentRevision << source()->friendlyName() << source()->id();
+//        Q_ASSERT_X( false, "DatabaseCommand_SetPlaylistRevision::exec", "No such playlist, WTF?" );
+        m_failed = true;
         return;
     }
 
@@ -153,7 +167,7 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
             if ( !e->query()->numResults() )
                 continue;
 
-            adde.bindValue( 0, hintFromQuery( e->query() ) );
+            adde.bindValue( 0, e->resultHint() );
             adde.bindValue( 1, e->guid() );
             adde.exec();
         }
@@ -170,9 +184,9 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
             if ( !e->isValid() )
                 continue;
 
-            adde.bindValue( 0, e->query()->track() );
-            adde.bindValue( 1, e->query()->artist() );
-            adde.bindValue( 2, e->query()->album() );
+            adde.bindValue( 0, e->query()->queryTrack()->track() );
+            adde.bindValue( 1, e->query()->queryTrack()->artist() );
+            adde.bindValue( 2, e->query()->queryTrack()->album() );
             adde.bindValue( 3, e->annotation() );
             adde.bindValue( 4, (int) e->duration() );
             adde.bindValue( 5, e->lastmodified() );
@@ -184,7 +198,7 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
     }
     else
     {
-        QString sql = "INSERT INTO playlist_item( guid, playlist, trackname, artistname, albumname, "
+        QString sql = "REPLACE INTO playlist_item( guid, playlist, trackname, artistname, albumname, "
                                                  "annotation, duration, addedon, addedby, result_hint ) "
                       "VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )";
         adde.prepare( sql );
@@ -199,18 +213,16 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
 
             m_addedmap.insert( e->guid(), e ); // needed in postcommithook
 
-            const QString resultHint = hintFromQuery( e->query() );
-
             adde.bindValue( 0, e->guid() );
             adde.bindValue( 1, m_playlistguid );
-            adde.bindValue( 2, e->query()->track() );
-            adde.bindValue( 3, e->query()->artist() );
-            adde.bindValue( 4, e->query()->album() );
+            adde.bindValue( 2, e->query()->queryTrack()->track() );
+            adde.bindValue( 3, e->query()->queryTrack()->artist() );
+            adde.bindValue( 4, e->query()->queryTrack()->album() );
             adde.bindValue( 5, e->annotation() );
             adde.bindValue( 6, (int) e->duration() );
             adde.bindValue( 7, e->lastmodified() );
             adde.bindValue( 8, source()->isLocal() ? QVariant(QVariant::Int) : source()->id() );
-            adde.bindValue( 9, resultHint );
+            adde.bindValue( 9, e->resultHint() );
             adde.exec();
         }
     }
@@ -229,11 +241,11 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
     query.addBindValue( m_oldrev.isEmpty() ? QVariant(QVariant::String) : m_oldrev );
     query.exec();
 
-    qDebug() << "Currentrevision:" << m_currentRevision << "oldrev:" << m_oldrev;
+    tDebug() << "Currentrevision:" << currentRevision << "oldrev:" << m_oldrev;
     // if optimistic locking is ok, update current revision to this new one
-    if ( m_currentRevision == m_oldrev )
+    if ( currentRevision == m_oldrev )
     {
-        qDebug() << "Updating current revision, optimistic locking ok";
+        tDebug() << "Updating current revision, optimistic locking ok" << m_newrev;
 
         TomahawkSqlQuery query2 = lib->newquery();
         query2.prepare( "UPDATE playlist SET currentrevision = ? WHERE guid = ?" );
@@ -263,28 +275,39 @@ DatabaseCommand_SetPlaylistRevision::exec( DatabaseImpl* lib )
     }
     else if ( !m_oldrev.isEmpty() )
     {
-        tDebug() << "Not updating current revision, optimistic locking fail";
-//        Q_ASSERT( false );
+        tDebug() << "Not updating current revision, optimistic locking fail" << currentRevision << m_oldrev;
+
+        Q_ASSERT( !source()->isLocal() );
     }
 }
 
 
-QString
-DatabaseCommand_SetPlaylistRevision::hintFromQuery( const query_ptr& query ) const
+void
+DatabaseCommand_SetPlaylistRevision::setAddedentriesV( const QVariantList& vlist )
 {
-    QString resultHint, foundResult;
-    if ( !query->results().isEmpty() )
-        foundResult = query->results().first()->url();
-    else if ( !query->resultHint().isEmpty() )
-        foundResult = query->resultHint();
-
-    if ( foundResult.startsWith( "file://" ) ||
-         foundResult.startsWith( "servent://" ) || // Save resulthints for local files and peers automatically
-         ( TomahawkUtils::whitelistedHttpResultHint( foundResult ) && query->saveHTTPResultHint() ) )
+    m_addedentries.clear();
+    foreach( const QVariant& v, vlist )
     {
-        resultHint = foundResult;
-    }
+        PlaylistEntry* pep = new PlaylistEntry;
+        QJson::QObjectHelper::qvariant2qobject( v.toMap(), pep );
 
-    return resultHint;
+        if ( pep->isValid() )
+            m_addedentries << plentry_ptr( pep );
+    }
 }
 
+
+QVariantList
+DatabaseCommand_SetPlaylistRevision::addedentriesV() const
+{
+    QVariantList vlist;
+    foreach( const plentry_ptr& pe, m_addedentries )
+    {
+        if ( !pe->isValid() )
+            continue;
+
+        QVariant v = QJson::QObjectHelper::qobject2qvariant( pe.data() );
+        vlist << v;
+    }
+    return vlist;
+}

@@ -1,7 +1,8 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,32 +20,36 @@
 
 #include "Artist.h"
 
-#include "ArtistPlaylistInterface.h"
-#include "Collection.h"
+#include "collection/Collection.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "database/DatabaseCommand_AllAlbums.h"
+#include "database/DatabaseCommand_ArtistStats.h"
 #include "database/DatabaseCommand_TrackStats.h"
 #include "database/IdThreadWorker.h"
-#include "Source.h"
-
+#include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
 
-#include <QReadWriteLock>
+#include "ArtistPlaylistInterface.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
 
-#define ID_THREAD_DEBUG 0
+#include <QReadWriteLock>
+#include <QPixmapCache>
 
 using namespace Tomahawk;
 
-QHash< QString, artist_ptr > Artist::s_artistsByName = QHash< QString, artist_ptr >();
-QHash< unsigned int, artist_ptr > Artist::s_artistsById = QHash< unsigned int, artist_ptr >();
+QHash< QString, artist_wptr > Artist::s_artistsByName = QHash< QString, artist_wptr >();
+QHash< unsigned int, artist_wptr > Artist::s_artistsById = QHash< unsigned int, artist_wptr >();
 
 static QMutex s_nameCacheMutex;
-static QMutex s_idCacheMutex;
 static QReadWriteLock s_idMutex;
+static QMutex s_memberMutex;
+
 
 Artist::~Artist()
 {
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Deleting artist:" << m_name;
     m_ownRef.clear();
 
 #ifndef ENABLE_HEADLESS
@@ -59,23 +64,22 @@ Artist::get( const QString& name, bool autoCreate )
     if ( name.isEmpty() )
         return artist_ptr();
 
-    const QString sortname = name.toLower();
-
     QMutexLocker lock( &s_nameCacheMutex );
-    if ( s_artistsByName.contains( sortname ) )
-        return s_artistsByName.value( sortname );
+    const QString key = name.toLower();
+    if ( s_artistsByName.contains( key ) )
+    {
+        artist_wptr artist = s_artistsByName.value( key );
+        if ( artist )
+            return artist.toStrongRef();
+    }
 
     if ( !Database::instance() || !Database::instance()->impl() )
         return artist_ptr();
 
-#if ID_THREAD_DEBUG
-        tDebug() << "Creating artist:" << name << "( sortname:" << sortname << ")";
-#endif
-
-    artist_ptr artist = artist_ptr( new Artist( name ), &QObject::deleteLater );
+    artist_ptr artist = artist_ptr( new Artist( name ), &Artist::deleteLater );
     artist->setWeakRef( artist.toWeakRef() );
     artist->loadId( autoCreate );
-    s_artistsByName.insert( sortname, artist );
+    s_artistsByName.insert( key, artist );
 
     return artist;
 }
@@ -84,25 +88,37 @@ Artist::get( const QString& name, bool autoCreate )
 artist_ptr
 Artist::get( unsigned int id, const QString& name )
 {
-    QMutexLocker lock( &s_idCacheMutex );
+    Q_ASSERT( id > 0 );
 
-    const QString sortname = name.toLower();
-    if ( s_artistsByName.contains( sortname ) )
-    {
-        return s_artistsByName.value( sortname );
-    }
+    s_idMutex.lockForRead();
     if ( s_artistsById.contains( id ) )
     {
-        return s_artistsById.value( id );
+        artist_wptr artist = s_artistsById.value( id );
+        s_idMutex.unlock();
+
+        if ( !artist.isNull() )
+            return artist;
+    }
+    s_idMutex.unlock();
+
+    QMutexLocker lock( &s_nameCacheMutex );
+    const QString key = name.toLower();
+    if ( s_artistsByName.contains( key ) )
+    {
+        artist_wptr artist = s_artistsByName.value( key );
+        if ( !artist.isNull() )
+            return artist;
     }
 
-    artist_ptr a = artist_ptr( new Artist( id, name ), &QObject::deleteLater );
+    artist_ptr a = artist_ptr( new Artist( id, name ), &Artist::deleteLater );
     a->setWeakRef( a.toWeakRef() );
+    s_artistsByName.insert( key, a );
 
-    s_artistsByName.insert( sortname, a );
     if ( id > 0 )
     {
+        s_idMutex.lockForWrite();
         s_artistsById.insert( id, a );
+        s_idMutex.unlock();
     }
 
     return a;
@@ -119,10 +135,13 @@ Artist::Artist( unsigned int id, const QString& name )
     , m_simArtistsLoaded( false )
     , m_biographyLoaded( false )
     , m_infoJobs( 0 )
+    , m_chartPosition( 0 )
+    , m_chartCount( 0 )
 #ifndef ENABLE_HEADLESS
     , m_cover( 0 )
 #endif
 {
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Creating artist:" << id << name;
     m_sortname = DatabaseImpl::sortname( name, true );
 }
 
@@ -137,11 +156,49 @@ Artist::Artist( const QString& name )
     , m_simArtistsLoaded( false )
     , m_biographyLoaded( false )
     , m_infoJobs( 0 )
+    , m_chartPosition( 0 )
+    , m_chartCount( 0 )
 #ifndef ENABLE_HEADLESS
     , m_cover( 0 )
 #endif
 {
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Creating artist:" << name;
     m_sortname = DatabaseImpl::sortname( name, true );
+}
+
+
+void
+Artist::deleteLater()
+{
+    QMutexLocker lock( &s_nameCacheMutex );
+
+    const QString key = m_name.toLower();
+    if ( s_artistsByName.contains( key ) )
+    {
+        s_artistsByName.remove( key );
+    }
+
+    if ( m_id > 0 )
+    {
+        s_idMutex.lockForWrite();
+        if ( s_artistsById.contains( m_id ) )
+        {
+            s_artistsById.remove( m_id );
+        }
+        s_idMutex.unlock();
+    }
+
+    QObject::deleteLater();
+}
+
+
+void
+Artist::onArtistStatsLoaded( unsigned int /* plays */, unsigned int chartPos, unsigned int chartCount )
+{
+    m_chartPosition = chartPos;
+    m_chartCount = chartCount;
+
+    emit statsLoaded();
 }
 
 
@@ -164,13 +221,29 @@ Artist::albums( ModelMode mode, const Tomahawk::collection_ptr& collection ) con
 
     if ( ( mode == DatabaseMode || mode == Mixed ) && !dbLoaded )
     {
-        DatabaseCommand_AllAlbums* cmd = new DatabaseCommand_AllAlbums( collection, artist );
-        cmd->setData( QVariant( collection.isNull() ) );
+        if ( collection.isNull() )
+        {
+            DatabaseCommand_AllAlbums* cmd = new DatabaseCommand_AllAlbums( collection, artist );
+            cmd->setData( QVariant( collection.isNull() ) );
 
-        connect( cmd, SIGNAL( albums( QList<Tomahawk::album_ptr>, QVariant ) ),
-                        SLOT( onAlbumsFound( QList<Tomahawk::album_ptr>, QVariant ) ) );
+            connect( cmd, SIGNAL( albums( QList<Tomahawk::album_ptr>, QVariant ) ),
+                          SLOT( onAlbumsFound( QList<Tomahawk::album_ptr>, QVariant ) ) );
 
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+            Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
+        }
+        else
+        {
+            //collection is *surely* not null, and might be a ScriptCollection
+            Tomahawk::AlbumsRequest* cmd = collection->requestAlbums( artist );
+
+            // There is also a signal albums( QList, QVariant ).
+            // The QVariant might carry a bool that says whether the dbcmd was executed for a null collection
+            // but here we know for a fact that the collection is not null, so we'll happily ignore it
+            connect( dynamic_cast< QObject* >( cmd ), SIGNAL( albums( QList<Tomahawk::album_ptr> ) ),
+                     this, SLOT( onAlbumsFound( QList<Tomahawk::album_ptr> ) ) );
+
+            cmd->enqueue();
+        }
     }
 
     if ( ( mode == InfoSystemMode || mode == Mixed ) && !infoLoaded )
@@ -268,25 +341,19 @@ Artist::id() const
 
     if ( waiting )
     {
-#if ID_THREAD_DEBUG
-        qDebug() << Q_FUNC_INFO << "Asked for artist ID and NOT loaded yet" << m_name << m_idFuture.isFinished();
-#endif
+//        qDebug() << Q_FUNC_INFO << "Asked for artist ID and NOT loaded yet" << m_name << m_idFuture.isFinished();
         m_idFuture.waitForFinished();
-#if ID_THREAD_DEBUG
-        qDebug() << "DONE WAITING:" << m_idFuture.resultCount() << m_idFuture.isResultReadyAt(0) << m_idFuture.isCanceled() << m_idFuture.isFinished() << m_idFuture.isPaused() << m_idFuture.isRunning() << m_idFuture.isStarted();
-#endif
+//        qDebug() << "DONE WAITING:" << m_idFuture.resultCount() << m_idFuture.isResultReadyAt( 0 ) << m_idFuture.isCanceled() << m_idFuture.isFinished() << m_idFuture.isPaused() << m_idFuture.isRunning() << m_idFuture.isStarted();
         finalid = m_idFuture.result();
 
-#if ID_THREAD_DEBUG
-        qDebug() << Q_FUNC_INFO << "Got loaded artist:" << m_name << finalid;
-#endif
+//        qDebug() << Q_FUNC_INFO << "Got loaded artist:" << m_name << finalid;
 
         s_idMutex.lockForWrite();
         m_id = finalid;
         m_waitingForFuture = false;
 
         if ( m_id > 0 )
-            s_artistsById[ m_id ] = m_ownRef.toStrongRef();
+            s_artistsById.insert( m_id, m_ownRef.toStrongRef() );
 
         s_idMutex.unlock();
     }
@@ -300,13 +367,14 @@ Artist::biography() const
 {
     if ( !m_biographyLoaded )
     {
+        Tomahawk::InfoSystem::InfoStringHash trackInfo;
+        trackInfo["artist"] = name();
+
         Tomahawk::InfoSystem::InfoRequestData requestData;
         requestData.caller = infoid();
-        requestData.customData = QVariantMap();
-
-        requestData.input = name();
         requestData.type = Tomahawk::InfoSystem::InfoArtistBiography;
-        requestData.requestId = TomahawkUtils::infosystemRequestId();
+        requestData.input = QVariant::fromValue< Tomahawk::InfoSystem::InfoStringHash >( trackInfo );
+        requestData.customData = QVariantMap();
 
         connect( Tomahawk::InfoSystem::InfoSystem::instance(),
                 SIGNAL( info( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ),
@@ -329,8 +397,16 @@ Artist::loadStats()
 {
     artist_ptr a = m_ownRef.toStrongRef();
 
-    DatabaseCommand_TrackStats* cmd = new DatabaseCommand_TrackStats( a );
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd) );
+    {
+        DatabaseCommand_TrackStats* cmd = new DatabaseCommand_TrackStats( a );
+        Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
+    }
+
+    {
+        DatabaseCommand_ArtistStats* cmd = new DatabaseCommand_ArtistStats( a );
+        connect( cmd, SIGNAL( done( unsigned int, unsigned int, unsigned int ) ), SLOT( onArtistStatsLoaded( unsigned int, unsigned int, unsigned int ) ) );
+        Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
+    }
 }
 
 
@@ -354,14 +430,20 @@ Artist::playbackHistory( const Tomahawk::source_ptr& source ) const
 void
 Artist::setPlaybackHistory( const QList< Tomahawk::PlaybackLog >& playbackData )
 {
-    m_playbackHistory = playbackData;
+    {
+        QMutexLocker locker( &s_memberMutex );
+        m_playbackHistory = playbackData;
+    }
+
     emit statsLoaded();
 }
 
 
 unsigned int
-Artist::playbackCount( const source_ptr& source )
+Artist::playbackCount( const source_ptr& source ) const
 {
+    QMutexLocker locker( &s_memberMutex );
+
     unsigned int count = 0;
     foreach ( const PlaybackLog& log, m_playbackHistory )
     {
@@ -373,10 +455,24 @@ Artist::playbackCount( const source_ptr& source )
 }
 
 
-void
-Artist::onAlbumsFound( const QList< album_ptr >& albums, const QVariant& data )
+unsigned int
+Artist::chartPosition() const
 {
-    if ( data.toBool() )
+    return m_chartPosition;
+}
+
+
+unsigned int
+Artist::chartCount() const
+{
+    return m_chartCount;
+}
+
+
+void
+Artist::onAlbumsFound( const QList< album_ptr >& albums, const QVariant& collectionIsNull )
+{
+    if ( collectionIsNull.toBool() )
     {
         m_databaseAlbums << albums;
         m_albumsLoaded.insert( DatabaseMode, true );
@@ -454,7 +550,6 @@ Artist::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData requestData, QVari
         case InfoSystem::InfoArtistBiography:
         {
             QVariantMap bmap = output.toMap();
-
             foreach ( const QString& source, bmap.keys() )
             {
                 if ( source == "last.fm" )
@@ -530,22 +625,25 @@ Artist::cover( const QSize& size, bool forceLoad ) const
 
     if ( !m_cover && !m_coverBuffer.isEmpty() )
     {
-        m_cover = new QPixmap();
-        m_cover->loadFromData( m_coverBuffer );
+        QPixmap cover;
+        cover.loadFromData( m_coverBuffer );
         m_coverBuffer.clear();
+
+        m_cover = new QPixmap( TomahawkUtils::squareCenterPixmap( cover ) );
     }
 
     if ( m_cover && !m_cover->isNull() && !size.isEmpty() )
     {
-        if ( m_coverCache.contains( size.width() ) )
-        {
-            return m_coverCache.value( size.width() );
-        }
+        const QString cacheKey = infoid() + "_" + size.width();
+        QPixmap cover;
 
-        QPixmap scaledCover;
-        scaledCover = m_cover->scaled( size, Qt::KeepAspectRatio, Qt::SmoothTransformation );
-        m_coverCache.insert( size.width(), scaledCover );
-        return scaledCover;
+        if ( !QPixmapCache::find( cacheKey, cover ) )
+        {
+            cover = m_cover->scaled( size, Qt::KeepAspectRatio, Qt::SmoothTransformation );
+            QPixmapCache::insert( cacheKey, cover );
+            return cover;
+        }
+        return cover;
     }
 
     if ( m_cover )

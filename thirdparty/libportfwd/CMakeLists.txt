@@ -8,19 +8,19 @@ SET(NATPMP_DIR      "third-party/libnatpmp-20100808")
 
 ADD_DEFINITIONS(-Wall -O2 -DNDEBUG)
 IF(WIN32)
-	ADD_DEFINITIONS(-DWIN32 -DMINIUPNP_EXPORTS )
+	ADD_DEFINITIONS(-DWIN32 )
 ELSE()
 	ADD_DEFINITIONS(-fPIC)
 ENDIF()
-INCLUDE_DIRECTORIES( ${MINIUPNP_DIR} include ${QT_INCLUDES} )
+INCLUDE_DIRECTORIES( ${MINIUPNP_DIR} include ${QT_INCLUDES} ${Qt5Core_INCLUDE_DIRS} )
 SET( CMAKE_C_FLAGS ${CLEAN_C_FLAGS} )
 
-ADD_DEFINITIONS( -DPORTFWDDLLEXPORT_PRO )
+ADD_DEFINITIONS( -DPORTFWDDLLEXPORT_STATIC -DSTATICLIB )
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   ADD_DEFINITIONS( -DMACOSX -D_DARWIN_C_SOURCE )
 endif ()
 
-ADD_LIBRARY(tomahawk_portfwd SHARED
+ADD_LIBRARY(tomahawk_portfwd STATIC
         # the needed bits of miniupnpc (no python module, no tests, no cli)
         ${MINIUPNP_DIR}/connecthostport.c
         ${MINIUPNP_DIR}/igd_desc_parse.c
@@ -45,13 +45,6 @@ ADD_LIBRARY(tomahawk_portfwd SHARED
 IF(WIN32)
 	TARGET_LINK_LIBRARIES( tomahawk_portfwd "ws2_32.dll" "iphlpapi.a" )
 ENDIF()
-
-INSTALL( TARGETS tomahawk_portfwd
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    BUNDLE DESTINATION library
-)
 
 #INSTALL(FILES include/portfwd/portfwddllmacro.h include/portfwd/portfwd.h DESTINATION include/portfwd)
 

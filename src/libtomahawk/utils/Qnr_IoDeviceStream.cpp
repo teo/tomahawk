@@ -22,27 +22,52 @@
 
 #include "Qnr_IoDeviceStream.h"
 
-#include <QtNetwork/QNetworkReply>
+#include "utils/Logger.h"
+
+#include <QNetworkReply>
+#include <QTimer>
 
 using namespace Tomahawk;
 
-QNR_IODeviceStream::QNR_IODeviceStream(QIODevice* ioDevice, QObject* parent)
-    : Phonon::AbstractMediaStream( parent ),
-      _ioDevice(ioDevice),
-      _networkReply(0)
+// Feed Phonon in 1MiB blocks
+#define BLOCK_SIZE 1048576
+
+QNR_IODeviceStream::QNR_IODeviceStream( const QSharedPointer<QNetworkReply>& reply, QObject* parent )
+    : Phonon::AbstractMediaStream( parent )
+    , m_networkReply( reply )
+    , m_pos( 0 )
+    , m_timer( new QTimer( this ) )
 {
-    _ioDevice->reset();
-    if (!_ioDevice->isOpen()) {
-        _ioDevice->open(QIODevice::ReadOnly);
+    if ( !m_networkReply->isOpen() ) {
+        m_networkReply->open(QIODevice::ReadOnly);
     }
 
-    Q_ASSERT(ioDevice->isOpen());
-    Q_ASSERT(ioDevice->isReadable());
-//     streamSize = ioDevice->size();
-//     streamSeekable = !ioDevice->isSequential();
-//
-    // Allow handling of QNetworkReplies WRT its isFinished() function..
-    _networkReply = qobject_cast<QNetworkReply *>(_ioDevice);
+    Q_ASSERT( m_networkReply->isOpen() );
+    Q_ASSERT( m_networkReply->isReadable() );
+
+    if ( m_networkReply->isFinished() )
+    {
+        // All data is ready, read it!
+        m_data = m_networkReply->readAll();
+        Q_ASSERT( m_networkReply->atEnd() );
+        setStreamSeekable( true );
+        setStreamSize( m_data.size() );
+    }
+    else
+    {
+        // TODO: Connect to finished() signal
+        QVariant contentLength = m_networkReply->header( QNetworkRequest::ContentLengthHeader );
+        if ( contentLength.isValid() && contentLength.toLongLong() > 0 )
+        {
+            setStreamSize( contentLength.toLongLong() );
+        }
+        // Just consume all data that is already available.
+        m_data = m_networkReply->readAll();
+        connect( m_networkReply.data(), SIGNAL( readyRead() ), SLOT( readyRead() ) );
+    }
+
+    m_timer->setInterval( 0 );
+    connect( m_timer, SIGNAL( timeout() ), SLOT( moreData() ) );
 }
 
 
@@ -50,36 +75,56 @@ QNR_IODeviceStream::~QNR_IODeviceStream()
 {
 }
 
-void QNR_IODeviceStream::reset()
+
+void
+QNR_IODeviceStream::enoughData()
 {
-    _ioDevice->reset();
-    //resetDone();
+    m_timer->stop();
 }
 
-void QNR_IODeviceStream::needData()
+
+void
+QNR_IODeviceStream::needData()
 {
-    quint32 size = 4096;
-    const QByteArray data = _ioDevice->read(size);
-// #ifdef __GNUC__
-// #warning TODO 4.5 - make sure we do not break anything without this, it is preventing IODs from working when they did not yet emit readyRead()
-// #endif
-//    if (data.isEmpty() && !d->ioDevice->atEnd()) {
-//        error(Phonon::NormalError, d->ioDevice->errorString());
-//    }
-    writeData(data);
-    if (_ioDevice->atEnd()) {
-        // If the IO device was identified as QNetworkReply also take its
-        // isFinished() into account, when triggering EOD.
-        if (!_networkReply || _networkReply->isFinished()) {
-            endOfData();
-        }
+    m_timer->start();
+    moreData();
+}
+
+void
+QNR_IODeviceStream::reset()
+{
+    m_pos = 0;
+}
+
+
+void
+QNR_IODeviceStream::seekStream( qint64 offset )
+{
+    m_pos = offset;
+}
+
+void
+QNR_IODeviceStream::moreData()
+{
+    QByteArray data = m_data.mid( m_pos, BLOCK_SIZE );
+    m_pos += data.size();
+    if ( ( data.size() == 0 ) && m_networkReply->atEnd() && m_networkReply->isFinished() )
+    {
+        // We're done.
+        endOfData();
+        m_timer->stop();
+    }
+    else
+    {
+        writeData( data );
     }
 }
 
-void QNR_IODeviceStream::seekStream(qint64 offset)
+
+void
+QNR_IODeviceStream::readyRead()
 {
-    _ioDevice->seek(offset);
-    //seekStreamDone();
+    m_data += m_networkReply->readAll();
 }
 
 

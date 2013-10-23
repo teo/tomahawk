@@ -19,6 +19,8 @@
 #ifndef JOB_STATUS_ITEM
 #define JOB_STATUS_ITEM
 
+#include "DllMacro.h"
+
 #include <QObject>
 #include <QMetaType>
 
@@ -36,7 +38,7 @@ class QPixmap;
  * The right column may be empty.
  *
  */
-class JobStatusItem : public QObject
+class DLLEXPORT JobStatusItem : public QObject
 {
     Q_OBJECT
 public:
@@ -44,12 +46,12 @@ public:
     virtual ~JobStatusItem();
 
     virtual QString type() const = 0;
-    virtual int weight() const { return 0; }
+    virtual int weight() const { return 1; }
 
     /// Please cache this.
     virtual QPixmap icon() const = 0;
     virtual QString mainText() const = 0;
-    virtual QString rightColumnText() const = 0;
+    virtual QString rightColumnText() const { return QString(); };
 
     /**
      * If collapse item is true, sending multiple items of the same type will "collapse" them into one

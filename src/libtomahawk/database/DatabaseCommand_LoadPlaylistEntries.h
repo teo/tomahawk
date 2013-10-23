@@ -20,22 +20,23 @@
 #ifndef DATABASECOMMAND_LOADPLAYLIST_H
 #define DATABASECOMMAND_LOADPLAYLIST_H
 
-#include <QObject>
-#include <QVariantMap>
-
 #include "DatabaseCommand.h"
+#include "DllMacro.h"
 #include "Playlist.h"
 
-#include "DllMacro.h"
+#include <QObject>
+#include <QStringList>
+#include <QVariantMap>
+
+namespace Tomahawk
+{
 
 class DLLEXPORT DatabaseCommand_LoadPlaylistEntries : public DatabaseCommand
 {
 Q_OBJECT
 
 public:
-    explicit DatabaseCommand_LoadPlaylistEntries( QString revision_guid, QObject* parent = 0 )
-    : DatabaseCommand( parent ), m_islatest( true ), m_revguid( revision_guid )
-    {}
+    explicit DatabaseCommand_LoadPlaylistEntries( QString revision_guid, QObject* parent = 0 );
 
     virtual void exec( DatabaseImpl* );
     virtual bool doesMutates() const { return false; }
@@ -62,5 +63,7 @@ protected:
 private:
     QString m_revguid;
 };
+
+}
 
 #endif

@@ -20,14 +20,15 @@
 #define FUNCTIMEOUT_H
 
 #include <QObject>
-#include <QWeakPointer>
+#include <QPointer>
 
-#include "boost/function.hpp"
-#include "boost/bind.hpp"
+#include <boost/function.hpp>
 
 #include "DllMacro.h"
 
 /*
+#include <boost/bind.hpp>
+
     I want to do:
         QTimer::singleShot(1000, this, SLOT(doSomething(x)));
     instead, I'm doing:
@@ -51,7 +52,7 @@ public slots:
 
 private:
     boost::function<void()> m_func;
-    QWeakPointer< QObject > m_watch;
+    QPointer< QObject > m_watch;
 };
 
 }; // ns

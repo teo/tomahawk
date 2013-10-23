@@ -22,15 +22,15 @@
 #ifndef NEWRELEASESWIDGET_H
 #define NEWRELEASESWIDGET_H
 
-#include <QtGui/QWidget>
-#include <QtGui/QListWidgetItem>
-#include <QtGui/QStyledItemDelegate>
-
 #include "PlaylistInterface.h"
 #include "infosystem/InfoSystem.h"
 #include "ViewPage.h"
 
 #include "DllMacro.h"
+
+#include <QWidget>
+#include <QListWidgetItem>
+#include <QStyledItemDelegate>
 
 class QSortFilterProxyModel;
 class QStandardItemModel;
@@ -40,7 +40,7 @@ class PlaylistModel;
 class TreeProxyModel;
 class AlbumModel;
 class PlayableModel;
-
+class AnimatedSpinner;
 namespace Ui
 {
     class NewReleasesWidget;
@@ -115,8 +115,8 @@ private:
     QHash< QString, PlayableModel* > m_albumModels;
     QString m_queueItemToShow;
     QSet< QString > m_queuedFetches;
-    QTimer* m_timer;
-
+    AnimatedSpinner* m_spinner;
+    bool m_loading;
     friend class Tomahawk::ChartsPlaylistInterface;
 };
 

@@ -18,11 +18,14 @@
 
 #include "DatabaseCommand_Resolve.h"
 
-#include "Artist.h"
-#include "Album.h"
-#include "Pipeline.h"
-#include "SourceList.h"
 #include "utils/Logger.h"
+
+#include "Album.h"
+#include "Artist.h"
+#include "Pipeline.h"
+#include "PlaylistEntry.h"
+#include "SourceList.h"
+#include "Track.h"
 
 using namespace Tomahawk;
 
@@ -52,10 +55,10 @@ DatabaseCommand_Resolve::exec( DatabaseImpl* lib )
 
     if ( !m_query->resultHint().isEmpty() )
     {
-        qDebug() << "Using result-hint to speed up resolving:" << m_query->resultHint();
+        tDebug() << "Using result-hint to speed up resolving:" << m_query->resultHint();
 
         Tomahawk::result_ptr result = lib->resultFromHint( m_query );
-        if ( !result.isNull() && ( result->collection().isNull() || result->collection()->source()->isOnline() ) )
+        if ( result && ( !result->collection() || result->collection()->source()->isOnline() ) )
         {
             QList<Tomahawk::result_ptr> res;
             res << result;
@@ -75,14 +78,13 @@ void
 DatabaseCommand_Resolve::resolve( DatabaseImpl* lib )
 {
     QList<Tomahawk::result_ptr> res;
-    typedef QPair<int, float> scorepair_t;
 
     // STEP 1
     QList< QPair<int, float> > tracks = lib->search( m_query );
 
     if ( tracks.length() == 0 )
     {
-        qDebug() << "No candidates found in first pass, aborting resolve" << m_query->artist() << m_query->track();
+        qDebug() << "No candidates found in first pass, aborting resolve" << m_query->queryTrack()->toString();
         emit results( m_query->id(), res );
         return;
     }
@@ -124,65 +126,34 @@ DatabaseCommand_Resolve::resolve( DatabaseImpl* lib )
 
     while ( files_query.next() )
     {
-        source_ptr s;
         QString url = files_query.value( 0 ).toString();
-
-        if ( files_query.value( 16 ).toUInt() == 0 )
+        source_ptr s = SourceList::instance()->get( files_query.value( 16 ).toUInt() );
+        if ( !s )
         {
-            s = SourceList::instance()->getLocal();
+            tDebug() << "Could not find source" << files_query.value( 16 ).toUInt();
+            continue;
         }
-        else
-        {
-            s = SourceList::instance()->get( files_query.value( 16 ).toUInt() );
-            if ( s.isNull() )
-            {
-                qDebug() << "Could not find source" << files_query.value( 16 ).toUInt();
-                continue;
-            }
+        if ( !s->isLocal() )
+            url = QString( "servent://%1\t%2" ).arg( s->nodeId() ).arg( url );
 
-            url = QString( "servent://%1\t%2" ).arg( s->userName() ).arg( url );
-        }
-
-        bool cached = Tomahawk::Result::isCached( url );
         Tomahawk::result_ptr result = Tomahawk::Result::get( url );
-        if ( cached )
+        if ( result->isValid() )
         {
-            qDebug() << "Result already cached:" << result->toString();
+            tDebug( LOGVERBOSE ) << "Result already cached:" << result->toString();
             res << result;
             continue;
         }
 
-        Tomahawk::artist_ptr artist = Tomahawk::Artist::get( files_query.value( 18 ).toUInt(), files_query.value( 12 ).toString() );
-        Tomahawk::album_ptr album = Tomahawk::Album::get( files_query.value( 19 ).toUInt(), files_query.value( 13 ).toString(), artist );
-        Tomahawk::artist_ptr composer = Tomahawk::Artist::get( files_query.value( 20 ).toUInt(), files_query.value( 15 ).toString() );
+        track_ptr track = Track::get( files_query.value( 9 ).toUInt(), files_query.value( 12 ).toString(), files_query.value( 14 ).toString(), files_query.value( 13 ).toString(), files_query.value( 5 ).toUInt(), files_query.value( 15 ).toString(), files_query.value( 17 ).toUInt(), files_query.value( 11 ).toUInt() );
+        track->loadAttributes();
+        result->setTrack( track );
 
         result->setModificationTime( files_query.value( 1 ).toUInt() );
         result->setSize( files_query.value( 2 ).toUInt() );
         result->setMimetype( files_query.value( 4 ).toString() );
-        result->setDuration( files_query.value( 5 ).toUInt() );
         result->setBitrate( files_query.value( 6 ).toUInt() );
-        result->setArtist( artist );
-        result->setComposer( composer );
-        result->setAlbum( album );
-        result->setDiscNumber( files_query.value( 11 ).toUInt() );
-        result->setTrack( files_query.value( 14 ).toString() );
         result->setRID( uuid() );
-        result->setAlbumPos( files_query.value( 17 ).toUInt() );
-        result->setTrackId( files_query.value( 9 ).toUInt() );
-
-        TomahawkSqlQuery attrQuery = lib->newquery();
-        QVariantMap attr;
-
-        attrQuery.prepare( "SELECT k, v FROM track_attributes WHERE id = ?" );
-        attrQuery.bindValue( 0, result->trackId() );
-        attrQuery.exec();
-        while ( attrQuery.next() )
-        {
-            attr[ attrQuery.value( 0 ).toString() ] = attrQuery.value( 1 ).toString();
-        }
-
-        result->setAttributes( attr );
-        result->setCollection( s->collection() );
+        result->setCollection( s->dbCollection() );
 
         res << result;
     }
@@ -263,24 +234,15 @@ DatabaseCommand_Resolve::fullTextResolve( DatabaseImpl* lib )
 
     while ( files_query.next() )
     {
-        source_ptr s;
         QString url = files_query.value( 0 ).toString();
-
-        if ( files_query.value( 16 ).toUInt() == 0 )
+        source_ptr s = SourceList::instance()->get( files_query.value( 16 ).toUInt() );
+        if ( !s )
         {
-            s = SourceList::instance()->getLocal();
+            tDebug() << "Could not find source" << files_query.value( 16 ).toUInt();
+            continue;
         }
-        else
-        {
-            s = SourceList::instance()->get( files_query.value( 16 ).toUInt() );
-            if ( s.isNull() )
-            {
-                qDebug() << "Could not find source" << files_query.value( 16 ).toUInt();
-                continue;
-            }
-
-            url = QString( "servent://%1\t%2" ).arg( s->userName() ).arg( url );
-        }
+        if ( !s->isLocal() )
+            url = QString( "servent://%1\t%2" ).arg( s->nodeId() ).arg( url );
 
         bool cached = Tomahawk::Result::isCached( url );
         Tomahawk::result_ptr result = Tomahawk::Result::get( url );
@@ -291,46 +253,25 @@ DatabaseCommand_Resolve::fullTextResolve( DatabaseImpl* lib )
             continue;
         }
 
-        Tomahawk::artist_ptr artist = Tomahawk::Artist::get( files_query.value( 18 ).toUInt(), files_query.value( 12 ).toString() );
-        Tomahawk::album_ptr album = Tomahawk::Album::get( files_query.value( 19 ).toUInt(), files_query.value( 13 ).toString(), artist );
-        Tomahawk::artist_ptr composer = Tomahawk::Artist::get( files_query.value( 20 ).toUInt(), files_query.value( 15 ).toString() );
+        track_ptr track = Track::get( files_query.value( 9 ).toUInt(), files_query.value( 12 ).toString(), files_query.value( 14 ).toString(), files_query.value( 13 ).toString(), files_query.value( 5 ).toUInt(), files_query.value( 15 ).toString(), files_query.value( 17 ).toUInt(), files_query.value( 11 ).toUInt() );
+        track->loadAttributes();
+        result->setTrack( track );
 
         result->setModificationTime( files_query.value( 1 ).toUInt() );
         result->setSize( files_query.value( 2 ).toUInt() );
         result->setMimetype( files_query.value( 4 ).toString() );
-        result->setDuration( files_query.value( 5 ).toUInt() );
         result->setBitrate( files_query.value( 6 ).toUInt() );
-        result->setArtist( artist );
-        result->setComposer( composer );
-        result->setAlbum( album );
-        result->setDiscNumber( files_query.value( 11 ).toUInt() );
-        result->setTrack( files_query.value( 14 ).toString() );
         result->setRID( uuid() );
-        result->setAlbumPos( files_query.value( 17 ).toUInt() );
-        result->setTrackId( files_query.value( 9 ).toUInt() );
+        result->setCollection( s->dbCollection() );
 
         for ( int k = 0; k < trackPairs.count(); k++ )
         {
-            if ( trackPairs.at( k ).first == (int)result->trackId() )
+            if ( trackPairs.at( k ).first == (int)track->trackId() )
             {
                 result->setScore( trackPairs.at( k ).second );
                 break;
             }
         }
-
-        TomahawkSqlQuery attrQuery = lib->newquery();
-        QVariantMap attr;
-
-        attrQuery.prepare( "SELECT k, v FROM track_attributes WHERE id = ?" );
-        attrQuery.bindValue( 0, result->trackId() );
-        attrQuery.exec();
-        while ( attrQuery.next() )
-        {
-            attr[ attrQuery.value( 0 ).toString() ] = attrQuery.value( 1 ).toString();
-        }
-
-        result->setAttributes( attr );
-        result->setCollection( s->collection() );
 
         res << result;
     }

@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,31 +19,35 @@
 
 #include "ContextMenu.h"
 
-#include "GlobalActionManager.h"
+#include "audio/AudioEngine.h"
 #include "playlist/PlaylistView.h"
+#include "filemetadata/MetadataEditor.h"
+#include "GlobalActionManager.h"
 #include "ViewManager.h"
 #include "Query.h"
 #include "Result.h"
-#include "Collection.h"
+#include "collection/Collection.h"
 #include "Source.h"
+#include "SourceList.h"
 #include "Artist.h"
 #include "Album.h"
 
+#include "utils/ImageRegistry.h"
 #include "utils/Logger.h"
-#include "audio/AudioEngine.h"
-#include "filemetadata/MetadataEditor.h"
 
 using namespace Tomahawk;
 
 
 ContextMenu::ContextMenu( QWidget* parent )
     : QMenu( parent )
+    , m_playlists_sigmap( 0 )
+    , m_sources_sigmap( 0 )
     , m_loveAction( 0 )
 {
     m_sigmap = new QSignalMapper( this );
     connect( m_sigmap, SIGNAL( mapped( int ) ), SLOT( onTriggered( int ) ) );
 
-    m_supportedActions = ActionPlay | ActionQueue | ActionCopyLink | ActionLove | ActionStopAfter | ActionPage | ActionEditMetadata;
+    m_supportedActions = ActionPlay | ActionQueue | ActionPlaylist | ActionCopyLink | ActionLove | ActionStopAfter | ActionPage | ActionEditMetadata | ActionSend;
 }
 
 
@@ -70,6 +75,39 @@ ContextMenu::itemCount() const
 
 
 void
+ContextMenu::addToPlaylist( int playlistIdx )
+{
+    Tomahawk::playlist_ptr playlist = m_playlists.at( playlistIdx );
+    playlist->addEntries( m_queries );
+}
+
+
+void
+ContextMenu::sendToSource( int sourceIdx )
+{
+    const Tomahawk::source_ptr &src = m_sources.at( sourceIdx );
+    foreach ( Tomahawk::query_ptr query, m_queries )
+    {
+        query->queryTrack()->share( src );
+    }
+}
+
+
+bool
+playlistsLessThan( const Tomahawk::playlist_ptr& s1, const Tomahawk::playlist_ptr& s2 )
+{
+    return s1->title().toLower() < s2->title().toLower();
+}
+
+
+bool
+sourcesLessThan( const Tomahawk::source_ptr& s1, const Tomahawk::source_ptr& s2 )
+{
+    return s1->friendlyName().toLower() < s2->friendlyName().toLower();
+}
+
+
+void
 ContextMenu::setQueries( const QList<Tomahawk::query_ptr>& queries )
 {
     if ( queries.isEmpty() )
@@ -84,6 +122,49 @@ ContextMenu::setQueries( const QList<Tomahawk::query_ptr>& queries )
 
     if ( m_supportedActions & ActionQueue )
         m_sigmap->setMapping( addAction( tr( "Add to &Queue" ) ), ActionQueue );
+
+    if ( m_supportedActions & ActionPlaylist )
+    {
+        // Get the current list of all playlists.
+        m_playlists = QList< Tomahawk::playlist_ptr >( SourceList::instance()->getLocal()->dbCollection()->playlists() );
+        // Sort the playlist
+        qSort( m_playlists.begin(), m_playlists.end(), playlistsLessThan );
+        if ( m_playlists_sigmap != 0 )
+            m_playlists_sigmap->deleteLater();
+        m_playlists_sigmap = new QSignalMapper( this );
+
+        // Build the menu listing all available playlists
+        QMenu* playlistMenu = addMenu( tr( "Add to &Playlist" ) );
+        for ( int i = 0; i < m_playlists.length(); ++i )
+        {
+            QAction* action = new QAction( m_playlists.at( i )->title() , this );
+            playlistMenu->addAction(action);
+            m_playlists_sigmap->setMapping( action, i );
+            connect( action, SIGNAL( triggered() ), m_playlists_sigmap, SLOT( map() ) );
+        }
+        connect( m_playlists_sigmap, SIGNAL( mapped( int ) ), this, SLOT( addToPlaylist( int ) ) );
+    }
+
+    if ( m_supportedActions & ActionSend ) //Send to someone's Inbox!
+    {
+        // Get the buddies list
+        m_sources = SourceList::instance()->sources( true );
+        qSort( m_sources.begin(), m_sources.end(), sourcesLessThan );
+
+        if ( m_sources_sigmap != 0 )
+            m_sources_sigmap->deleteLater();
+        m_sources_sigmap = new QSignalMapper( this );
+
+        QMenu* sourcesMenu = addMenu( tr( "Send to &Friend" ) );
+        for ( int i = 0; i < m_sources.length(); ++i )
+        {
+            QAction* action = new QAction( m_sources.at( i )->friendlyName(), this );
+            sourcesMenu->addAction( action );
+            m_sources_sigmap->setMapping( action, i );
+            connect( action, SIGNAL( triggered() ), m_sources_sigmap, SLOT( map() ) );
+        }
+        connect( m_sources_sigmap, SIGNAL( mapped( int ) ), this, SLOT( sendToSource( int ) ) );
+    }
 
     if ( m_supportedActions & ActionStopAfter && itemCount() == 1 )
     {
@@ -100,25 +181,57 @@ ContextMenu::setQueries( const QList<Tomahawk::query_ptr>& queries )
         m_loveAction = addAction( tr( "&Love" ) );
         m_sigmap->setMapping( m_loveAction, ActionLove );
 
-        connect( queries.first().data(), SIGNAL( socialActionsLoaded() ), SLOT( onSocialActionsLoaded() ) );
+        connect( queries.first()->track().data(), SIGNAL( socialActionsLoaded() ), SLOT( onSocialActionsLoaded() ) );
         onSocialActionsLoaded();
     }
 
-    if ( m_supportedActions & ActionCopyLink && itemCount() == 1 )
-        m_sigmap->setMapping( addAction( tr( "&Copy Track Link" ) ), ActionCopyLink );
+    addSeparator();
 
     if ( m_supportedActions & ActionPage && itemCount() == 1 )
-        m_sigmap->setMapping( addAction( tr( "&Show Track Page" ) ), ActionPage );
+    {
+        // Ampersands need to be escaped as they indicate a keyboard shortcut
+        const QString track = m_queries.first()->track()->track().replace( QString( "&" ), QString( "&&" ) );
+        m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/track-icon.svg" ),
+                                         tr( "&Go to \"%1\"" ).arg( track ) ), ActionTrackPage );
+        if ( !m_queries.first()->track()->album().isEmpty() )
+        {
+            const QString album = m_queries.first()->track()->album().replace( QString( "&" ), QString( "&&" ) );
+            m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/album-icon.svg" ),
+                                             tr( "Go to \"%1\"" ).arg( album ) ), ActionAlbumPage );
+        }
+        const QString artist = m_queries.first()->track()->artist().replace( QString( "&" ), QString( "&&" ) );
+        m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/artist-icon.svg" ),
+                                         tr( "Go to \"%1\"" ).arg( artist ) ), ActionArtistPage );
+    }
 
     addSeparator();
+
+    if ( m_supportedActions & ActionCopyLink && itemCount() == 1 )
+        m_sigmap->setMapping( addAction( tr( "&Copy Track Link" ) ), ActionCopyLink );
 
     if ( m_supportedActions & ActionEditMetadata && itemCount() == 1 )
         m_sigmap->setMapping( addAction( tr( "Properties..." ) ), ActionEditMetadata );
 
     addSeparator();
 
+    if ( m_supportedActions & ActionMarkListened )
+    {
+        bool thereAreUnlistenedTracks = false;
+        foreach ( const Tomahawk::query_ptr& query, m_queries )
+        {
+            if ( !query->queryTrack()->isListened() )
+            {
+                thereAreUnlistenedTracks = true;
+                break;
+            }
+        }
+
+        if ( thereAreUnlistenedTracks )
+            m_sigmap->setMapping( addAction( tr( "Mark as &Listened" ) ), ActionMarkListened );
+    }
+
     if ( m_supportedActions & ActionDelete )
-        m_sigmap->setMapping( addAction( queries.count() > 1 ? tr( "&Delete Items" ) : tr( "&Delete Item" ) ), ActionDelete );
+        m_sigmap->setMapping( addAction( queries.count() > 1 ? tr( "&Remove Items" ) : tr( "&Remove Item" ) ), ActionDelete );
 
     foreach ( QAction* action, actions() )
     {
@@ -149,14 +262,20 @@ ContextMenu::setAlbums( const QList<Tomahawk::album_ptr>& albums )
     m_albums.clear();
     m_albums << albums;
 
-/*    if ( m_supportedActions & ActionPlay && itemCount() == 1 )
-        m_sigmap->setMapping( addAction( tr( "Show &Album Page" ) ), ActionPlay );*/
-
     if ( m_supportedActions & ActionQueue )
         m_sigmap->setMapping( addAction( tr( "Add to &Queue" ) ), ActionQueue );
 
+    addSeparator();
+
     if ( m_supportedActions & ActionPage && itemCount() == 1 )
-        m_sigmap->setMapping( addAction( tr( "&Show Album Page" ) ), ActionPage );
+    {
+        const QString album = m_albums.first()->name().replace( QString( "&" ), QString( "&&" ) );
+        m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/album-icon.svg" ),
+                                         tr( "&Go to \"%1\"" ).arg( album ) ), ActionAlbumPage );
+        const QString artist = m_albums.first()->artist()->name().replace( QString( "&" ), QString( "&&" ) );
+        m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/artist-icon.svg" ),
+                                         tr( "Go to \"%1\"" ).arg( artist ) ), ActionArtistPage );
+    }
 
     //m_sigmap->setMapping( addAction( tr( "&Add to Playlist" ) ), ActionAddToPlaylist );
 
@@ -197,8 +316,14 @@ ContextMenu::setArtists( const QList<Tomahawk::artist_ptr>& artists )
     if ( m_supportedActions & ActionQueue )
         m_sigmap->setMapping( addAction( tr( "Add to &Queue" ) ), ActionQueue );
 
+    addSeparator();
+
     if ( m_supportedActions & ActionPage && itemCount() == 1 )
-        m_sigmap->setMapping( addAction( tr( "&Show Artist Page" ) ), ActionPage );
+    {
+        const QString artist = m_artists.first()->name().replace( QString( "&" ), QString( "&&" ) );
+        m_sigmap->setMapping( addAction( ImageRegistry::instance()->icon( RESPATH "images/artist-icon.svg" ),
+                                         tr( "&Go to \"%1\"" ).arg( artist ) ), ActionArtistPage );
+    }
 
     //m_sigmap->setMapping( addAction( tr( "&Add to Playlist" ) ), ActionAddToPlaylist );
 
@@ -236,12 +361,14 @@ ContextMenu::onTriggered( int action )
             copyLink();
             break;
 
-        case ActionPage:
-            openPage();
+        case ActionTrackPage:
+        case ActionArtistPage:
+        case ActionAlbumPage:
+            openPage( (MenuActions)action );
             break;
 
         case ActionLove:
-            m_queries.first()->setLoved( !m_queries.first()->loved() );
+            m_queries.first()->track()->setLoved( !m_queries.first()->track()->loved() );
             break;
 
         case ActionStopAfter:
@@ -261,6 +388,8 @@ ContextMenu::onTriggered( int action )
         default:
             emit triggered( action );
     }
+
+    clear();
 }
 
 
@@ -304,19 +433,40 @@ ContextMenu::copyLink()
 
 
 void
-ContextMenu::openPage()
+ContextMenu::openPage( MenuActions action )
 {
     if ( m_queries.count() )
     {
-        ViewManager::instance()->show( m_queries.first() );
+        if ( action == ActionTrackPage )
+        {
+            ViewManager::instance()->show( m_queries.first() );
+        }
+        else
+        {
+            if ( action == ActionArtistPage )
+            {
+                ViewManager::instance()->show( m_queries.first()->track()->artistPtr() );
+            }
+            else if ( action == ActionAlbumPage )
+            {
+                ViewManager::instance()->show( m_queries.first()->track()->albumPtr() );
+            }
+        }
+    }
+    else if ( m_albums.count() )
+    {
+        if ( action == ActionArtistPage )
+        {
+            ViewManager::instance()->show( m_albums.first()->artist() );
+        }
+        else
+        {
+            ViewManager::instance()->show( m_albums.first() );
+        }
     }
     else if ( m_artists.count() )
     {
         ViewManager::instance()->show( m_artists.first() );
-    }
-    else if ( m_albums.count() )
-    {
-        ViewManager::instance()->show( m_albums.first() );
     }
 }
 
@@ -327,15 +477,15 @@ ContextMenu::onSocialActionsLoaded()
     if ( m_queries.isEmpty() || m_queries.first().isNull() )
         return;
 
-    if ( m_loveAction && m_queries.first()->loved() )
+    if ( m_loveAction && m_queries.first()->track()->loved() )
     {
         m_loveAction->setText( tr( "Un-&Love" ) );
-        m_loveAction->setIcon( QIcon( RESPATH "images/not-loved.png" ) );
+        m_loveAction->setIcon( ImageRegistry::instance()->icon( RESPATH "images/not-loved.svg" ) );
     }
     else if ( m_loveAction )
     {
         m_loveAction->setText( tr( "&Love" ) );
-        m_loveAction->setIcon( QIcon( RESPATH "images/loved.png" ) );
+        m_loveAction->setIcon( ImageRegistry::instance()->icon( RESPATH "images/loved.svg" ) );
     }
 }
 

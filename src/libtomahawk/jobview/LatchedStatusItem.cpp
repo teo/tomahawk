@@ -22,7 +22,12 @@
 #include "SourceList.h"
 #include "JobStatusView.h"
 #include "JobStatusModel.h"
-#include "utils/TomahawkUtils.h"
+#include "utils/TomahawkUtilsGui.h"
+
+#ifndef ENABLE_HEADLESS
+#include "JobStatusModel.h"
+#include "JobStatusView.h"
+#endif
 
 LatchedStatusItem::LatchedStatusItem( const Tomahawk::source_ptr& from, const Tomahawk::source_ptr& to, LatchedStatusManager* parent )
     : JobStatusItem()
@@ -65,8 +70,6 @@ LatchedStatusManager::LatchedStatusManager( QObject* parent )
 {
     connect( SourceList::instance(), SIGNAL( sourceLatchedOn( Tomahawk::source_ptr, Tomahawk::source_ptr ) ), this, SLOT( latchedOn( Tomahawk::source_ptr, Tomahawk::source_ptr ) ) );
     connect( SourceList::instance(), SIGNAL( sourceLatchedOff( Tomahawk::source_ptr, Tomahawk::source_ptr ) ), this, SLOT( latchedOff( Tomahawk::source_ptr, Tomahawk::source_ptr ) ) );
-
-    m_pixmap.load( RESPATH "images/headphones-bigger.png" );
 }
 
 void
@@ -77,9 +80,11 @@ LatchedStatusManager::latchedOn( const Tomahawk::source_ptr& from, const Tomahaw
 
     if ( to->isLocal() )
     {
+#ifndef ENABLE_HEADLESS
         LatchedStatusItem* item = new LatchedStatusItem( from, to, this );
-        m_jobs[ from->userName() ] = item;
+        m_jobs[ from->nodeId() ] = item;
         JobStatusView::instance()->model()->addJob( item );
+#endif
 
         connect( from.data(), SIGNAL( offline() ), this, SLOT( sourceOffline() ), Qt::UniqueConnection );
     }
@@ -91,9 +96,9 @@ LatchedStatusManager::sourceOffline()
     Tomahawk::Source* s = qobject_cast< Tomahawk::Source* >( sender() );
     Q_ASSERT( s );
 
-    if ( m_jobs.contains( s->userName() ) )
+    if ( m_jobs.contains( s->nodeId() ) )
     {
-        QWeakPointer< LatchedStatusItem> job = m_jobs.take( s->userName() ).data();
+        QPointer< LatchedStatusItem> job = m_jobs.take( s->nodeId() ).data();
         if ( !job.isNull() )
             job.data()->stop();
     }
@@ -106,10 +111,17 @@ LatchedStatusManager::latchedOff( const Tomahawk::source_ptr& from, const Tomaha
     if ( from.isNull() || to.isNull() )
         return;
 
-    if ( to->isLocal() && m_jobs.contains( from->userName() ) )
+    if ( to->isLocal() && m_jobs.contains( from->nodeId() ) )
     {
-        QWeakPointer< LatchedStatusItem > item = m_jobs.take( from->userName() );
+        QPointer< LatchedStatusItem > item = m_jobs.take( from->nodeId() );
         if ( !item.isNull() )
             item.data()->stop();
     }
+}
+
+
+QPixmap
+LatchedStatusManager::pixmap() const
+{
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::HeadphonesOn, TomahawkUtils::Original, QSize( 128, 128 ) );
 }

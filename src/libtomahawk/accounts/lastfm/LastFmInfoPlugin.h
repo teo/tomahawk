@@ -51,6 +51,8 @@ public:
     LastFmInfoPlugin( Accounts::LastFmAccount* account );
     virtual ~LastFmInfoPlugin();
 
+    const QString friendlyName() const { return "LastFM"; };
+
 public slots:
     void settingsChanged();
 
@@ -59,6 +61,8 @@ public slots:
     void artistImagesReturned();
     void similarArtistsReturned();
     void topTracksReturned();
+    void artistInfoReturned();
+    void albumInfoReturned();
     void chartReturned();
     void similarTracksReturned();
 
@@ -70,23 +74,23 @@ protected slots:
     virtual void pushInfo( Tomahawk::InfoSystem::InfoPushData pushData );
 
 private:
-    void fetchCoverArt( Tomahawk::InfoSystem::InfoRequestData requestData );
-    void fetchArtistImages( Tomahawk::InfoSystem::InfoRequestData requestData );
     void fetchSimilarArtists( Tomahawk::InfoSystem::InfoRequestData requestData );
     void fetchTopTracks( Tomahawk::InfoSystem::InfoRequestData requestData );
+    void fetchArtistInfo( Tomahawk::InfoSystem::InfoRequestData requestData );
+    void fetchAlbumInfo( Tomahawk::InfoSystem::InfoRequestData requestData );
     void fetchChart( Tomahawk::InfoSystem::InfoRequestData requestData );
     void fetchChartCapabilities( Tomahawk::InfoSystem::InfoRequestData requestData );
     void fetchSimilarTracks( Tomahawk::InfoSystem::InfoRequestData requestData );
 
     void createScrobbler();
-    void nowPlaying( const QVariant &input );
+    void nowPlaying( const QVariant& input );
     void scrobble();
     void sendLoveSong( const InfoType type, QVariant input );
 
     void dataError( Tomahawk::InfoSystem::InfoRequestData requestData );
 
-    QWeakPointer< Accounts::LastFmAccount > m_account;
-    QList<lastfm::Track> parseTrackList( QNetworkReply * reply );
+    QPointer< Accounts::LastFmAccount > m_account;
+    QList<lastfm::Track> parseTrackList( QNetworkReply* reply );
 
     lastfm::MutableTrack m_track;
     lastfm::Audioscrobbler* m_scrobbler;

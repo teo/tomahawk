@@ -31,7 +31,7 @@ namespace Tomahawk {
 
 namespace Accounts {
 
-class AccountModelNode;
+struct AccountModelNode;
 
 class DLLEXPORT AccountModel : public QAbstractListModel
 {
@@ -100,6 +100,8 @@ signals:
     void errorInstalling( const QPersistentModelIndex& idx );
 
 private slots:
+    void init();
+
     void atticaLoaded();
     void loadData();
 

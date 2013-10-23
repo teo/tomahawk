@@ -3,6 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
  *   Copyright 2012,      Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,7 +32,7 @@
 #include "database/Database.h"
 #include "AlbumPlaylistInterface.h"
 #include "PlayableItem.h"
-#include "utils/TomahawkUtils.h"
+#include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
 
 using namespace Tomahawk;
@@ -41,7 +42,8 @@ TreeModel::TreeModel( QObject* parent )
     : PlayableModel( parent )
     , m_mode( DatabaseMode )
 {
-    setIcon( QPixmap( RESPATH "images/music-icon.png" ) );
+    setIcon( TomahawkUtils::defaultPixmap( TomahawkUtils::SuperCollection, TomahawkUtils::Original,
+                                           /*big enough for the ViewPage header on retina*/ QSize( 256, 256 ) ) );
 
     connect( AudioEngine::instance(), SIGNAL( started( Tomahawk::result_ptr ) ), SLOT( onPlaybackStarted( Tomahawk::result_ptr ) ), Qt::DirectConnection );
     connect( AudioEngine::instance(), SIGNAL( stopped() ), SLOT( onPlaybackStopped() ), Qt::DirectConnection );
@@ -136,14 +138,14 @@ TreeModel::addAllCollections()
     connect( cmd, SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
                     SLOT( onArtistsAdded( QList<Tomahawk::artist_ptr> ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 
     connect( SourceList::instance(), SIGNAL( sourceAdded( Tomahawk::source_ptr ) ), SLOT( onSourceAdded( Tomahawk::source_ptr ) ), Qt::UniqueConnection );
 
     QList<Tomahawk::source_ptr> sources = SourceList::instance()->sources();
     foreach ( const source_ptr& source, sources )
     {
-        connect( source->collection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ), Qt::UniqueConnection );
+        connect( source->dbCollection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ), Qt::UniqueConnection );
     }
 
     setTitle( tr( "All Artists" ) );
@@ -246,59 +248,65 @@ TreeModel::addCollection( const collection_ptr& collection )
 {
     qDebug() << Q_FUNC_INFO << collection->name()
                             << collection->source()->id()
-                            << collection->source()->userName();
+                            << collection->source()->nodeId();
 
     startLoading();
 
     m_collection = collection;
-    DatabaseCommand_AllArtists* cmd = new DatabaseCommand_AllArtists( collection );
 
-    connect( cmd, SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
-                    SLOT( onArtistsAdded( QList<Tomahawk::artist_ptr> ) ) );
-
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Tomahawk::ArtistsRequest* req = m_collection->requestArtists();
+    connect( dynamic_cast< QObject* >( req ), SIGNAL( artists( QList< Tomahawk::artist_ptr > ) ),
+             this, SLOT( onArtistsAdded( QList< Tomahawk::artist_ptr > ) ), Qt::UniqueConnection );
+    req->enqueue();
 
     connect( collection.data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ), Qt::UniqueConnection );
 
-    if ( !collection->source()->avatar().isNull() )
-        setIcon( collection->source()->avatar( Source::FancyStyle ) );
+    setIcon( collection->bigIcon() );
 
-    if ( collection->source()->isLocal() )
-        setTitle( tr( "My Collection" ) );
-    else
-        setTitle( tr( "Collection of %1" ).arg( collection->source()->friendlyName() ) );
+    setTitle( collection->prettyName() );
+    setDescription( collection->description() );
 }
 
 
 void
-TreeModel::addFilteredCollection( const collection_ptr& collection, unsigned int amount, DatabaseCommand_AllArtists::SortOrder order )
+TreeModel::reloadCollection()
 {
-    qDebug() << Q_FUNC_INFO << collection->name()
-                            << collection->source()->id()
-                            << collection->source()->userName()
-                            << amount << order;
+    if ( m_collection.isNull() )
+        return;
 
-    DatabaseCommand_AllArtists* cmd = new DatabaseCommand_AllArtists( collection );
-    cmd->setLimit( amount );
-    cmd->setSortOrder( order );
-    cmd->setSortDescending( true );
-
-    connect( cmd, SIGNAL( artists( QList<Tomahawk::artist_ptr>, Tomahawk::collection_ptr ) ),
-                    SLOT( onArtistsAdded( QList<Tomahawk::artist_ptr>, Tomahawk::collection_ptr ) ) );
-
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
-
-    if ( collection->source()->isLocal() )
-        setTitle( tr( "My Collection" ) );
-    else
-        setTitle( tr( "Collection of %1" ).arg( collection->source()->friendlyName() ) );
+    if ( !isLoading() )
+        onCollectionChanged();
 }
+
+
+//void
+//TreeModel::addFilteredCollection( const collection_ptr& collection, unsigned int amount, DatabaseCommand_AllArtists::SortOrder order )
+//{
+//    qDebug() << Q_FUNC_INFO << collection->name()
+//                            << collection->source()->id()
+//                            << collection->source()->nodeId()
+//                            << amount << order;
+//    DatabaseCommand_AllArtists* cmd = new DatabaseCommand_AllArtists( collection );
+//    cmd->setLimit( amount );
+//    cmd->setSortOrder( order );
+//    cmd->setSortDescending( true );
+
+//    connect( cmd, SIGNAL( artists( QList<Tomahawk::artist_ptr>, Tomahawk::collection_ptr ) ),
+//                    SLOT( onArtistsAdded( QList<Tomahawk::artist_ptr>, Tomahawk::collection_ptr ) ) );
+
+//    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
+
+//    if ( collection->source()->isLocal() )
+//        setTitle( tr( "My Collection" ) );
+//    else
+//        setTitle( tr( "Collection of %1" ).arg( collection->source()->friendlyName() ) );
+//}
 
 
 void
 TreeModel::onSourceAdded( const Tomahawk::source_ptr& source )
 {
-    connect( source->collection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ), Qt::UniqueConnection );
+    connect( source->dbCollection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ), Qt::UniqueConnection );
 }
 
 
@@ -420,4 +428,62 @@ TreeModel::indexFromAlbum( const Tomahawk::album_ptr& album ) const
 
     tDebug() << "Could not find item for album:" << album->name() << album->artist()->name();
     return QModelIndex();
+}
+
+
+QModelIndex
+TreeModel::indexFromResult( const Tomahawk::result_ptr& result ) const
+{
+    QModelIndex albumIdx = indexFromAlbum( result->track()->albumPtr() );
+    for ( int i = 0; i < rowCount( albumIdx ); i++ )
+    {
+        QModelIndex idx = index( i, 0, albumIdx );
+        PlayableItem* item = itemFromIndex( idx );
+        tDebug() << item->result()->toString();
+        if ( item && item->result() == result )
+        {
+            return idx;
+        }
+    }
+
+    tDebug() << "Could not find item for result:" << result->toString();
+    return QModelIndex();
+}
+
+
+QModelIndex
+TreeModel::indexFromQuery( const Tomahawk::query_ptr& query ) const
+{
+    QModelIndex albumIdx = indexFromAlbum( query->queryTrack()->albumPtr() );
+    for ( int i = 0; i < rowCount( albumIdx ); i++ )
+    {
+        QModelIndex idx = index( i, 0, albumIdx );
+        PlayableItem* item = itemFromIndex( idx );
+        if ( item && item->result() && item->result()->track()->equals( query->track() ) )
+        {
+            return idx;
+        }
+    }
+
+    tDebug() << "Could not find item for query:" << query->toString();
+    return QModelIndex();
+}
+
+
+PlayableItem*
+TreeModel::itemFromResult( const Tomahawk::result_ptr& result ) const
+{
+    QModelIndex albumIdx = indexFromAlbum( result->track()->albumPtr() );
+    for ( int i = 0; i < rowCount( albumIdx ); i++ )
+    {
+        QModelIndex idx = index( i, 0, albumIdx );
+        PlayableItem* item = itemFromIndex( idx );
+        if ( item && item->result() == result )
+        {
+            return item;
+        }
+    }
+
+    tDebug() << "Could not find item for result:" << result->toString();
+    return 0;
 }

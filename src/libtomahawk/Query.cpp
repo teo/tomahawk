@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,10 +18,10 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Query.h"
+#include "Query_p.h"
 
-#include <QtAlgorithms>
-
+#include "audio/AudioEngine.h"
+#include "collection/Collection.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "database/DatabaseCommand_LogPlayback.h"
@@ -28,55 +29,18 @@
 #include "database/DatabaseCommand_LoadSocialActions.h"
 #include "database/DatabaseCommand_SocialAction.h"
 #include "database/DatabaseCommand_TrackStats.h"
-#include "Album.h"
-#include "Collection.h"
-#include "Pipeline.h"
-#include "Resolver.h"
-#include "SourceList.h"
-#include "audio/AudioEngine.h"
-
+#include "resolvers/Resolver.h"
 #include "utils/Logger.h"
 
+#include "Album.h"
+#include "Pipeline.h"
+#include "Result.h"
+#include "SourceList.h"
+
+#include <QtAlgorithms>
+#include <QDebug>
+
 using namespace Tomahawk;
-
-
-SocialAction::SocialAction() {}
-SocialAction::~SocialAction() {}
-
-SocialAction& SocialAction::operator=( const SocialAction& other )
-{
-    action = other.action;
-    value = other.value;
-    timestamp = other.timestamp;
-    source = other.source;
-
-    return *this;
-}
-
-
-SocialAction::SocialAction( const SocialAction& other )
-{
-    *this = other;
-}
-
-
-PlaybackLog::PlaybackLog() {}
-PlaybackLog::~PlaybackLog() {}
-
-PlaybackLog& PlaybackLog::operator=( const PlaybackLog& other )
-{
-    source = other.source;
-    timestamp = other.timestamp;
-    secsPlayed = other.secsPlayed;
-
-    return *this;
-}
-
-
-PlaybackLog::PlaybackLog( const PlaybackLog& other )
-{
-    *this = other;
-}
 
 
 query_ptr
@@ -88,11 +52,21 @@ Query::get( const QString& artist, const QString& track, const QString& album, c
     if ( qid.isEmpty() )
         autoResolve = false;
 
-    query_ptr q = query_ptr( new Query( artist, track, album, qid, autoResolve ), &QObject::deleteLater );
+    query_ptr q = query_ptr( new Query( Track::get( artist, track, album ), qid, autoResolve ), &QObject::deleteLater );
     q->setWeakRef( q.toWeakRef() );
 
     if ( autoResolve )
         Pipeline::instance()->resolve( q );
+
+    return q;
+}
+
+
+query_ptr
+Query::get( const Tomahawk::track_ptr& track, const QID& qid )
+{
+    query_ptr q = query_ptr( new Query( track, qid, false ), &QObject::deleteLater );
+    q->setWeakRef( q.toWeakRef() );
 
     return q;
 }
@@ -113,15 +87,8 @@ Query::get( const QString& query, const QID& qid )
 }
 
 
-Query::Query( const QString& artist, const QString& track, const QString& album, const QID& qid, bool autoResolve )
-    : m_qid( qid )
-    , m_artist( artist )
-    , m_album( album )
-    , m_track( track )
-    , m_socialActionsLoaded( false )
-    , m_simTracksLoaded( false )
-    , m_lyricsLoaded( false )
-    , m_infoJobs( 0 )
+Query::Query( const track_ptr& track, const QID& qid, bool autoResolve )
+    : d_ptr( new QueryPrivate( this, track, qid ) )
 {
     init();
 
@@ -135,8 +102,7 @@ Query::Query( const QString& artist, const QString& track, const QString& album,
 
 
 Query::Query( const QString& query, const QID& qid )
-    : m_qid( qid )
-    , m_fullTextQuery( query )
+    : d_ptr( new QueryPrivate( this, query, qid ) )
 {
     init();
 
@@ -149,62 +115,51 @@ Query::Query( const QString& query, const QID& qid )
 
 Query::~Query()
 {
-    QMutexLocker lock( &m_mutex );
-    m_ownRef.clear();
-    m_results.clear();
+    Q_D( Query );
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << toString();
+
+    QMutexLocker lock( &d->mutex );
+    d->ownRef.clear();
+    d->results.clear();
 }
 
 
 void
 Query::init()
 {
-    m_resolveFinished = false;
-    m_solved = false;
-    m_playable = false;
-    m_duration = -1;
-    m_albumpos = 0;
-    m_discnumber = 0;
-    m_saveResultHint = false;
-
-    updateSortNames();
+    Q_D( Query );
+    d->resolveFinished = false;
+    d->solved = false;
+    d->playable = false;
+    d->saveResultHint = false;
 }
 
 
-void
-Query::updateSortNames()
+track_ptr
+Query::queryTrack() const
 {
-    if ( isFullTextQuery() )
-    {
-        m_artistSortname = DatabaseImpl::sortname( m_fullTextQuery, true );
-        m_composerSortname = DatabaseImpl::sortname( m_composer, true );
-        m_albumSortname = DatabaseImpl::sortname( m_fullTextQuery );
-        m_trackSortname = m_albumSortname;
-    }
-    else
-    {
-        m_artistSortname = DatabaseImpl::sortname( m_artist, true );
-        m_composerSortname = DatabaseImpl::sortname( m_composer, true );
-        m_albumSortname = DatabaseImpl::sortname( m_album );
-        m_trackSortname = DatabaseImpl::sortname( m_track );
-    }
+    Q_D( const Query );
+    return d->queryTrack;
 }
 
 
-query_ptr
-Query::displayQuery() const
+track_ptr
+Query::track() const
 {
+    Q_D( const Query );
     if ( !results().isEmpty() )
-        return results().first()->toQuery();
+        return results().first()->track();
 
-    return m_ownRef.toStrongRef();
+    return d->queryTrack;
 }
 
 
 void
 Query::addResults( const QList< Tomahawk::result_ptr >& newresults )
 {
+    Q_D( Query );
     {
-        QMutexLocker lock( &m_mutex );
+        QMutexLocker lock( &d->mutex );
 
 /*        const QStringList smt = AudioEngine::instance()->supportedMimeTypes();
         foreach ( const Tomahawk::result_ptr& result, newresults )
@@ -217,8 +172,8 @@ Query::addResults( const QList< Tomahawk::result_ptr >& newresults )
                 m_results.append( result );
         }*/
 
-        m_results << newresults;
-        qStableSort( m_results.begin(), m_results.end(), Query::resultSorter );
+        d->results << newresults;
+        qStableSort( d->results.begin(), d->results.end(), Query::resultSorter );
 
         // hook up signals, and check solved status
         foreach( const result_ptr& rp, newresults )
@@ -237,8 +192,9 @@ void
 Query::addAlbums( const QList< Tomahawk::album_ptr >& newalbums )
 {
     {
-        QMutexLocker lock( &m_mutex );
-        m_albums << newalbums;
+        Q_D( Query );
+        QMutexLocker lock( &d->mutex );
+        d->albums << newalbums;
     }
 
     emit albumsAdded( newalbums );
@@ -249,8 +205,9 @@ void
 Query::addArtists( const QList< Tomahawk::artist_ptr >& newartists )
 {
     {
-        QMutexLocker lock( &m_mutex );
-        m_artists << newartists;
+        Q_D( Query );
+        QMutexLocker lock( &d->mutex );
+        d->artists << newartists;
     }
 
     emit artistsAdded( newartists );
@@ -260,13 +217,20 @@ Query::addArtists( const QList< Tomahawk::artist_ptr >& newartists )
 void
 Query::refreshResults()
 {
-    if ( m_resolveFinished )
+    Q_D( Query );
+    if ( d->resolveFinished )
     {
-        m_resolveFinished = false;
-        query_ptr q = m_ownRef.toStrongRef();
+        d->resolveFinished = false;
+        query_ptr q = d->ownRef.toStrongRef();
         if ( q )
             Pipeline::instance()->resolve( q );
     }
+}
+
+
+Query::Query()
+    : d_ptr( new QueryPrivate( this ) )
+{
 }
 
 
@@ -274,9 +238,10 @@ void
 Query::onResultStatusChanged()
 {
     {
-        QMutexLocker lock( &m_mutex );
-        if ( m_results.count() )
-            qStableSort( m_results.begin(), m_results.end(), Query::resultSorter );
+        Q_D( Query );
+        QMutexLocker lock( &d->mutex );
+        if ( d->results.count() )
+            qStableSort( d->results.begin(), d->results.end(), Query::resultSorter );
     }
 
     checkResults();
@@ -288,8 +253,9 @@ void
 Query::removeResult( const Tomahawk::result_ptr& result )
 {
     {
-        QMutexLocker lock( &m_mutex );
-        m_results.removeAll( result );
+        Q_D( Query );
+        QMutexLocker lock( &d->mutex );
+        d->results.removeAll( result );
     }
 
     emit resultsRemoved( result );
@@ -301,13 +267,14 @@ Query::removeResult( const Tomahawk::result_ptr& result )
 void
 Query::onResolvingFinished()
 {
+    Q_D( Query );
     tDebug( LOGVERBOSE ) << "Finished resolving:" << toString();
-    if ( !m_resolveFinished )
+    if ( !d->resolveFinished )
     {
-        m_resolveFinished = true;
-        m_resolvers.clear();
+        d->resolveFinished = true;
+        d->resolvers.clear();
 
-        emit resolvingFinished( m_solved );
+        emit resolvingFinished( d->playable );
     }
 }
 
@@ -325,51 +292,76 @@ Query::onResolverAdded()
 QList< result_ptr >
 Query::results() const
 {
-    QMutexLocker lock( &m_mutex );
-    return m_results;
+    Q_D( const Query );
+    QMutexLocker lock( &d->mutex );
+    return d->results;
 }
 
 
 unsigned int
 Query::numResults() const
 {
-    QMutexLocker lock( &m_mutex );
-    return m_results.length();
+    Q_D( const Query );
+    QMutexLocker lock( &d->mutex );
+    return d->results.length();
+}
+
+
+bool
+Query::resolvingFinished() const
+{
+    Q_D( const Query );
+    return d->resolveFinished;
+}
+
+
+bool
+Query::solved() const
+{
+    Q_D( const Query );
+    return d->solved;
+}
+
+
+bool
+Query::playable() const
+{
+    Q_D( const Query );
+    return d->playable;
 }
 
 
 QID
 Query::id() const
 {
-    if ( m_qid.isEmpty() )
+    Q_D( const Query );
+    if ( d->qid.isEmpty() )
     {
-        m_qid = uuid();
+        d->qid = uuid();
     }
 
-    return m_qid;
-}
-
-
-void
-Query::setPlayedBy( const Tomahawk::source_ptr& source, unsigned int playtime )
-{
-    m_playedBy.first = source;
-    m_playedBy.second = playtime;
+    return d->qid;
 }
 
 
 bool
 Query::resultSorter( const result_ptr& left, const result_ptr& right )
 {
-    const float ls = left->score();
-    const float rs = right->score();
+    const float ls = left->isOnline() ? left->score() : 0.0;
+    const float rs = right->isOnline() ? right->score() : 0.0;
 
     if ( ls == rs )
     {
-        if ( !left->collection().isNull() && left->collection()->source()->isLocal() )
+/*        if ( left->collection() && left->collection()->source()->isLocal() )
+        {
             return true;
-        else
+        }*/
+        if ( right->collection() && right->collection()->source()->isLocal() )
+        {
             return false;
+        }
+
+        return true;
     }
 
     return ls > rs;
@@ -379,17 +371,19 @@ Query::resultSorter( const result_ptr& left, const result_ptr& right )
 void
 Query::setCurrentResolver( Tomahawk::Resolver* resolver )
 {
-    m_resolvers << resolver;
+    Q_D( Query );
+    d->resolvers << resolver;
 }
 
 
 Tomahawk::Resolver*
 Query::currentResolver() const
 {
-    int x = m_resolvers.count();
+    Q_D( const Query );
+    int x = d->resolvers.count();
     while ( --x )
     {
-        QWeakPointer< Resolver > r = m_resolvers.at( x );
+        QPointer< Resolver > r = d->resolvers.at( x );
         if ( r.isNull() )
             continue;
 
@@ -400,10 +394,42 @@ Query::currentResolver() const
 }
 
 
+QList< QPointer<Resolver> >
+Query::resolvedBy() const
+{
+    Q_D( const Query );
+    return d->resolvers;
+}
+
+
+QString
+Query::fullTextQuery() const
+{
+    Q_D( const Query );
+    return d->fullTextQuery;
+}
+
+
+bool
+Query::isFullTextQuery() const
+{
+    Q_D( const Query );
+    return !d->fullTextQuery.isEmpty();
+}
+
+
+void
+Query::setResolveFinished( bool resolved )
+{
+    Q_D( Query );
+    d->resolveFinished = resolved;
+}
+
+
 void
 Query::clearResults()
 {
-    foreach( const result_ptr& rp, m_results )
+    foreach( const result_ptr& rp, results() )
     {
         removeResult( rp );
     }
@@ -413,25 +439,20 @@ Query::clearResults()
 void
 Query::checkResults()
 {
+    Q_D( Query );
     bool playable = false;
     bool solved = false;
 
     {
-        QMutexLocker lock( &m_mutex );
+        QMutexLocker lock( &d->mutex );
 
         // hook up signals, and check solved status
-        foreach( const result_ptr& rp, m_results )
+        foreach( const result_ptr& rp, d->results )
         {
-            if ( rp->score() > 0.0 && rp->collection().isNull() )
-            {
+            if ( rp->playable() )
                 playable = true;
-            }
-            else if ( !rp->collection().isNull() && rp->collection()->source()->isOnline() )
-            {
-                playable = true;
-            }
 
-            if ( rp->score() > 0.99 )
+            if ( rp->isOnline() && rp->score() > 0.99 )
             {
                 solved = true;
             }
@@ -441,20 +462,19 @@ Query::checkResults()
         }
     }
 
-    if ( m_solved && !solved )
+    if ( d->solved && !solved )
     {
         refreshResults();
     }
-
-    if ( m_playable != playable )
+    if ( d->playable != playable )
     {
-        m_playable = playable;
-        emit playableStateChanged( m_playable );
+        d->playable = playable;
+        emit playableStateChanged( d->playable );
     }
-    if ( m_solved != solved )
+    if ( d->solved != solved )
     {
-        m_solved = solved;
-        emit solvedStateChanged( m_solved );
+        d->solved = solved;
+        emit solvedStateChanged( d->solved );
     }
 }
 
@@ -466,13 +486,13 @@ Query::equals( const Tomahawk::query_ptr& other, bool ignoreCase ) const
         return false;
 
     if ( ignoreCase )
-        return ( artist().toLower() == other->artist().toLower() &&
-                 album().toLower() == other->album().toLower() &&
-                 track().toLower() == other->track().toLower() );
+        return ( queryTrack()->artist().toLower() == other->queryTrack()->artist().toLower() &&
+                 queryTrack()->album().toLower() == other->queryTrack()->album().toLower() &&
+                 queryTrack()->track().toLower() == other->queryTrack()->track().toLower() );
     else
-        return ( artist() == other->artist() &&
-                 album() == other->album() &&
-                 track() == other->track() );
+        return ( queryTrack()->artist() == other->queryTrack()->artist() &&
+                 queryTrack()->album() == other->queryTrack()->album() &&
+                 queryTrack()->track() == other->queryTrack()->track() );
 }
 
 
@@ -480,10 +500,10 @@ QVariant
 Query::toVariant() const
 {
     QVariantMap m;
-    m.insert( "artist", artist() );
-    m.insert( "album", album() );
-    m.insert( "track", track() );
-    m.insert( "duration", duration() );
+    m.insert( "artist", queryTrack()->artist() );
+    m.insert( "album", queryTrack()->album() );
+    m.insert( "track", queryTrack()->track() );
+    m.insert( "duration", queryTrack()->duration() );
     m.insert( "qid", id() );
 
     return m;
@@ -497,9 +517,9 @@ Query::toString() const
     {
         return QString( "Query(%1, %2 - %3%4)" )
                   .arg( id() )
-                  .arg( artist() )
-                  .arg( track() )
-                  .arg( album().isEmpty() ? "" : QString( " on %1" ).arg( album() ) );
+                  .arg( queryTrack()->artist() )
+                  .arg( queryTrack()->track() )
+                  .arg( queryTrack()->album().isEmpty() ? "" : QString( " on %1" ).arg( queryTrack()->album() ) );
     }
     else
     {
@@ -514,25 +534,38 @@ Query::toString() const
 float
 Query::howSimilar( const Tomahawk::result_ptr& r )
 {
-    Q_ASSERT( !r->artist().isNull() );
-    Q_ASSERT( !r->album().isNull() );
-    if ( r->artist().isNull() || r->album().isNull() )
-        return 0.0;
-
+    Q_D( Query );
     // result values
-    const QString rArtistname = r->artist()->sortname();
-    const QString rAlbumname  = r->album()->sortname();
-    const QString rTrackname  = DatabaseImpl::sortname( r->track() );
+    const QString rArtistname = r->track()->artistSortname();
+    const QString rAlbumname  = r->track()->albumSortname();
+    const QString rTrackname  = r->track()->trackSortname();
+
+    QString qArtistname;
+    QString qAlbumname;
+    QString qTrackname;
+
+    if ( isFullTextQuery() )
+    {
+        qArtistname = DatabaseImpl::sortname( d->fullTextQuery, true );
+        qAlbumname = DatabaseImpl::sortname( d->fullTextQuery );
+        qTrackname = qAlbumname;
+    }
+    else
+    {
+        qArtistname = queryTrack()->artistSortname();
+        qAlbumname  = queryTrack()->albumSortname();
+        qTrackname  = queryTrack()->trackSortname();
+    }
 
     // normal edit distance
-    int artdist = TomahawkUtils::levenshtein( m_artistSortname, rArtistname );
-    int albdist = TomahawkUtils::levenshtein( m_albumSortname, rAlbumname );
-    int trkdist = TomahawkUtils::levenshtein( m_trackSortname, rTrackname );
+    int artdist = TomahawkUtils::levenshtein( qArtistname, rArtistname );
+    int albdist = TomahawkUtils::levenshtein( qAlbumname, rAlbumname );
+    int trkdist = TomahawkUtils::levenshtein( qTrackname, rTrackname );
 
     // max length of name
-    int mlart = qMax( m_artistSortname.length(), rArtistname.length() );
-    int mlalb = qMax( m_albumSortname.length(), rAlbumname.length() );
-    int mltrk = qMax( m_trackSortname.length(), rTrackname.length() );
+    int mlart = qMax( qArtistname.length(), rArtistname.length() );
+    int mlalb = qMax( qAlbumname.length(), rAlbumname.length() );
+    int mltrk = qMax( qTrackname.length(), rTrackname.length() );
 
     // distance scores
     float dcart = (float)( mlart - artdist ) / mlart;
@@ -542,7 +575,7 @@ Query::howSimilar( const Tomahawk::result_ptr& r )
     if ( isFullTextQuery() )
     {
         const QString artistTrackname = DatabaseImpl::sortname( fullTextQuery() );
-        const QString rArtistTrackname  = DatabaseImpl::sortname( r->artist()->name() + " " + r->track() );
+        const QString rArtistTrackname  = DatabaseImpl::sortname( r->track()->artist() + " " + r->track()->track() );
 
         int atrdist = TomahawkUtils::levenshtein( artistTrackname, rArtistTrackname );
         int mlatr = qMax( artistTrackname.length(), rArtistTrackname.length() );
@@ -555,7 +588,7 @@ Query::howSimilar( const Tomahawk::result_ptr& r )
     else
     {
         // don't penalize for missing album name
-        if ( m_albumSortname.isEmpty() )
+        if ( queryTrack()->albumSortname().isEmpty() )
             dcalb = 1.0;
 
         // weighted, so album match is worth less than track title
@@ -565,393 +598,50 @@ Query::howSimilar( const Tomahawk::result_ptr& r )
 }
 
 
-QPair< Tomahawk::source_ptr, unsigned int >
-Query::playedBy() const
-{
-    return m_playedBy;
-}
-
-
 void
-Query::loadStats()
+Query::setSaveHTTPResultHint( bool saveResultHint )
 {
-    query_ptr q = m_ownRef.toStrongRef();
-
-    DatabaseCommand_TrackStats* cmd = new DatabaseCommand_TrackStats( q );
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd) );
-}
-
-
-QList< Tomahawk::PlaybackLog >
-Query::playbackHistory( const Tomahawk::source_ptr& source ) const
-{
-    QList< Tomahawk::PlaybackLog > history;
-
-    foreach ( const PlaybackLog& log, m_playbackHistory )
-    {
-        if ( source.isNull() || log.source == source )
-        {
-            history << log;
-        }
-    }
-
-    return history;
-}
-
-
-void
-Query::setPlaybackHistory( const QList< Tomahawk::PlaybackLog >& playbackData )
-{
-    m_playbackHistory = playbackData;
-    emit statsLoaded();
-}
-
-
-unsigned int
-Query::playbackCount( const source_ptr& source )
-{
-    unsigned int count = 0;
-    foreach ( const PlaybackLog& log, m_playbackHistory )
-    {
-        if ( source.isNull() || log.source == source )
-            count++;
-    }
-
-    return count;
-}
-
-
-void
-Query::loadSocialActions()
-{
-    if ( m_socialActionsLoaded )
-        return;
-
-    m_socialActionsLoaded = true;
-    query_ptr q = m_ownRef.toStrongRef();
-
-    DatabaseCommand_LoadSocialActions* cmd = new DatabaseCommand_LoadSocialActions( q );
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd) );
-}
-
-
-void
-Query::setAllSocialActions( const QList< SocialAction >& socialActions )
-{
-    m_allSocialActions = socialActions;
-    parseSocialActions();
-
-    emit socialActionsLoaded();
-}
-
-
-QList< SocialAction >
-Query::allSocialActions() const
-{
-    return m_allSocialActions;
-}
-
-
-void
-Query::parseSocialActions()
-{
-    QListIterator< Tomahawk::SocialAction > it( m_allSocialActions );
-    unsigned int highestTimestamp = 0;
-
-    while ( it.hasNext() )
-    {
-        Tomahawk::SocialAction socialAction;
-        socialAction = it.next();
-        if ( socialAction.timestamp.toUInt() > highestTimestamp && socialAction.source->isLocal() )
-        {
-            m_currentSocialActions[ socialAction.action.toString() ] = socialAction.value.toBool();
-        }
-    }
+    Q_D( Query );
+    d->saveResultHint = saveResultHint;
 }
 
 
 bool
-Query::loved()
+Query::saveHTTPResultHint() const
 {
-    if ( m_socialActionsLoaded )
-    {
-        return m_currentSocialActions[ "Love" ].toBool();
-    }
-    else
-    {
-        loadSocialActions();
-    }
-
-    return false;
-}
-
-
-void
-Query::setLoved( bool loved )
-{
-    query_ptr q = m_ownRef.toStrongRef();
-    if ( q )
-    {
-        m_currentSocialActions[ "Love" ] = loved;
-
-        QVariantMap loveInfo;
-        Tomahawk::InfoSystem::InfoStringHash trackInfo;
-        trackInfo["title"] = track();
-        trackInfo["artist"] = artist();
-        trackInfo["album"] = album();
-
-        loveInfo[ "trackinfo" ] = QVariant::fromValue< Tomahawk::InfoSystem::InfoStringHash >( trackInfo );
-
-        Tomahawk::InfoSystem::InfoPushData pushData ( id(),
-                                                      ( loved ? Tomahawk::InfoSystem::InfoLove : Tomahawk::InfoSystem::InfoUnLove ),
-                                                      loveInfo,
-                                                      Tomahawk::InfoSystem::PushShortUrlFlag );
-
-        Tomahawk::InfoSystem::InfoSystem::instance()->pushInfo( pushData );
-
-        DatabaseCommand_SocialAction* cmd = new DatabaseCommand_SocialAction( q, QString( "Love" ), loved ? QString( "true" ) : QString( "false" ) );
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd) );
-
-        emit socialActionsLoaded();
-    }
+    Q_D( const Query );
+    return d->saveResultHint;
 }
 
 
 QString
-Query::socialActionDescription( const QString& action, DescriptionMode mode ) const
+Query::resultHint() const
 {
-    QString desc;
-    QList< Tomahawk::SocialAction > socialActions = allSocialActions();
-
-    QStringList actionSources;
-    int loveTotal = 0;
-    foreach ( const Tomahawk::SocialAction& sa, socialActions )
-    {
-        if ( sa.action == action )
-        {
-            if ( actionSources.contains( sa.source->friendlyName() ) )
-                continue;
-            actionSources << sa.source->friendlyName();
-            loveTotal++;
-        }
-    }
-
-    actionSources.clear();
-    int loveCounter = 0;
-    foreach ( const Tomahawk::SocialAction& sa, socialActions )
-    {
-        if ( sa.action == action )
-        {
-            if ( actionSources.contains( sa.source->friendlyName() ) )
-                continue;
-            actionSources << sa.source->friendlyName();
-
-            if ( ++loveCounter > 3 )
-                continue;
-            else if ( loveCounter > 1 )
-            {
-                if ( loveCounter == loveTotal )
-                    desc += tr( " and " );
-                else
-                    desc += ", ";
-            }
-
-            if ( sa.source->isLocal() )
-            {
-                if ( loveCounter == 1 )
-                    desc += "<b>" + tr( "You" ) + "</b>";
-                else
-                    desc += "<b>" + tr( "you" ) + "</b>";
-            }
-            else
-                desc += "<b>" + sa.source->friendlyName() + "</b>";
-        }
-    }
-    if ( loveCounter > 0 )
-    {
-        if ( loveCounter > 3 )
-            desc += " " + tr( "and" ) + " <b>" + tr( "%n other(s)", "", loveCounter - 3 ) + "</b>";
-
-        if ( mode == Short )
-            desc = "<b>" + tr( "%1 people" ).arg( loveCounter ) + "</b>";
-
-        desc += " " + tr( "loved this track" ); //FIXME: more action descs required
-    }
-
-    return desc;
+    Q_D( const Query );
+    return d->resultHint;
 }
 
 
 void
-Query::setSaveHTTPResultHint( bool saveResultHint )
+Query::setResultHint( const QString& resultHint )
 {
-    m_saveResultHint = saveResultHint;
+    Q_D( Query );
+    d->resultHint = resultHint;
 }
 
 
-#ifndef ENABLE_HEADLESS
-QPixmap
-Query::cover( const QSize& size, bool forceLoad ) const
+QWeakPointer<Query>
+Query::weakRef()
 {
-    if ( m_albumPtr.isNull() )
-    {
-        m_artistPtr = Artist::get( artist(), false );
-        m_albumPtr = Album::get( m_artistPtr, album(), false );
-        connect( m_artistPtr.data(), SIGNAL( updated() ), SIGNAL( updated() ), Qt::UniqueConnection );
-        connect( m_artistPtr.data(), SIGNAL( coverChanged() ), SIGNAL( coverChanged() ), Qt::UniqueConnection );
-        connect( m_albumPtr.data(), SIGNAL( updated() ), SIGNAL( updated() ), Qt::UniqueConnection );
-        connect( m_albumPtr.data(), SIGNAL( coverChanged() ), SIGNAL( coverChanged() ), Qt::UniqueConnection );
-    }
-
-    m_albumPtr->cover( size, forceLoad );
-    if ( m_albumPtr->coverLoaded() )
-    {
-        if ( !m_albumPtr->cover( size ).isNull() )
-            return m_albumPtr->cover( size );
-
-        return m_artistPtr->cover( size, forceLoad );
-    }
-
-    return QPixmap();
-}
-
-
-bool
-Query::coverLoaded() const
-{
-    if ( m_albumPtr.isNull() )
-        return false;
-
-    if ( m_albumPtr->coverLoaded() && !m_albumPtr->cover( QSize( 0, 0 ) ).isNull() )
-        return true;
-
-    return m_artistPtr->coverLoaded();
-}
-
-#endif
-
-
-QList<Tomahawk::query_ptr>
-Query::similarTracks() const
-{
-    if ( !m_simTracksLoaded )
-    {
-        Tomahawk::InfoSystem::InfoStringHash trackInfo;
-        trackInfo["artist"] = artist();
-        trackInfo["track"] = track();
-
-        Tomahawk::InfoSystem::InfoRequestData requestData;
-        requestData.caller = id();
-        requestData.customData = QVariantMap();
-
-        requestData.input = QVariant::fromValue< Tomahawk::InfoSystem::InfoStringHash >( trackInfo );
-        requestData.type = Tomahawk::InfoSystem::InfoTrackSimilars;
-        requestData.requestId = TomahawkUtils::infosystemRequestId();
-
-        connect( Tomahawk::InfoSystem::InfoSystem::instance(),
-                 SIGNAL( info( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ),
-                 SLOT( infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ), Qt::UniqueConnection );
-
-        connect( Tomahawk::InfoSystem::InfoSystem::instance(),
-                 SIGNAL( finished( QString ) ),
-                 SLOT( infoSystemFinished( QString ) ), Qt::UniqueConnection );
-
-        m_infoJobs++;
-        Tomahawk::InfoSystem::InfoSystem::instance()->getInfo( requestData );
-    }
-
-    return m_similarTracks;
-}
-
-
-QStringList
-Query::lyrics() const
-{
-    if ( !m_lyricsLoaded )
-    {
-        Tomahawk::InfoSystem::InfoStringHash trackInfo;
-        trackInfo["artist"] = artist();
-        trackInfo["track"] = track();
-
-        Tomahawk::InfoSystem::InfoRequestData requestData;
-        requestData.caller = id();
-        requestData.customData = QVariantMap();
-
-        requestData.input = QVariant::fromValue< Tomahawk::InfoSystem::InfoStringHash >( trackInfo );
-        requestData.type = Tomahawk::InfoSystem::InfoTrackLyrics;
-        requestData.requestId = TomahawkUtils::infosystemRequestId();
-
-        connect( Tomahawk::InfoSystem::InfoSystem::instance(),
-                 SIGNAL( info( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ),
-                 SLOT( infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ), Qt::UniqueConnection );
-
-        connect( Tomahawk::InfoSystem::InfoSystem::instance(),
-                 SIGNAL( finished( QString ) ),
-                 SLOT( infoSystemFinished( QString ) ), Qt::UniqueConnection );
-
-        m_infoJobs++;
-        Tomahawk::InfoSystem::InfoSystem::instance()->getInfo( requestData );
-    }
-
-    return m_lyrics;
+    Q_D( Query );
+    return d->ownRef;
 }
 
 
 void
-Query::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData requestData, QVariant output )
+Query::setWeakRef( QWeakPointer<Query> weakRef )
 {
-    if ( requestData.caller != id() )
-        return;
-
-    QVariantMap returnedData = output.value< QVariantMap >();
-    switch ( requestData.type )
-    {
-        case InfoSystem::InfoTrackLyrics:
-        {
-            m_lyrics = output.value< QVariant >().toString().split( "\n" );
-
-            m_lyricsLoaded = true;
-            emit lyricsLoaded();
-            break;
-        }
-
-        case InfoSystem::InfoTrackSimilars:
-        {
-            const QStringList artists = returnedData["artists"].toStringList();
-            const QStringList tracks = returnedData["tracks"].toStringList();
-
-            for ( int i = 0; i < tracks.count() && i < 50; i++ )
-            {
-                m_similarTracks << Query::get( artists.at( i ), tracks.at( i ), QString(), uuid(), false );
-            }
-            Pipeline::instance()->resolve( m_similarTracks );
-
-            m_simTracksLoaded = true;
-            emit similarTracksLoaded();
-
-            break;
-        }
-
-        default:
-            Q_ASSERT( false );
-    }
+    Q_D( Query );
+    d->ownRef = weakRef;
 }
 
-
-void
-Query::infoSystemFinished( QString target )
-{
-    if ( target != id() )
-        return;
-
-    if ( --m_infoJobs == 0 )
-    {
-        disconnect( Tomahawk::InfoSystem::InfoSystem::instance(), SIGNAL( info( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ),
-                    this, SLOT( infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ) );
-
-        disconnect( Tomahawk::InfoSystem::InfoSystem::instance(), SIGNAL( finished( QString ) ),
-                    this, SLOT( infoSystemFinished( QString ) ) );
-    }
-
-    emit updated();
-}

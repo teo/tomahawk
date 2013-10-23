@@ -26,7 +26,7 @@
 #include "accounts/Account.h"
 #include "accounts/AccountManager.h"
 
-#include "utils/TomahawkUtils.h"
+#include "utils/ImageRegistry.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
 #include "utils/AnimatedSpinner.h"
@@ -38,12 +38,6 @@
 #define PADDING 4
 #define PADDING_BETWEEN_STARS 2
 #define STAR_SIZE 12
-
-#ifdef Q_OS_MAC
-#define ROW_HEIGHT_MULTIPLIER 4.9
-#else
-#define ROW_HEIGHT_MULTIPLIER 5.7
-#endif
 
 #define ICONSIZE 40
 #define WRENCH_SIZE 24
@@ -60,23 +54,6 @@ AccountDelegate::AccountDelegate( QObject* parent )
     , m_accountRowHeight( -1 )
     , m_model( 0 )
 {
-    m_defaultCover.load( RESPATH "images/sipplugin-online.png" );
-    m_ratingStarPositive.load( RESPATH "images/starred.png" );
-    m_ratingStarNegative.load( RESPATH "images/star-unstarred.png" );
-    m_onHoverStar.load( RESPATH "images/star-hover.png" );
-    m_onlineIcon.load( RESPATH "images/sipplugin-online.png" );
-    m_offlineIcon.load( RESPATH "images/sipplugin-offline.png" );
-    m_removeIcon.load( RESPATH "images/list-remove.png" );
-
-    m_ratingStarPositive = m_ratingStarPositive.scaled( STAR_SIZE, STAR_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation  );
-    m_ratingStarNegative = m_ratingStarNegative.scaled( STAR_SIZE, STAR_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation  );
-    m_onlineIcon = m_onlineIcon.scaled( STATUS_ICON_SIZE, STATUS_ICON_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation  );
-    m_offlineIcon = m_offlineIcon.scaled( STATUS_ICON_SIZE, STATUS_ICON_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation  );
-    m_onHoverStar = m_onHoverStar.scaled( STAR_SIZE, STAR_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation  );
-    m_removeIcon = m_removeIcon.scaled( REMOVE_ICON_SIZE, REMOVE_ICON_SIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation );
-
-    m_defaultCover = m_defaultCover.scaled( ICONSIZE, ICONSIZE, Qt::KeepAspectRatio, Qt::SmoothTransformation );
-
 }
 
 
@@ -89,7 +66,7 @@ AccountDelegate::sizeHint( const QStyleOptionViewItem& option, const QModelIndex
         // Haven't calculated normal item height yet, do it once and save it
         QStyleOptionViewItemV4 opt( option );
         initStyleOption( &opt, index );
-        m_accountRowHeight = ROW_HEIGHT_MULTIPLIER * opt.fontMetrics.height();
+        m_accountRowHeight = ACCOUNT_DELEGATE_ROW_HEIGHT_MULTIPLIER * opt.fontMetrics.height();
     }
 
     if ( rowType == AccountModel::TopLevelAccount || rowType == AccountModel::UniqueFactory || rowType == AccountModel::CustomAccount )
@@ -188,7 +165,7 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
     QPixmap p = index.data( Qt::DecorationRole ).value< QPixmap >();
     QRect pixmapRect( leftEdge + PADDING, center - ICONSIZE/2, ICONSIZE, ICONSIZE );
     if ( p.isNull() ) // default image... TODO
-        p = m_defaultCover;
+        p = TomahawkUtils::defaultPixmap( TomahawkUtils::DefaultResolver, TomahawkUtils::Original, pixmapRect.size() );
     else
         p = p.scaled( pixmapRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation );
 
@@ -265,9 +242,9 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
         {
             Q_ASSERT( accts.size() == 1 );
 
-            rightEdge = drawStatus( painter, QPointF( rightEdge, center - painter->fontMetrics().height()/2 ), accts.first(), true );
+            painter->setFont( installFont );
+            rightEdge = drawStatus( painter, QPointF( rightEdge - PADDING, center - painter->fontMetrics().height()/2 ), accts.first(), true );
         }
-
     }
     else if ( canDelete )
     {
@@ -302,11 +279,16 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
     // Draw the title and description
     // title
     QString title = index.data( Qt::DisplayRole ).toString();
+    QString author = index.data( AccountModel::AuthorRole ).toString();
+    QString desc = index.data( AccountModel::DescriptionRole ).toString();
+
     const int rightTitleEdge = rightEdge - PADDING;
     const int leftTitleEdge = pixmapRect.right() + PADDING;
     painter->setFont( titleFont );
     QRect textRect;
-    const bool canRate = index.data( AccountModel::CanRateRole ).toBool();
+    const bool canRate = index.data( AccountModel::CanRateRole ).toBool()
+                         || !author.isEmpty()
+                         || !desc.isEmpty(); // if it's Attica, or it has non-empty at least author or description
     if ( canRate )
     {
         textRect = QRect( leftTitleEdge, opt.rect.top() + PADDING, rightTitleEdge - leftTitleEdge, painter->fontMetrics().height() );
@@ -318,12 +300,12 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
     painter->drawText( textRect, Qt::AlignVCenter | Qt::AlignLeft, title );
 
     // author
-    QString author = index.data( AccountModel::AuthorRole ).toString();
     int runningBottom = textRect.bottom();
     if ( !author.isEmpty() && canRate )
     {
         painter->save();
         painter->setFont( authorFont );
+        //FIXME const color
         painter->setPen( QColor( Qt::gray ).darker( 150 ) );
         const int authorWidth = authorMetrics.width( author );
         const QRect authorRect( textRect.left(),  textRect.bottom() + PADDING/2, authorWidth + 6, authorMetrics.height() );
@@ -334,7 +316,6 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
     }
 
     // description
-    QString desc = index.data( AccountModel::DescriptionRole ).toString();
     const int descWidth = rightEdge - leftTitleEdge - PADDING;
     painter->setFont( descFont );
     const QRect descRect( leftTitleEdge, runningBottom + PADDING, descWidth, painter->fontMetrics().height() );
@@ -353,7 +334,7 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
         int starsTop = runningBottom + PADDING;
         for ( int i = 1; i < 6; i++ )
         {
-            QRect r( runningEdge, starsTop, m_ratingStarPositive.width(), m_ratingStarPositive.height() );
+            QRect r( runningEdge, starsTop, STAR_SIZE, STAR_SIZE );
 //             QRect r( runningEdge, opt.rect.top() + PADDING, m_ratingStarPositive.width(), m_ratingStarPositive.height() );
             if ( i == 1 )
                 m_cachedStarRects[ index ] = r;
@@ -364,23 +345,23 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
                  m_hoveringItem == index )
             {
                 if ( i <= m_hoveringOver ) // positive star
-                    painter->drawPixmap( r, m_onHoverStar );
+                    painter->drawPixmap( r, TomahawkUtils::defaultPixmap( TomahawkUtils::StarHovered, TomahawkUtils::Original, r.size() ) );
                 else
-                    painter->drawPixmap( r, m_ratingStarNegative );
+                    painter->drawPixmap( r, TomahawkUtils::defaultPixmap( TomahawkUtils::Unstarred, TomahawkUtils::Original, r.size() ) );
             }
             else
             {
                 if ( i <= rating ) // positive or rated star
                 {
                     if ( userHasRated )
-                        painter->drawPixmap( r, m_onHoverStar );
+                        painter->drawPixmap( r, TomahawkUtils::defaultPixmap( TomahawkUtils::StarHovered, TomahawkUtils::Original, r.size() ) );
                     else
-                        painter->drawPixmap( r, m_ratingStarPositive );
+                        painter->drawPixmap( r, TomahawkUtils::defaultPixmap( TomahawkUtils::Starred, TomahawkUtils::Original, r.size() ) );
                 }
                 else
-                    painter->drawPixmap( r, m_ratingStarNegative );
+                    painter->drawPixmap( r, TomahawkUtils::defaultPixmap( TomahawkUtils::Unstarred, TomahawkUtils::Original, r.size() ) );
             }
-            runningEdge += m_ratingStarPositive.width() + PADDING_BETWEEN_STARS;
+            runningEdge += STAR_SIZE + PADDING_BETWEEN_STARS;
         }
 
         // downloaded num times
@@ -391,6 +372,23 @@ AccountDelegate::paint ( QPainter* painter, const QStyleOptionViewItem& option, 
         count = painter->fontMetrics().elidedText( count, Qt::ElideRight, rightEdge - PADDING - countRect.left() );
         painter->drawText( countRect, Qt::AlignLeft, count );
         //         runningEdge = authorRect.x();
+    }
+    else //no rating, it's not attica, let's show other stuff...
+    {
+        QString versionString = index.data( AccountModel::VersionRole ).toString();
+
+        if ( !versionString.isEmpty() )
+        {
+            int runningEdge = textRect.left();
+            int pkgTop = runningBottom + PADDING;
+            int h = painter->fontMetrics().height();
+
+            QRect pkgRect( runningEdge, pkgTop, h, h );
+            painter->drawPixmap( pkgRect, TomahawkUtils::defaultPixmap( TomahawkUtils::ResolverBundle, TomahawkUtils::Original, pkgRect.size() ) );
+
+            QRect textRect( runningEdge + PADDING + h, pkgTop, painter->fontMetrics().width( versionString ), h );
+            painter->drawText( textRect, Qt::AlignLeft, versionString );
+        }
     }
 
     // Title and description!
@@ -422,8 +420,10 @@ AccountDelegate::drawAccountList( QPainter* painter, QStyleOptionViewItemV4& opt
 
     for ( int i = 0; i < accts.size(); i++ )
     {
+        //FIXME: special case for twitter, remove for 0.8.0
+        if ( accts.at( i )->accountServiceName() != "Twitter" )
         // draw lightbulb and text
-        runningRightEdge = drawStatus( painter, QPointF( rightEdge - PADDING, current), accts.at( i ) );
+            runningRightEdge = drawStatus( painter, QPointF( rightEdge - PADDING, current), accts.at( i ) );
 
         const QString label = accts.at( i )->accountFriendlyName();
         const QPoint textTopLeft( runningRightEdge - PADDING - painter->fontMetrics().width( label ), current);
@@ -511,7 +511,7 @@ AccountDelegate::editorEvent( QEvent* event, QAbstractItemModel* model, const QS
     if ( m_cachedStarRects.contains( index ) )
     {
         QRect fullStars = m_cachedStarRects[ index ];
-        const int starsWidth = 5 * ( m_ratingStarPositive.width() + PADDING_BETWEEN_STARS );
+        const int starsWidth = 5 * ( STAR_SIZE + PADDING_BETWEEN_STARS );
         fullStars.setWidth( starsWidth );
 
         QMouseEvent* me = static_cast< QMouseEvent* >( event );
@@ -550,6 +550,7 @@ AccountDelegate::editorEvent( QEvent* event, QAbstractItemModel* model, const QS
 void
 AccountDelegate::drawRoundedButton( QPainter* painter, const QRect& btnRect, bool red ) const
 {
+    //FIXME const colors
     if ( !red )
         TomahawkUtils::drawRoundedButton( painter, btnRect, QColor(54, 127, 211), QColor(43, 104, 182), QColor(34, 85, 159), QColor(35, 79, 147) );
     else
@@ -563,25 +564,25 @@ AccountDelegate::drawStatus( QPainter* painter, const QPointF& rightTopEdge, Acc
     QPixmap p;
     QString statusText;
 
+    const int yPos = rightTopEdge.y();
+    const QRect connectIconRect( rightTopEdge.x() - STATUS_ICON_SIZE, yPos, STATUS_ICON_SIZE, STATUS_ICON_SIZE );
     const Account::ConnectionState state = acct->connectionState();
+
     if ( state == Account::Connected )
     {
-        p = m_onlineIcon;
+        p = TomahawkUtils::defaultPixmap( TomahawkUtils::SipPluginOnline, TomahawkUtils::Original, connectIconRect.size() );
         statusText = tr( "Online" );
     }
     else if ( state == Account::Connecting )
     {
-        p = m_offlineIcon;
+        p = TomahawkUtils::defaultPixmap( TomahawkUtils::SipPluginOffline, TomahawkUtils::Original, connectIconRect.size() );
         statusText = tr( "Connecting..." );
     }
     else
     {
-        p = m_offlineIcon;
+        p = TomahawkUtils::defaultPixmap( TomahawkUtils::SipPluginOffline, TomahawkUtils::Original, connectIconRect.size() );
         statusText = tr( "Offline" );
     }
-
-    const int yPos = rightTopEdge.y();
-    const QRect connectIconRect( rightTopEdge.x() - STATUS_ICON_SIZE, yPos, STATUS_ICON_SIZE, STATUS_ICON_SIZE );
 
     if ( state == Account::Connecting )
     {
@@ -637,7 +638,7 @@ AccountDelegate::drawConfigWrench ( QPainter* painter, QStyleOptionViewItemV4& o
 
     // draw it the same size as the check belox
     topt.font = opt.font;
-    topt.icon = QIcon( RESPATH "images/configure.png" );
+    topt.icon = ImageRegistry::instance()->icon( RESPATH "images/configure.svg" );
     topt.iconSize = QSize( 14, 14 );
     topt.subControls = QStyle::SC_ToolButton;
     topt.activeSubControls = QStyle::SC_None;

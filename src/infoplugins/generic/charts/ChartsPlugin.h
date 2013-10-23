@@ -20,7 +20,8 @@
 #ifndef ChartsPlugin_H
 #define ChartsPlugin_H
 
-#include "infoplugins/InfoPluginDllMacro.h"
+#include "../../InfoPluginDllMacro.h"
+
 #include "infosystem/InfoSystem.h"
 #include "infosystem/InfoSystemWorker.h"
 #include <QNetworkReply>
@@ -36,6 +37,7 @@ namespace InfoSystem
 
 class INFOPLUGINDLLEXPORT ChartsPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 
@@ -48,7 +50,6 @@ public:
         Track =     0x01,
         Album =     0x02,
         Artist =    0x04
-
     };
 
     void setChartType( ChartType type ) { m_chartType = type; }
@@ -94,20 +95,30 @@ private:
      * Updates the cache.
      */
     void fetchChart( Tomahawk::InfoSystem::InfoRequestData requestData, const QString& source, const QString& chart_id );
-
+    void fetchSource( const QString& source );
     void fetchChartFromCache( Tomahawk::InfoSystem::InfoRequestData requestData );
+    void fetchExpiredSources();
+
     void fetchChartCapabilitiesFromCache( Tomahawk::InfoSystem::InfoRequestData requestData );
     void dataError( Tomahawk::InfoSystem::InfoRequestData requestData );
 
-    QStringList m_chartResources;
-    QString m_chartVersion;
-    QList< InfoStringHash > m_charts;
-    ChartType m_chartType;
+    QString countryName( const QString& cc );
+
+    qlonglong getMaxAge( const QByteArray &rawHeader ) const;
+    qlonglong getMaxAge( const qlonglong expires ) const;
+
     QVariantMap m_allChartsMap;
-    uint m_chartsFetchJobs;
-    QList< InfoRequestData > m_cachedRequests;
     QHash< QString, QString > m_cachedCountries;
-    QWeakPointer< QNetworkAccessManager > m_nam;
+    QList< Tomahawk::InfoSystem::InfoStringHash > m_chartResources;
+    QList< InfoRequestData > m_cachedRequests;
+    QStringList m_refetchSource;
+    QString m_cacheIdentifier;
+    QString m_chartVersion;
+    ChartType m_chartType;
+
+    uint m_chartsFetchJobs;
+    bool m_fetchAll;
+
 };
 
 }

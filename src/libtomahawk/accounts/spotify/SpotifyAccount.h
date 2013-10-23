@@ -28,8 +28,8 @@
 #include "utils/SmartPointerList.h"
 #include "DllMacro.h"
 
-class QAction;
-class QAction;
+#include <QAction>
+
 class SpotifyPlaylistUpdater;
 class QTimer;
 
@@ -51,13 +51,14 @@ class SpotifyAccountConfig;
 // metadata for a playlist
 struct SpotifyPlaylistInfo {
     QString name, plid, revid;
-    bool sync, subscribed, changed, isOwner;
+    bool sync, subscribed, changed, isOwner, starContainer;
+    bool loveSync;
 
+    SpotifyPlaylistInfo( const QString& nname, const QString& pid, const QString& rrevid, bool ssync, bool ssubscribed, bool isowner = false, bool star = false )
+        : name( nname ), plid( pid ), revid( rrevid ), sync( ssync ), subscribed( ssubscribed )
+        , changed( false ), isOwner( isowner ), starContainer( star ), loveSync( false ) {}
 
-    SpotifyPlaylistInfo( const QString& nname, const QString& pid, const QString& rrevid, bool ssync, bool ssubscribed, bool isowner = false )
-        : name( nname ), plid( pid ), revid( rrevid ), sync( ssync ), subscribed( ssubscribed ), changed( false ), isOwner( isowner ) {}
-
-    SpotifyPlaylistInfo() : sync( false ), changed( false ) {}
+    SpotifyPlaylistInfo() : sync( false ), changed( false ), starContainer( false ), loveSync( false ) {}
 };
 
 
@@ -88,7 +89,7 @@ public:
     virtual ~SpotifyAccount();
     static SpotifyAccount* instance();
     virtual QPixmap icon() const;
-    virtual QWidget* configurationWidget();
+    virtual AccountConfigWidget* configurationWidget();
     virtual QWidget* aboutWidget();
     virtual void saveConfig();
     virtual Attica::Content atticaContent() const;
@@ -99,17 +100,21 @@ public:
 
     virtual QWidget* aclWidget() { return 0; }
     virtual Tomahawk::InfoSystem::InfoPluginPtr infoPlugin();
-    virtual SipPlugin* sipPlugin() { return 0; }
+    virtual SipPlugin* sipPlugin( bool ) { return 0; }
     virtual bool preventEnabling() const { return m_preventEnabling; }
 
-
+    bool hasPlaylist( const QString& plId );
+    Tomahawk::playlist_ptr playlistForURI( const QString& plId );
     void registerUpdaterForPlaylist( const QString& plId, SpotifyPlaylistUpdater* updater );
-    void registerPlaylistInfo( const QString& name, const QString& plid, const QString &revid, const bool sync, const bool subscribed , const bool owner = false);
+    void registerPlaylistInfo( const QString& name, const QString& plid, const QString &revid, const bool sync, const bool subscribed , const bool owner = false );
     void registerPlaylistInfo( SpotifyPlaylistInfo* info );
     void unregisterUpdater( const QString& plid );
 
     bool deleteOnUnsync() const;
+    bool loveSync() const;
+    bool persitentPrivacy() const;
 
+    void starTrack( const QString& artist, const QString& title, const bool starred );
     void setManualResolverPath( const QString& resolverPath );
 
     bool loggedIn() const;
@@ -120,7 +125,7 @@ public slots:
     void aboutToShow( QAction* action, const Tomahawk::playlist_ptr& playlist );
     void syncActionTriggered( QAction* action );
     void subscribeActionTriggered( QAction* action );
-    void atticaLoaded(Attica::Content::List);
+    void atticaLoaded( Attica::Content::List );
     void collaborateActionTriggered( QAction* action );
 
 private slots:
@@ -128,6 +133,7 @@ private slots:
     void resolverInstalled( const QString& resolverId );
 
     void resolverMessage( const QString& msgType, const QVariantMap& msg );
+    void privateModeChanged();
 
     void login( const QString& username, const QString& password );
     void logout();
@@ -145,7 +151,6 @@ private:
     bool checkForResolver();
     void hookupResolver();
     void killExistingResolvers();
-
     void loadPlaylists();
     void clearUser( bool permanentlyDelete = false );
 
@@ -163,10 +168,10 @@ private:
     SpotifyPlaylistUpdater* getPlaylistUpdater( QObject* sender );
     static SpotifyAccount* s_instance;
 
-    QWeakPointer<SpotifyAccountConfig> m_configWidget;
-    QWeakPointer<QWidget> m_aboutWidget;
-    QWeakPointer<ScriptResolver> m_spotifyResolver;
-    QWeakPointer< InfoSystem::SpotifyInfoPlugin > m_infoPlugin;
+    QPointer<SpotifyAccountConfig> m_configWidget;
+    QPointer<QWidget> m_aboutWidget;
+    QPointer<ScriptResolver> m_spotifyResolver;
+    QPointer< InfoSystem::SpotifyInfoPlugin > m_infoPlugin;
 
     QMap<QString, QPair<QObject*, QString> > m_qidToSlotMap;
     QMap<QString, QVariant > m_qidToExtraData;
@@ -185,6 +190,7 @@ private:
 };
 
 }
+
 }
 
 Q_DECLARE_METATYPE( Tomahawk::Accounts::SpotifyPlaylistInfo* )

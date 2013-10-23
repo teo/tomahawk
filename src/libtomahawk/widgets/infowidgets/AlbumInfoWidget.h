@@ -30,14 +30,14 @@
 #ifndef ALBUMINFOWIDGET_H
 #define ALBUMINFOWIDGET_H
 
-#include <QtGui/QWidget>
-
 #include "PlaylistInterface.h"
 #include "ViewPage.h"
 #include "infosystem/InfoSystem.h"
 
 #include "DllMacro.h"
 #include "Typedefs.h"
+
+#include <QWidget>
 
 class PlayableModel;
 class TreeModel;
@@ -64,7 +64,7 @@ public:
     virtual QString title() const { return m_title; }
     virtual QString description() const { return m_description; }
     virtual QString longDescription() const { return m_longDescription; }
-    virtual QPixmap pixmap() const { if ( m_pixmap.isNull() ) return Tomahawk::ViewPage::pixmap(); else return m_pixmap; }
+    virtual QPixmap pixmap() const;
 
     virtual bool isTemporaryPage() const { return true; }
     virtual bool showInfoBar() const { return false; }

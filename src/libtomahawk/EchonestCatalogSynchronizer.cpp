@@ -18,15 +18,22 @@
 
 #include "EchonestCatalogSynchronizer.h"
 
-#include "Collection.h"
+#include <echonest/CatalogUpdateEntry.h>
+#include <echonest/Config.h>
+
+#include "collection/Collection.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "database/DatabaseCommand_GenericSelect.h"
 #include "database/DatabaseCommand_SetCollectionAttributes.h"
 #include "database/DatabaseCommand_LoadFiles.h"
-#include "TomahawkSettings.h"
-#include "SourceList.h"
+#include "utils/Logger.h"
+
+#include "PlaylistEntry.h"
 #include "Query.h"
+#include "SourceList.h"
+#include "TomahawkSettings.h"
+#include "Track.h"
 
 #include <echonest/CatalogUpdateEntry.h>
 #include <echonest/Config.h>
@@ -43,8 +50,8 @@ EchonestCatalogSynchronizer::EchonestCatalogSynchronizer( QObject *parent )
     qRegisterMetaType<QList<QStringList> >("QList<QStringList>");
 
     connect( TomahawkSettings::instance(), SIGNAL( changed() ), this, SLOT( checkSettingsChanged() ) );
-    connect( SourceList::instance()->getLocal()->collection().data(), SIGNAL( tracksAdded( QList<unsigned int> ) ), this, SLOT( tracksAdded( QList<unsigned int> ) ), Qt::QueuedConnection );
-    connect( SourceList::instance()->getLocal()->collection().data(), SIGNAL( tracksRemoved( QList<unsigned int> ) ), this, SLOT( tracksRemoved( QList<unsigned int> ) ), Qt::QueuedConnection );
+    connect( SourceList::instance()->getLocal()->dbCollection().data(), SIGNAL( tracksAdded( QList<unsigned int> ) ), this, SLOT( tracksAdded( QList<unsigned int> ) ), Qt::QueuedConnection );
+    connect( SourceList::instance()->getLocal()->dbCollection().data(), SIGNAL( tracksRemoved( QList<unsigned int> ) ), this, SLOT( tracksRemoved( QList<unsigned int> ) ), Qt::QueuedConnection );
 
     const QByteArray artist = TomahawkSettings::instance()->value( "collection/artistCatalog" ).toByteArray();
     const QByteArray song = TomahawkSettings::instance()->value( "collection/songCatalog" ).toByteArray();
@@ -87,11 +94,11 @@ EchonestCatalogSynchronizer::checkSettingsChanged()
         // delete all track nums and catalog ids from our peers
         {
             DatabaseCommand_SetTrackAttributes* cmd = new DatabaseCommand_SetTrackAttributes( DatabaseCommand_SetTrackAttributes::EchonestCatalogId );
-            Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+            Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
         }
         {
             DatabaseCommand_SetCollectionAttributes* cmd = new DatabaseCommand_SetCollectionAttributes( DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog, true );
-            Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+            Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
         }
 
         if ( !m_songCatalog.id().isEmpty() )
@@ -154,7 +161,7 @@ EchonestCatalogSynchronizer::songCreateFinished()
     {
         m_songCatalog = Echonest::Catalog::parseCreate( r );
         TomahawkSettings::instance()->setValue( "collection/songCatalog", m_songCatalog.id() );
-        QSharedPointer< DatabaseCommand > cmd( new DatabaseCommand_SetCollectionAttributes( DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog,
+        Tomahawk::dbcmd_ptr cmd( new DatabaseCommand_SetCollectionAttributes( DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog,
                                                                                             m_songCatalog.id() ) );
         Database::instance()->enqueue( cmd );
     } catch ( const Echonest::ParseError& e )
@@ -173,7 +180,7 @@ EchonestCatalogSynchronizer::songCreateFinished()
                  "AND file.source IS NULL");
     DatabaseCommand_GenericSelect* cmd = new DatabaseCommand_GenericSelect( sql, DatabaseCommand_GenericSelect::Track, true );
     connect( cmd, SIGNAL( rawData( QList< QStringList > ) ), this, SLOT( rawTracksAdd( QList< QStringList > ) ) );
-    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -191,7 +198,7 @@ EchonestCatalogSynchronizer::artistCreateFinished()
         m_artistCatalog = Echonest::Catalog::parseCreate( r );
         TomahawkSettings::instance()->setValue( "collection/artistCatalog", m_artistCatalog.id() );
 
-//        QSharedPointer< DatabaseCommand > cmd( new DatabaseCommand_SetCollectionAttributes( SourceList::instance()->getLocal(),
+//        Tomahawk::dbcmd_ptr cmd( new DatabaseCommand_SetCollectionAttributes( SourceList::instance()->getLocal(),
 //                                                                                            DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog,
 //                                                                                            m_songCatalog.id() ) );
 //        Database::instance()->enqueue( cmd );
@@ -307,7 +314,7 @@ EchonestCatalogSynchronizer::tracksAdded( const QList< unsigned int >& tracks )
     // Get the result_ptrs from the tracks
     DatabaseCommand_LoadFiles* cmd = new DatabaseCommand_LoadFiles( tracks );
     connect( cmd, SIGNAL( results( QList<Tomahawk::result_ptr> ) ), this, SLOT( loadedResults( QList<Tomahawk::result_ptr> ) ) );
-    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -324,9 +331,7 @@ EchonestCatalogSynchronizer::loadedResults( const QList<result_ptr>& results )
 
         qDebug() << "Metadata for item:" << result->fileId();
 
-        const QString artist = result->artist().isNull() ? QString() : result->artist()->name();
-        const QString album = result->album().isNull() ? QString() : result->album()->name();
-        rawTracks << ( QStringList() << QString::number( result->fileId() ) << result->track() << artist << album );
+        rawTracks << ( QStringList() << QString::number( result->fileId() ) << result->track()->track() << result->track()->artist() << result->track()->album() );
     }
     rawTracksAdd( rawTracks );
 }

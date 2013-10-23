@@ -1,6 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
- *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2010-2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,8 +21,21 @@
 
 #include "DatabaseCommand.h"
 #include "DllMacro.h"
+#include <QPointer>
 
 class IndexingJobItem;
+
+namespace Tomahawk
+{
+
+struct IndexData
+{
+    unsigned int id;
+    unsigned int artistId;
+    QString artist;
+    QString album;
+    QString track;
+};
 
 class DLLEXPORT DatabaseCommand_UpdateSearchIndex : public DatabaseCommand
 {
@@ -36,7 +49,9 @@ public:
     virtual void exec( DatabaseImpl* db );
 
 private:
-    QWeakPointer<IndexingJobItem> m_statusJob;
+    QPointer<IndexingJobItem> m_statusJob;
 };
+
+}
 
 #endif // DATABASECOMMAND_UPDATESEARCHINDEX_H

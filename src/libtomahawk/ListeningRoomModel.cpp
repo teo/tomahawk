@@ -25,12 +25,14 @@
 #include "ListeningRoom.h"
 #include "Pipeline.h"
 #include "playlist/PlayableItem.h"
+#include "PlaylistInterface.h"
 #include "Source.h"
 #include "SourceList.h"
 #include "utils/TomahawkUtils.h"
-#include <utils/WebResultHintChecker.h>
+#include "utils/Logger.h"
 
-#include <QtCore/QMimeData>
+#include <QDateTime>
+#include <QMimeData>
 
 using namespace Tomahawk;
 
@@ -301,7 +303,7 @@ ListeningRoomModel::reload()
 
     QList< lrentry_ptr > entries = m_listeningRoom->entries();
     foreach ( const lrentry_ptr& p, entries )
-        tDebug() << p->guid() << p->query()->track() << p->query()->artist();
+        tDebug() << p->guid() << p->query()->track()->track() << p->query()->track()->artist();
 
     // Since LR dbcmds are all singletons, they give all listeners the complete LR data every time,
     // even if the actual list of tracks has not changed.
@@ -418,7 +420,7 @@ ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
     {
         lrentry_ptr entry = lrentry_ptr( new ListeningRoomEntry() );
 
-        entry->setDuration( query->displayQuery()->duration() );
+        entry->setDuration( query->queryTrack()->duration() );
         entry->setLastmodified( 0 );
         //TODO: annotations? do we need them here?
         entry->setQuery( query );
@@ -448,7 +450,7 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
 {
     if ( !entries.count() )
     {
-        emit trackCountChanged( rowCount( QModelIndex() ) );
+        emit itemCountChanged( rowCount( QModelIndex() ) );
         finishLoading();
         return;
     }
@@ -483,8 +485,6 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
         }
 
         connect( plitem, SIGNAL( dataChanged() ), SLOT( onDataChanged() ) );
-
-        WebResultHintChecker::checkQuery( entry->query() );
     }
 
     if ( !m_waitingForResolved.isEmpty() )
@@ -494,7 +494,7 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
     }
 
     emit endInsertRows();
-    emit trackCountChanged( rowCount( QModelIndex() ) );
+    emit itemCountChanged( rowCount( QModelIndex() ) );
     finishLoading();
 }
 
@@ -552,7 +552,7 @@ ListeningRoomModel::removeIndex( const QModelIndex& index, bool moreToCome )
 void
 ListeningRoomModel::setCurrentItem( const QModelIndex& index )
 {
-    PlayableModel::setCurrentItem( index );
+    PlayableModel::setCurrentIndex( index );
     if ( !m_listeningRoom.isNull() && m_listeningRoom->author() == SourceList::instance()->getLocal() )
     {
         m_listeningRoom->setCurrentRow( index.row() );

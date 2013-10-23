@@ -18,48 +18,78 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "PlayableModel.h"
-
-#include <QDateTime>
-#include <QMimeData>
-#include <QTreeView>
+#include "PlayableModel_p.h"
 
 #include "audio/AudioEngine.h"
 #include "utils/TomahawkUtils.h"
-#include "Source.h"
+#include "utils/Logger.h"
 
 #include "Artist.h"
 #include "Album.h"
 #include "Pipeline.h"
 #include "PlayableItem.h"
-#include "utils/Logger.h"
+#include "PlayableProxyModel.h"
+#include "Result.h"
+#include "Source.h"
+#include "Typedefs.h"
+
+#include <QDateTime>
+#include <QMimeData>
+#include <QTreeView>
 
 using namespace Tomahawk;
 
 
-PlayableModel::PlayableModel( QObject* parent, bool loading )
-    : QAbstractItemModel( parent )
-    , m_rootItem( new PlayableItem( 0 ) )
-    , m_readOnly( true )
-    , m_loading( loading )
+void
+PlayableModel::init()
 {
+    Q_D( PlayableModel );
     connect( AudioEngine::instance(), SIGNAL( started( Tomahawk::result_ptr ) ), SLOT( onPlaybackStarted( Tomahawk::result_ptr ) ), Qt::DirectConnection );
     connect( AudioEngine::instance(), SIGNAL( stopped() ), SLOT( onPlaybackStopped() ), Qt::DirectConnection );
 
-    m_header << tr( "Artist" ) << tr( "Title" ) << tr( "Composer" ) << tr( "Album" ) << tr( "Track" ) << tr( "Duration" )
-             << tr( "Bitrate" ) << tr( "Age" ) << tr( "Year" ) << tr( "Size" ) << tr( "Origin" ) << tr( "Score" ) << tr( "Name" );
+    d->header << tr( "Artist" ) << tr( "Title" ) << tr( "Composer" ) << tr( "Album" ) << tr( "Track" ) << tr( "Duration" )
+              << tr( "Bitrate" ) << tr( "Age" ) << tr( "Year" ) << tr( "Size" ) << tr( "Origin" ) << tr( "Accuracy" ) << tr( "Name" );
 }
+
+
+PlayableModel::PlayableModel( QObject* parent, bool loading )
+    : QAbstractItemModel( parent )
+    , d_ptr( new PlayableModelPrivate( this, loading ) )
+{
+    init();
+}
+
+
+PlayableModel::PlayableModel( QObject* parent, PlayableModelPrivate* d )
+    : QAbstractItemModel( parent )
+    , d_ptr( d )
+
+{
+    init();
+}
+
 
 
 PlayableModel::~PlayableModel()
 {
+    Q_D( PlayableModel );
+    tDebug() << Q_FUNC_INFO;
+    delete d->rootItem;
+}
+
+
+QModelIndex
+PlayableModel::createIndex( int row, int column, PlayableItem* item ) const
+{
+    return QAbstractItemModel::createIndex( row, column, item );
 }
 
 
 QModelIndex
 PlayableModel::index( int row, int column, const QModelIndex& parent ) const
 {
-    if ( !m_rootItem || row < 0 || column < 0 )
+    Q_D( const PlayableModel );
+    if ( !d->rootItem || row < 0 || column < 0 )
         return QModelIndex();
 
     PlayableItem* parentItem = itemFromIndex( parent );
@@ -97,11 +127,12 @@ PlayableModel::columnCount( const QModelIndex& parent ) const
 bool
 PlayableModel::hasChildren( const QModelIndex& parent ) const
 {
+    Q_D( const PlayableModel );
     PlayableItem* parentItem = itemFromIndex( parent );
     if ( !parentItem )
         return false;
 
-    if ( parentItem == m_rootItem )
+    if ( parentItem == d->rootItem )
         return true;
 
     return ( !parentItem->artist().isNull() || !parentItem->album().isNull() );
@@ -128,12 +159,41 @@ PlayableModel::parent( const QModelIndex& child ) const
 }
 
 
+bool
+PlayableModel::isReadOnly() const
+{
+    Q_D( const PlayableModel );
+    return d->readOnly;
+}
+
+
+void
+PlayableModel::setReadOnly( bool b )
+{
+    Q_D( PlayableModel );
+    d->readOnly = b;
+}
+
+
+bool
+PlayableModel::isLoading() const
+{
+    Q_D( const PlayableModel );
+    return d->loading;
+}
+
+
+QString
+PlayableModel::title() const
+{
+    Q_D( const PlayableModel );
+    return d->title;
+}
+
+
 QVariant
 PlayableModel::artistData( const artist_ptr& artist, int role ) const
 {
-    if ( role == Qt::SizeHintRole )
-        return QSize( 0, 44 );
-
     if ( role != Qt::DisplayRole ) // && role != Qt::ToolTipRole )
         return QVariant();
 
@@ -144,9 +204,6 @@ PlayableModel::artistData( const artist_ptr& artist, int role ) const
 QVariant
 PlayableModel::albumData( const album_ptr& album, int role ) const
 {
-    if ( role == Qt::SizeHintRole )
-        return QSize( 0, 32 );
-
     if ( role != Qt::DisplayRole ) // && role != Qt::ToolTipRole )
         return QVariant();
 
@@ -157,45 +214,42 @@ PlayableModel::albumData( const album_ptr& album, int role ) const
 QVariant
 PlayableModel::queryData( const query_ptr& query, int column, int role ) const
 {
-    if ( role == Qt::SizeHintRole )
-        return QSize( 0, 18 );
-
     if ( role != Qt::DisplayRole ) // && role != Qt::ToolTipRole )
         return QVariant();
 
     switch ( column )
     {
         case Artist:
-            return query->artist();
+            return query->track()->artist();
             break;
 
         case Name:
         case Track:
-            return query->track();
+            return query->track()->track();
             break;
 
         case Album:
-            return query->album();
+            return query->track()->album();
             break;
 
         case Composer:
-            return query->composer();
+            return query->track()->composer();
             break;
 
         case Duration:
-            return TomahawkUtils::timeToString( query->duration() );
+            return TomahawkUtils::timeToString( query->track()->duration() );
             break;
 
         case AlbumPos:
         {
             QString tPos;
-            if ( query->albumpos() != 0 )
+            if ( query->track()->albumpos() != 0 )
             {
-                tPos = QString::number( query->albumpos() );
-                if( query->discnumber() == 0 )
+                tPos = QString::number( query->track()->albumpos() );
+                if ( query->track()->discnumber() == 0 )
                     return tPos;
                 else
-                    return QString( "%1.%2" ).arg( QString::number( query->discnumber() ) )
+                    return QString( "%1.%2" ).arg( QString::number( query->track()->discnumber() ) )
                                              .arg( tPos );
             }
         }
@@ -218,8 +272,8 @@ PlayableModel::queryData( const query_ptr& query, int column, int role ) const
                 break;
 
             case Year:
-                if ( query->results().first()->year() != 0 )
-                    return query->results().first()->year();
+                if ( query->results().first()->track()->year() != 0 )
+                    return query->results().first()->track()->year();
                 break;
 
             case Filesize:
@@ -231,8 +285,30 @@ PlayableModel::queryData( const query_ptr& query, int column, int role ) const
                 break;
 
             case Score:
-                return query->results().first()->score();
+            {
+                float score;
+                if ( query->results().first()->isOnline() )
+                    score = query->results().first()->score();
+                else
+                    score = 0.0;
+
+                return scoreText( score );
                 break;
+            }
+
+            default:
+                break;
+        }
+    }
+    else
+    {
+        switch ( column )
+        {
+            case Score:
+                if ( query->resolvingFinished() )
+                    return scoreText( 0.0 );
+                else
+                    return scoreText( -1.0 );
 
             default:
                 break;
@@ -250,27 +326,58 @@ PlayableModel::data( const QModelIndex& index, int role ) const
     if ( !entry )
         return QVariant();
 
-    if ( role == Qt::DecorationRole )
+    if ( role == PlayableProxyModel::TypeRole )
     {
-        return QVariant();
+        if ( entry->result() )
+        {
+            return Tomahawk::TypeResult;
+        }
+        else if ( entry->query() )
+        {
+            return Tomahawk::TypeQuery;
+        }
+        else if ( entry->artist() )
+        {
+            return Tomahawk::TypeArtist;
+        }
+        else if ( entry->album() )
+        {
+            return Tomahawk::TypeAlbum;
+        }
     }
 
-    if ( role == Qt::TextAlignmentRole )
+    int column = index.column();
+    if ( role < CoverIDRole && role >= Qt::UserRole )
     {
-        return QVariant( columnAlignment( index.column() ) );
+        // map role to column
+        column = role - Qt::UserRole;
+        role = Qt::DisplayRole;
     }
 
-    if ( !entry->query().isNull() )
+    switch ( role )
     {
-        return queryData( entry->query()->displayQuery(), index.column(), role );
-    }
-    else if ( !entry->artist().isNull() )
-    {
-        return artistData( entry->artist(), role );
-    }
-    else if ( !entry->album().isNull() )
-    {
-        return albumData( entry->album(), role );
+        case Qt::TextAlignmentRole:
+        {
+            return QVariant( columnAlignment( index.column() ) );
+            break;
+        }
+
+        default:
+        {
+            if ( !entry->query().isNull() )
+            {
+                return queryData( entry->query(), column, role );
+            }
+            else if ( !entry->artist().isNull() )
+            {
+                return artistData( entry->artist(), role );
+            }
+            else if ( !entry->album().isNull() )
+            {
+                return albumData( entry->album(), role );
+            }
+            break;
+        }
     }
 
     return QVariant();
@@ -280,12 +387,13 @@ PlayableModel::data( const QModelIndex& index, int role ) const
 QVariant
 PlayableModel::headerData( int section, Qt::Orientation orientation, int role ) const
 {
+    Q_D( const PlayableModel );
     Q_UNUSED( orientation );
 
     if ( role == Qt::DisplayRole && section >= 0 )
     {
-        if ( section < m_header.count() )
-            return m_header.at( section );
+        if ( section < d->header.count() )
+            return d->header.at( section );
         else
             return tr( "Name" );
     }
@@ -300,9 +408,10 @@ PlayableModel::headerData( int section, Qt::Orientation orientation, int role ) 
 
 
 void
-PlayableModel::setCurrentItem( const QModelIndex& index )
+PlayableModel::setCurrentIndex( const QModelIndex& index )
 {
-    PlayableItem* oldEntry = itemFromIndex( m_currentIndex );
+    Q_D( PlayableModel );
+    PlayableItem* oldEntry = itemFromIndex( d->currentIndex );
     if ( oldEntry )
     {
         oldEntry->setIsPlaying( false );
@@ -311,15 +420,17 @@ PlayableModel::setCurrentItem( const QModelIndex& index )
     PlayableItem* entry = itemFromIndex( index );
     if ( index.isValid() && entry && !entry->query().isNull() )
     {
-        m_currentIndex = index;
-        m_currentUuid = entry->query()->id();
+        d->currentIndex = index;
+        d->currentUuid = entry->query()->id();
         entry->setIsPlaying( true );
     }
     else
     {
-        m_currentIndex = QModelIndex();
-        m_currentUuid = QString();
+        d->currentIndex = QModelIndex();
+        d->currentUuid = QString();
     }
+
+    emit currentIndexChanged();
 }
 
 
@@ -342,6 +453,29 @@ PlayableModel::flags( const QModelIndex& index ) const
 }
 
 
+QPersistentModelIndex
+PlayableModel::currentItem()
+{
+    Q_D( PlayableModel );
+    return d->currentIndex;
+}
+
+
+QID
+PlayableModel::currentItemUuid()
+{
+    Q_D( PlayableModel );
+    return d->currentUuid;
+}
+
+
+PlaylistModes::RepeatMode
+PlayableModel::repeatMode() const
+{
+    return Tomahawk::PlaylistModes::NoRepeat;
+}
+
+
 QStringList
 PlayableModel::mimeTypes() const
 {
@@ -354,8 +488,6 @@ PlayableModel::mimeTypes() const
 QMimeData*
 PlayableModel::mimeData( const QModelIndexList &indexes ) const
 {
-    qDebug() << Q_FUNC_INFO;
-
     QByteArray resultData;
     QDataStream resultStream( &resultData, QIODevice::WriteOnly );
 
@@ -492,14 +624,15 @@ PlayableModel::mimeData( const QModelIndexList &indexes ) const
 void
 PlayableModel::clear()
 {
+    Q_D( PlayableModel );
     if ( rowCount( QModelIndex() ) )
     {
         finishLoading();
 
         emit beginResetModel();
-        delete m_rootItem;
-        m_rootItem = 0;
-        m_rootItem = new PlayableItem( 0 );
+        delete d->rootItem;
+        d->rootItem = 0;
+        d->rootItem = new PlayableItem( 0 );
         emit endResetModel();
     }
 }
@@ -508,10 +641,11 @@ PlayableModel::clear()
 QList< query_ptr >
 PlayableModel::queries() const
 {
-    Q_ASSERT( m_rootItem );
+    Q_D( const PlayableModel );
+    Q_ASSERT( d->rootItem );
 
     QList< query_ptr > tracks;
-    foreach ( PlayableItem* item, m_rootItem->children )
+    foreach ( PlayableItem* item, d->rootItem->children )
     {
         tracks << item->query();
     }
@@ -522,11 +656,11 @@ PlayableModel::queries() const
 
 template <typename T>
 void
-PlayableModel::insertInternal( const QList< T >& items, int row )
+PlayableModel::insertInternal( const QList< T >& items, int row, const QList< Tomahawk::PlaybackLog >& logs )
 {
+    Q_D( PlayableModel );
     if ( !items.count() )
     {
-        emit trackCountChanged( rowCount( QModelIndex() ) );
         emit itemCountChanged( rowCount( QModelIndex() ) );
 
         finishLoading();
@@ -542,10 +676,19 @@ PlayableModel::insertInternal( const QList< T >& items, int row )
 
     int i = 0;
     PlayableItem* plitem;
-    foreach( const T& item, items )
+    foreach ( const T& item, items )
     {
-        plitem = new PlayableItem( item, m_rootItem, row + i );
+        plitem = new PlayableItem( item, d->rootItem, row + i );
         plitem->index = createIndex( row + i, 0, plitem );
+        if ( plitem->query() )
+        {
+            connect( plitem->query().data(), SIGNAL( playableStateChanged( bool ) ), SLOT( onQueryBecamePlayable( bool ) ), Qt::UniqueConnection );
+            connect( plitem->query().data(), SIGNAL( resolvingFinished( bool ) ), SLOT( onQueryResolved( bool ) ), Qt::UniqueConnection );
+        }
+
+        if ( logs.count() > i )
+            plitem->setPlaybackLog( logs.at( i ) );
+
         i++;
 
 /*        if ( item->id() == currentItemUuid() )
@@ -555,8 +698,23 @@ PlayableModel::insertInternal( const QList< T >& items, int row )
     }
 
     emit endInsertRows();
-    emit trackCountChanged( rowCount( QModelIndex() ) );
+    emit itemCountChanged( rowCount( QModelIndex() ) );
     finishLoading();
+}
+
+
+bool
+PlayableModel::removeRows( int row, int count, const QModelIndex& parent )
+{
+    tDebug() << Q_FUNC_INFO << row << count << parent;
+    QList<QPersistentModelIndex> pil;
+    for ( int i = row; i < row + count; i++ )
+    {
+        pil << index( i, 0, parent );
+    }
+
+    removeIndexes( pil );
+    return true;
 }
 
 
@@ -570,9 +728,10 @@ PlayableModel::remove( int row, bool moreToCome )
 void
 PlayableModel::removeIndex( const QModelIndex& index, bool moreToCome )
 {
+    Q_D( PlayableModel );
     if ( QThread::currentThread() != thread() )
     {
-        QMetaObject::invokeMethod( this, "remove",
+        QMetaObject::invokeMethod( this, "removeIndex",
                                    Qt::QueuedConnection,
                                    Q_ARG(const QModelIndex, index),
                                    Q_ARG(bool, moreToCome) );
@@ -585,13 +744,16 @@ PlayableModel::removeIndex( const QModelIndex& index, bool moreToCome )
     PlayableItem* item = itemFromIndex( index );
     if ( item )
     {
+        if ( index == d->currentIndex )
+            setCurrentIndex( QModelIndex() );
+
         emit beginRemoveRows( index.parent(), index.row(), index.row() );
         delete item;
         emit endRemoveRows();
     }
 
     if ( !moreToCome )
-        emit trackCountChanged( rowCount( QModelIndex() ) );
+        emit itemCountChanged( rowCount( QModelIndex() ) );
 }
 
 
@@ -626,10 +788,19 @@ PlayableModel::removeIndexes( const QList<QPersistentModelIndex>& indexes )
 }
 
 
+PlayableItem*
+PlayableModel::rootItem() const
+{
+    Q_D( const PlayableModel );
+    return d->rootItem;
+}
+
+
 void
 PlayableModel::onPlaybackStarted( const Tomahawk::result_ptr& result )
 {
-    PlayableItem* oldEntry = itemFromIndex( m_currentIndex );
+    Q_D( PlayableModel );
+    PlayableItem* oldEntry = itemFromIndex( d->currentIndex );
     if ( oldEntry && ( oldEntry->query().isNull() || !oldEntry->query()->numResults() || oldEntry->query()->results().first().data() != result.data() ) )
     {
         oldEntry->setIsPlaying( false );
@@ -640,7 +811,8 @@ PlayableModel::onPlaybackStarted( const Tomahawk::result_ptr& result )
 void
 PlayableModel::onPlaybackStopped()
 {
-    PlayableItem* oldEntry = itemFromIndex( m_currentIndex );
+    Q_D( PlayableModel );
+    PlayableItem* oldEntry = itemFromIndex( d->currentIndex );
     if ( oldEntry )
     {
         oldEntry->setIsPlaying( false );
@@ -651,13 +823,16 @@ PlayableModel::onPlaybackStopped()
 void
 PlayableModel::ensureResolved()
 {
-    for( int i = 0; i < rowCount( QModelIndex() ); i++ )
+    QList< query_ptr > ql;
+    for ( int i = 0; i < rowCount( QModelIndex() ); i++ )
     {
         query_ptr query = itemFromIndex( index( i, 0, QModelIndex() ) )->query();
 
         if ( !query->resolvingFinished() )
-            Pipeline::instance()->resolve( query );
+            ql << query;
     }
+
+    Pipeline::instance()->resolve( ql );
 }
 
 
@@ -671,6 +846,7 @@ PlayableModel::columnAlignment( int column ) const
         case Bitrate:
         case Duration:
         case Filesize:
+        case Score:
         case Year:
             return Qt::AlignHCenter;
             break;
@@ -678,6 +854,41 @@ PlayableModel::columnAlignment( int column ) const
         default:
             return Qt::AlignLeft;
     }
+}
+
+
+QString
+PlayableModel::scoreText( float score ) const
+{
+    static QMap<float, QString> texts;
+    if ( texts.isEmpty() )
+    {
+        texts[ 1.0 ] = tr( "Perfect match" );
+        texts[ 0.9 ] = tr( "Very good match" );
+        texts[ 0.7 ] = tr( "Good match" );
+        texts[ 0.5 ] = tr( "Vague match" );
+        texts[ 0.3 ] = tr( "Bad match" );
+        texts[ 0.1 ] = tr( "Very bad match" );
+        texts[ 0.0 ] = tr( "Not available" );
+        texts[ -1.0 ] = tr( "Searching..." );
+    }
+
+    if ( score == 1.0 )
+        return texts[ 1.0 ];
+    if ( score > 0.9 )
+        return texts[ 0.9 ];
+    if ( score > 0.7 )
+        return texts[ 0.7 ];
+    if ( score > 0.5 )
+        return texts[ 0.5 ];
+    if ( score > 0.3 )
+        return texts[ 0.3 ];
+    if ( score > 0.0 )
+        return texts[ 0.1 ];
+    if ( score == 0.0 )
+        return texts[ 0.0 ];
+
+    return texts[ -1.0 ];
 }
 
 
@@ -693,7 +904,9 @@ PlayableModel::onDataChanged()
 void
 PlayableModel::startLoading()
 {
-    m_loading = true;
+    tDebug() << Q_FUNC_INFO;
+    Q_D( PlayableModel );
+    d->loading = true;
     emit loadingStarted();
 }
 
@@ -701,7 +914,9 @@ PlayableModel::startLoading()
 void
 PlayableModel::finishLoading()
 {
-    m_loading = false;
+    tDebug() << Q_FUNC_INFO;
+    Q_D( PlayableModel );
+    d->loading = false;
     emit loadingFinished();
 }
 
@@ -709,13 +924,14 @@ PlayableModel::finishLoading()
 PlayableItem*
 PlayableModel::itemFromIndex( const QModelIndex& index ) const
 {
+    Q_D( const PlayableModel );
     if ( index.isValid() )
     {
         return static_cast<PlayableItem*>( index.internalPointer() );
     }
     else
     {
-        return m_rootItem;
+        return d->rootItem;
     }
 }
 
@@ -772,6 +988,19 @@ PlayableModel::appendQueries( const QList< Tomahawk::query_ptr >& queries )
 
 
 void
+PlayableModel::appendTracks( const QList< Tomahawk::track_ptr >& tracks, const QList< Tomahawk::PlaybackLog >& logs )
+{
+    QList< Tomahawk::query_ptr > queries;
+    foreach ( const track_ptr& track, tracks )
+    {
+        queries << track->toQuery();
+    }
+
+    insertQueries( queries, rowCount( QModelIndex() ), logs );
+}
+
+
+void
 PlayableModel::insertArtist( const Tomahawk::artist_ptr& artist, int row )
 {
     QList< artist_ptr > artists;
@@ -792,12 +1021,14 @@ PlayableModel::insertAlbum( const Tomahawk::album_ptr& album, int row )
 
 
 void
-PlayableModel::insertQuery( const Tomahawk::query_ptr& query, int row )
+PlayableModel::insertQuery( const Tomahawk::query_ptr& query, int row, const Tomahawk::PlaybackLog& log )
 {
     QList< query_ptr > queries;
     queries << query;
+    QList< Tomahawk::PlaybackLog > logs;
+    logs << log;
 
-    insertQueries( queries, row );
+    insertQueries( queries, row, logs );
 }
 
 
@@ -816,39 +1047,119 @@ PlayableModel::insertAlbums( const QList< Tomahawk::album_ptr >& albums, int row
 
 
 void
-PlayableModel::insertQueries( const QList< Tomahawk::query_ptr >& queries, int row )
+PlayableModel::insertQueries( const QList< Tomahawk::query_ptr >& queries, int row, const QList< Tomahawk::PlaybackLog >& logs )
 {
-    insertInternal( queries, row );
+    insertInternal( queries, row, logs );
 }
 
 
 void
 PlayableModel::setTitle( const QString& title )
 {
-    m_title = title;
+    Q_D( PlayableModel );
+    d->title = title;
     emit changed();
+}
+
+
+QString
+PlayableModel::description() const
+{
+    Q_D( const PlayableModel );
+    return d->description;
 }
 
 
 void
 PlayableModel::setDescription( const QString& description )
 {
-    m_description = description;
+    Q_D( PlayableModel );
+    d->description = description;
     emit changed();
+}
+
+
+QPixmap
+PlayableModel::icon() const
+{
+    Q_D( const PlayableModel );
+    return d->icon;
 }
 
 
 void
 PlayableModel::setIcon( const QPixmap& pixmap )
 {
-    m_icon = pixmap;
+    Q_D( PlayableModel );
+    d->icon = pixmap;
     emit changed();
+}
+
+
+int
+PlayableModel::trackCount() const
+{
+    return rowCount( QModelIndex() );
+}
+
+
+int
+PlayableModel::itemCount() const
+{
+    return rowCount( QModelIndex() );
+}
+
+
+void
+PlayableModel::onQueryBecamePlayable( bool playable )
+{
+    Q_UNUSED( playable );
+
+    Tomahawk::Query* q = qobject_cast< Query* >( sender() );
+    if ( !q )
+    {
+        // Track has been removed from the playlist by now
+        return;
+    }
+
+    Tomahawk::query_ptr query = q->weakRef().toStrongRef();
+    PlayableItem* item = itemFromQuery( query );
+
+    if ( item )
+    {
+        emit indexPlayable( item->index );
+    }
+}
+
+
+void
+PlayableModel::onQueryResolved( bool hasResults )
+{
+    Q_UNUSED( hasResults );
+
+    Tomahawk::Query* q = qobject_cast< Query* >( sender() );
+    if ( !q )
+    {
+        // Track has been removed from the playlist by now
+        return;
+    }
+
+    Tomahawk::query_ptr query = q->weakRef().toStrongRef();
+    PlayableItem* item = itemFromQuery( query );
+
+    if ( item )
+    {
+        emit indexResolved( item->index );
+    }
 }
 
 
 PlayableItem*
 PlayableModel::itemFromQuery( const Tomahawk::query_ptr& query ) const
 {
+    if ( !query )
+        return 0;
+
     for ( int i = 0; i < rowCount( QModelIndex() ); i++ )
     {
         QModelIndex idx = index( i, 0, QModelIndex() );
@@ -860,5 +1171,26 @@ PlayableModel::itemFromQuery( const Tomahawk::query_ptr& query ) const
     }
 
     tDebug() << "Could not find item for query:" << query->toString();
+    return 0;
+}
+
+
+PlayableItem*
+PlayableModel::itemFromResult( const Tomahawk::result_ptr& result ) const
+{
+    if ( !result )
+        return 0;
+
+    for ( int i = 0; i < rowCount( QModelIndex() ); i++ )
+    {
+        QModelIndex idx = index( i, 0, QModelIndex() );
+        PlayableItem* item = itemFromIndex( idx );
+        if ( item && item->result() == result )
+        {
+            return item;
+        }
+    }
+
+    tDebug() << "Could not find item for result:" << result->toString();
     return 0;
 }

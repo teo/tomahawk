@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013, Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,28 +18,29 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ControlConnection.h"
+#include "ControlConnection_p.h"
 
-#include "StreamConnection.h"
 #include "database/Database.h"
 #include "database/DatabaseCommand_CollectionStats.h"
-#include "DbSyncConnection.h"
-#include "SourceList.h"
 #include "network/DbSyncConnection.h"
+#include "network/Msg.h"
+#include "network/MsgProcessor.h"
 #include "network/Servent.h"
-#include "sip/SipHandler.h"
+#include "sip/PeerInfo.h"
 #include "utils/Logger.h"
+
+#include "PlaylistEntry.h"
+#include "StreamConnection.h"
+#include "SourceList.h"
 
 #define TCP_TIMEOUT 600
 
 using namespace Tomahawk;
 
 
-ControlConnection::ControlConnection( Servent* parent, const QHostAddress &ha )
+ControlConnection::ControlConnection( Servent* parent )
     : Connection( parent )
-    , m_dbsyncconn( 0 )
-    , m_registered( false )
-    , m_pingtimer( 0 )
+    , d_ptr( new ControlConnectionPrivate( this ) )
 {
     qDebug() << "CTOR controlconnection";
     setId("ControlConnection()");
@@ -48,66 +50,53 @@ ControlConnection::ControlConnection( Servent* parent, const QHostAddress &ha )
 
     this->setMsgProcessorModeIn( MsgProcessor::UNCOMPRESS_ALL | MsgProcessor::PARSE_JSON );
     this->setMsgProcessorModeOut( MsgProcessor::COMPRESS_IF_LARGE );
-
-    m_peerIpAddress = ha;
-}
-
-
-ControlConnection::ControlConnection( Servent* parent, const QString &ha )
-    : Connection( parent )
-    , m_dbsyncconn( 0 )
-    , m_registered( false )
-    , m_pingtimer( 0 )
-{
-    qDebug() << "CTOR controlconnection";
-    setId("ControlConnection()");
-
-    // auto delete when connection closes:
-    connect( this, SIGNAL( finished() ), SLOT( deleteLater() ) );
-
-    this->setMsgProcessorModeIn( MsgProcessor::UNCOMPRESS_ALL | MsgProcessor::PARSE_JSON );
-    this->setMsgProcessorModeOut( MsgProcessor::COMPRESS_IF_LARGE );
-
-    if ( !ha.isEmpty() )
-    {
-        QHostAddress qha( ha );
-        if ( !qha.isNull() )
-            m_peerIpAddress = qha;
-        else
-        {
-            QHostInfo qhi = QHostInfo::fromName( ha );
-            if ( !qhi.addresses().isEmpty() )
-                m_peerIpAddress = qhi.addresses().first();
-        }
-    }
 }
 
 
 ControlConnection::~ControlConnection()
 {
-    qDebug() << "DTOR controlconnection";
+    Q_D( ControlConnection );
+    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << id() << name();
 
-    if ( !m_source.isNull() )
-        m_source->setOffline();
+    {
+        QReadLocker locker( &d->sourceLock );
+        if ( !d->source.isNull() )
+        {
+            d->source->setOffline();
+        }
+    }
 
-    delete m_pingtimer;
-    m_servent->unregisterControlConnection( this );
-    if ( m_dbsyncconn )
-        m_dbsyncconn->deleteLater();
+    delete d->pingtimer;
+    servent()->unregisterControlConnection( this );
+    if ( d->dbsyncconn )
+        d->dbsyncconn->deleteLater();
+    delete d_ptr;
 }
 
 
 source_ptr
 ControlConnection::source() const
 {
-    return m_source;
+    Q_D( const ControlConnection );
+    // We return a copy of the shared pointer, no need for a longer lock
+    QReadLocker locker( &d->sourceLock );
+    return d->source;
+}
+
+
+void
+ControlConnection::unbindFromSource()
+{
+    Q_D( ControlConnection );
+    QWriteLocker locker( &d->sourceLock );
+    d->source = Tomahawk::source_ptr();
 }
 
 
 Connection*
 ControlConnection::clone()
 {
-    ControlConnection* clone = new ControlConnection( servent(), m_peerIpAddress.toString() );
+    ControlConnection* clone = new ControlConnection( servent() );
     clone->setOnceOnly( onceOnly() );
     clone->setName( name() );
     return clone;
@@ -117,35 +106,53 @@ ControlConnection::clone()
 void
 ControlConnection::setup()
 {
+    Q_D( ControlConnection );
     qDebug() << Q_FUNC_INFO << id() << name();
+    // We need to manually lock, so that we can release before the end of the function
+    d->sourceLock.lockForWrite();
 
-    if ( !m_source.isNull() )
+    if ( !d->source.isNull() )
     {
         qDebug() << "This source seems to be online already.";
         Q_ASSERT( false );
+        d->sourceLock.unlock();
         return;
     }
 
     QString friendlyName = name();
 
-    tDebug() << "Detected name:" << name() << friendlyName << m_sock->peerAddress();
+    tDebug() << "Detected name:" << name() << friendlyName;
 
     // setup source and remote collection for this peer
-    m_source = SourceList::instance()->get( id(), friendlyName, true );
-    m_source->setControlConnection( this );
+    d->source = SourceList::instance()->get( id(), friendlyName, true );
+    QSharedPointer<QMutexLocker> locker = d->source->acquireLock();
+    if ( d->source->setControlConnection( this ) )
+    {
+        // We are the new ControlConnection for this source
 
-    // delay setting up collection/etc until source is synced.
-    // we need it DB synced so it has an ID + exists in DB.
-    connect( m_source.data(), SIGNAL( syncedWithDatabase() ),
-                                SLOT( registerSource() ), Qt::QueuedConnection );
+        // delay setting up collection/etc until source is synced.
+        // we need it DB synced so it has an ID + exists in DB.
+        connect( d->source.data(), SIGNAL( syncedWithDatabase() ),
+                                    SLOT( registerSource() ), Qt::QueuedConnection );
 
-    m_source->setOnline();
+        d->source->setOnline();
 
-    m_pingtimer = new QTimer;
-    m_pingtimer->setInterval( 5000 );
-    connect( m_pingtimer, SIGNAL( timeout() ), SLOT( onPingTimer() ) );
-    m_pingtimer->start();
-    m_pingtimer_mark.start();
+        d->pingtimer = new QTimer;
+        d->pingtimer->setInterval( 5000 );
+        connect( d->pingtimer, SIGNAL( timeout() ), SLOT( onPingTimer() ) );
+        d->pingtimer->start();
+        d->pingtimer_mark.start();
+        d->sourceLock.unlock();
+    }
+    else
+    {
+        // We are not responsible for this source anymore, so do not keep a reference.
+        d->source = Tomahawk::source_ptr();
+        // Unlock before we delete ourselves
+        d->sourceLock.unlock();
+        // There is already another ControlConnection in use, we are useless.
+        deleteLater();
+    }
 }
 
 
@@ -153,62 +160,74 @@ ControlConnection::setup()
 void
 ControlConnection::registerSource()
 {
-    qDebug() << Q_FUNC_INFO << m_source->id();
-    Source* source = (Source*) sender();
-    Q_UNUSED( source )
-    Q_ASSERT( source == m_source.data() );
-
-#ifndef ENABLE_HEADLESS
-//    qDebug() << Q_FUNC_INFO << "Setting avatar ... " << name() << !SipHandler::instance()->avatar( name() ).isNull();
-    if ( !SipHandler::instance()->avatar( name() ).isNull() )
+    Q_D( ControlConnection );
+    QReadLocker sourceLocker( &d->sourceLock );
+    if ( d->source.isNull() )
     {
-        source->setAvatar( SipHandler::instance()->avatar( name() ) );
+        // Not connected to a source anymore, nothing to do.
+        return;
     }
-#endif
 
-    m_registered = true;
-    m_servent->registerControlConnection( this );
-    setupDbSyncConnection();
+    QSharedPointer<QMutexLocker> locker = d->source->acquireLock();
+    // Only continue if we are still the ControlConnection associated with this source.
+    if ( d->source->controlConnection() == this )
+    {
+        qDebug() << Q_FUNC_INFO << d->source->id();
+        Source* source = (Source*) sender();
+        Q_UNUSED( source )
+        Q_ASSERT( source == d->source.data() );
+
+        d->registered = true;
+        setupDbSyncConnection();
+    }
 }
 
 
 void
 ControlConnection::setupDbSyncConnection( bool ondemand )
 {
-    qDebug() << Q_FUNC_INFO << ondemand << m_source->id() << m_dbconnkey << m_dbsyncconn << m_registered;
+    Q_D( ControlConnection );
+    QReadLocker locker( &d->sourceLock );
+    if ( d->source.isNull() )
+    {
+        // We were unbind from the Source, nothing to do here, just waiting to be deleted.
+        return;
+    }
 
-    if ( m_dbsyncconn || !m_registered )
+    qDebug() << Q_FUNC_INFO << ondemand << d->source->id() << d->dbconnkey << d->dbsyncconn << d->registered;
+
+    if ( d->dbsyncconn || !d->registered )
         return;
 
-    Q_ASSERT( m_source->id() > 0 );
+    Q_ASSERT( d->source->id() > 0 );
 
-    if ( !m_dbconnkey.isEmpty() )
+    if ( !d->dbconnkey.isEmpty() )
     {
         qDebug() << "Connecting to DBSync offer from peer...";
-        m_dbsyncconn = new DBSyncConnection( m_servent, m_source );
+        d->dbsyncconn = new DBSyncConnection( servent(), d->source );
 
-        m_servent->createParallelConnection( this, m_dbsyncconn, m_dbconnkey );
-        m_dbconnkey.clear();
+        servent()->createParallelConnection( this, d->dbsyncconn, d->dbconnkey );
+        d->dbconnkey.clear();
     }
     else if ( !outbound() || ondemand ) // only one end makes the offer
     {
         qDebug() << "Offering a DBSync key to peer...";
-        m_dbsyncconn = new DBSyncConnection( m_servent, m_source );
+        d->dbsyncconn = new DBSyncConnection( servent(), d->source );
 
         QString key = uuid();
-        m_servent->registerOffer( key, m_dbsyncconn );
+        servent()->registerOffer( key, d->dbsyncconn );
         QVariantMap m;
         m.insert( "method", "dbsync-offer" );
         m.insert( "key", key );
         sendMsg( m );
     }
 
-    if ( m_dbsyncconn )
+    if ( d->dbsyncconn )
     {
-        connect( m_dbsyncconn, SIGNAL( finished() ),
-                 m_dbsyncconn,   SLOT( deleteLater() ) );
+        connect( d->dbsyncconn, SIGNAL( finished() ),
+                 d->dbsyncconn,   SLOT( deleteLater() ) );
 
-        connect( m_dbsyncconn, SIGNAL( destroyed( QObject* ) ),
+        connect( d->dbsyncconn, SIGNAL( destroyed( QObject* ) ),
                                  SLOT( dbSyncConnFinished( QObject* ) ), Qt::DirectConnection );
     }
 }
@@ -217,11 +236,12 @@ ControlConnection::setupDbSyncConnection( bool ondemand )
 void
 ControlConnection::dbSyncConnFinished( QObject* c )
 {
+    Q_D( ControlConnection );
     qDebug() << Q_FUNC_INFO << "DBSync connection closed (for now)";
-    if ( (DBSyncConnection*)c == m_dbsyncconn )
+    if ( (DBSyncConnection*)c == d->dbsyncconn )
     {
         //qDebug() << "Setting m_dbsyncconn to NULL";
-        m_dbsyncconn = NULL;
+        d->dbsyncconn = NULL;
     }
     else
         qDebug() << "Old DbSyncConn destroyed?!";
@@ -231,37 +251,39 @@ ControlConnection::dbSyncConnFinished( QObject* c )
 DBSyncConnection*
 ControlConnection::dbSyncConnection()
 {
-    qDebug() << Q_FUNC_INFO << m_source->id();
-    if ( !m_dbsyncconn )
+    Q_D( ControlConnection );
+    if ( !d->dbsyncconn )
     {
         setupDbSyncConnection( true );
 //        Q_ASSERT( m_dbsyncconn );
     }
 
-    return m_dbsyncconn;
+    return d->dbsyncconn;
 }
 
 
 void
 ControlConnection::handleMsg( msg_ptr msg )
 {
+    Q_D( ControlConnection );
     if ( msg->is( Msg::PING ) )
     {
         // qDebug() << "Received Connection PING, nice." << m_pingtimer_mark.elapsed();
-        m_pingtimer_mark.restart();
+        d->pingtimer_mark.restart();
         return;
     }
 
     // if small and not compresed, print it out for debug
     if ( msg->length() < 1024 && !msg->is( Msg::COMPRESSED ) )
     {
-        qDebug() << id() << "got msg:" << QString::fromAscii( msg->payload() );
+        qDebug() << id() << "got msg:" << QString::fromLatin1( msg->payload() );
     }
 
     // All control connection msgs are JSON
     if ( !msg->is( Msg::JSON ) )
     {
         Q_ASSERT( msg->is( Msg::JSON ) );
+        tLog( LOGVERBOSE ) << Q_FUNC_INFO << "Received message was not in JSON format";
         markAsFailed();
         return;
     }
@@ -278,7 +300,7 @@ ControlConnection::handleMsg( msg_ptr msg )
         }
         else if ( m.value( "method" ).toString() == "dbsync-offer" )
         {
-            m_dbconnkey = m.value( "key" ).toString() ;
+            d->dbconnkey = m.value( "key" ).toString() ;
             setupDbSyncConnection();
         }
         else if ( m.value( "method" ) == "protovercheckfail" )
@@ -289,25 +311,87 @@ ControlConnection::handleMsg( msg_ptr msg )
         }
         else
         {
-            tDebug() << id() << "Unhandled msg:" << QString::fromAscii( msg->payload() );
+            tDebug() << id() << "Unhandled msg:" << QString::fromLatin1( msg->payload() );
         }
 
         return;
     }
 
-    tDebug() << id() << "Invalid msg:" << QString::fromAscii( msg->payload() );
+    tDebug() << id() << "Invalid msg:" << QString::fromLatin1( msg->payload() );
 }
 
+void
+ControlConnection::authCheckTimeout()
+{
+    if ( isReady() )
+        return;
+
+    Q_D( ControlConnection );
+    Servent::instance()->queueForAclResult( bareName(), d->peerInfos );
+
+    tDebug( LOGVERBOSE ) << "Closing connection, not authed in time.";
+    shutdown();
+}
 
 
 void
 ControlConnection::onPingTimer()
 {
-    if ( m_pingtimer_mark.elapsed() >= TCP_TIMEOUT * 1000 )
+    Q_D( ControlConnection );
+    if ( d->pingtimer_mark.elapsed() >= TCP_TIMEOUT * 1000 )
     {
-        qDebug() << "Timeout reached! Shutting down connection to" << m_source->friendlyName();
+        QReadLocker locker( &d->sourceLock );
+        qDebug() << "Timeout reached! Shutting down connection to" << d->source->friendlyName();
         shutdown( true );
     }
 
     sendMsg( Msg::factory( QByteArray(), Msg::PING ) );
+}
+
+
+void
+ControlConnection::addPeerInfo( const peerinfo_ptr& peerInfo )
+{
+    Q_D( ControlConnection );
+
+    peerInfo->setControlConnection( this );
+    d->peerInfos.insert( peerInfo );
+}
+
+
+void
+ControlConnection::removePeerInfo( const peerinfo_ptr& peerInfo )
+{
+    Q_D( ControlConnection );
+    peerInfoDebug( peerInfo ) << "Remove peer from control connection:" << name();
+
+    Q_ASSERT( peerInfo->controlConnection() == this );
+//     TODO: find out why this happens
+//     Q_ASSERT( m_peerInfos.contains( peerInfo ) );
+
+    d->peerInfos.remove( peerInfo );
+
+    if ( d->peerInfos.isEmpty() && d->shutdownOnEmptyPeerInfos )
+    {
+        shutdown( true );
+    }
+}
+
+void
+ControlConnection::setShutdownOnEmptyPeerInfos( bool shutdownOnEmptyPeerInfos )
+{
+    Q_D( ControlConnection );
+    d->shutdownOnEmptyPeerInfos = shutdownOnEmptyPeerInfos;
+    if ( d->peerInfos.isEmpty() && d->shutdownOnEmptyPeerInfos )
+    {
+        shutdown( true );
+    }
+}
+
+
+const QSet< peerinfo_ptr >
+ControlConnection::peerInfos() const
+{
+    Q_D( const ControlConnection );
+    return d->peerInfos;
 }

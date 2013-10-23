@@ -21,6 +21,7 @@
 #include "playlist/dynamic/echonest/EchonestSteerer.h"
 #include "Query.h"
 #include "utils/TomahawkUtils.h"
+#include "utils/TomahawkCache.h"
 #include "TomahawkSettings.h"
 #include "database/DatabaseCommand_CollectionAttributes.h"
 #include "database/Database.h"
@@ -28,6 +29,7 @@
 #include "SourceList.h"
 #include <QFile>
 #include <QDir>
+#include <QReadWriteLock>
 #include <EchonestCatalogSynchronizer.h>
 
 using namespace Tomahawk;
@@ -35,8 +37,14 @@ using namespace Tomahawk;
 
 QStringList EchonestGenerator::s_moods = QStringList();
 QStringList EchonestGenerator::s_styles = QStringList();
+QStringList EchonestGenerator::s_genres = QStringList();
 QNetworkReply* EchonestGenerator::s_moodsJob = 0;
 QNetworkReply* EchonestGenerator::s_stylesJob = 0;
+QNetworkReply* EchonestGenerator::s_genresJob = 0;
+
+static QReadWriteLock s_moods_lock;
+static QReadWriteLock s_styles_lock;
+static QReadWriteLock s_genres_lock;
 
 CatalogManager* EchonestGenerator::s_catalogs = 0;
 
@@ -63,9 +71,9 @@ EchonestFactory::createControl( const QString& controlType )
 QStringList
 EchonestFactory::typeSelectors() const
 {
-    QStringList types =  QStringList() << "Artist" << "Artist Description" << "User Radio" << "Song" << "Mood" << "Style" << "Adventurousness" << "Variety" << "Tempo" << "Duration" << "Loudness"
+    QStringList types =  QStringList() << "Artist" << "Artist Description" << "User Radio" << "Song" << "Genre" << "Mood" << "Style" << "Adventurousness" << "Variety" << "Tempo" << "Duration" << "Loudness"
                           << "Danceability" << "Energy" << "Artist Familiarity" << "Artist Hotttnesss" << "Song Hotttnesss"
-                          << "Longitude" << "Latitude" <<  "Mode" << "Key" << "Sorting";
+                          << "Longitude" << "Latitude" <<  "Mode" << "Key" << "Sorting" << "Song Type";
 
     return types;
 }
@@ -106,7 +114,7 @@ CatalogManager::collectionAttributes( const PairList& data )
 void
 CatalogManager::doCatalogUpdate()
 {
-    QSharedPointer< DatabaseCommand > cmd( new DatabaseCommand_CollectionAttributes( DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog ) );
+    Tomahawk::dbcmd_ptr cmd( new DatabaseCommand_CollectionAttributes( DatabaseCommand_SetCollectionAttributes::EchonestSongCatalog ) );
     connect( cmd.data(), SIGNAL( collectionAttributes( PairList ) ), this, SLOT( collectionAttributes( PairList ) ) );
     Database::instance()->enqueue( cmd );
 }
@@ -126,7 +134,7 @@ EchonestGenerator::EchonestGenerator ( QObject* parent )
     m_mode = OnDemand;
     m_logo.load( RESPATH "/images/echonest_logo.png" );
 
-    loadStylesAndMoods();
+    loadStylesMoodsAndGenres();
 
     connect( s_catalogs, SIGNAL( catalogsUpdated() ), this, SLOT( knownCatalogsChanged() ) );
 }
@@ -470,12 +478,17 @@ EchonestGenerator::appendRadioType( Echonest::DynamicPlaylist::PlaylistParams& p
     /// 4. artist-radio: If all the artist entries are Similar To. If some were but not all, error out.
     /// 5. song-radio: If all the artist entries are Similar To. If some were but not all, error out.
     bool someCatalog = false;
+    bool genreType = false;
     foreach( const dyncontrol_ptr& control, m_controls ) {
         if ( control->selectedType() == "User Radio" )
             someCatalog = true;
+        else if ( control->selectedType() == "Genre" )
+            genreType = true;
     }
     if( someCatalog )
         params.append( Echonest::DynamicPlaylist::PlaylistParamData( Echonest::DynamicPlaylist::Type, Echonest::DynamicPlaylist::CatalogRadioType ) );
+    else if ( genreType )
+        params.append( Echonest::DynamicPlaylist::PlaylistParamData( Echonest::DynamicPlaylist::Type, Echonest::DynamicPlaylist::GenreRadioType ) );
     else if( onlyThisArtistType( Echonest::DynamicPlaylist::ArtistType ) )
         params.append( Echonest::DynamicPlaylist::PlaylistParamData( Echonest::DynamicPlaylist::Type, Echonest::DynamicPlaylist::ArtistType ) );
     else if( onlyThisArtistType( Echonest::DynamicPlaylist::ArtistDescriptionType ) )
@@ -603,53 +616,98 @@ EchonestGenerator::sentenceSummary()
 }
 
 void
-EchonestGenerator::loadStylesAndMoods()
+EchonestGenerator::loadStylesMoodsAndGenres()
 {
-    if( !s_styles.isEmpty() || !s_moods.isEmpty() )
+    if( !s_styles.isEmpty() && !s_moods.isEmpty() && !s_genres.isEmpty() )
         return;
 
-    QFile dataFile( TomahawkUtils::appDataDir().absoluteFilePath( "echonest_stylesandmoods.dat" ) );
-    if( !dataFile.exists() ) // load
-    {
-        s_stylesJob = Echonest::Artist::listTerms( "style" );
-        connect( s_stylesJob, SIGNAL( finished() ), this, SLOT( stylesReceived() ) );
-        s_moodsJob = Echonest::Artist::listTerms( "mood" );
-        connect( s_moodsJob, SIGNAL( finished() ), this, SLOT( moodsReceived() ) );
-    } else
-    {
-        if( !dataFile.open( QIODevice::ReadOnly ) )
-        {
-            tLog() << "Failed to open for reading styles/moods db file:" << dataFile.fileName();
-            return;
-        }
+    loadStyles();
+    loadMoods();
+    loadGenres();
+}
 
-        QString allData = QString::fromUtf8( dataFile.readAll() );
-        QStringList parts = allData.split( "\n" );
-        if( parts.size() != 2 )
+void
+EchonestGenerator::loadStyles()
+{
+    if ( s_styles.isEmpty() )
+    {
+        if ( s_styles_lock.tryLockForRead() )
         {
-            tLog() << "Didn't get both moods and styles in file...:" << allData;
-            return;
+            QVariant styles = TomahawkUtils::Cache::instance()->getData( "EchonesGenerator", "styles" );
+            s_styles_lock.unlock();
+            if ( styles.isValid() && styles.canConvert< QStringList >() )
+            {
+                s_styles = styles.toStringList();
+            }
+            else
+            {
+                s_styles_lock.lockForWrite();
+                tLog() << "Styles not in cache or too old, refetching styles ...";
+                s_stylesJob = Echonest::Artist::listTerms( "style" );
+                connect( s_stylesJob, SIGNAL( finished() ), this, SLOT( stylesReceived() ) );
+            }
         }
-        s_moods = parts[ 0 ].split( "|" );
-        s_styles = parts[ 1 ].split( "|" );
+        else
+        {
+            connect( this, SIGNAL( stylesSaved() ), this, SLOT( loadStyles() ) );
+        }
     }
 }
 
 void
-EchonestGenerator::saveStylesAndMoods()
+EchonestGenerator::loadMoods()
 {
-    QFile dataFile( TomahawkUtils::appDataDir().absoluteFilePath( "echonest_stylesandmoods.dat" ) );
-    if( !dataFile.open( QIODevice::WriteOnly ) )
+    if ( s_moods.isEmpty() )
     {
-        tLog() << "Failed to open styles and moods data file for saving:" << dataFile.errorString() << dataFile.fileName();
-        return;
+        if ( s_moods_lock.tryLockForRead() )
+        {
+            QVariant moods = TomahawkUtils::Cache::instance()->getData( "EchonesGenerator", "moods" );
+            s_moods_lock.unlock();
+            if ( moods.isValid() && moods.canConvert< QStringList >() ) {
+                s_moods = moods.toStringList();
+            }
+            else
+            {
+                s_moods_lock.lockForWrite();
+                tLog() << "Moods not in cache or too old, refetching moods ...";
+                s_moodsJob = Echonest::Artist::listTerms( "mood" );
+                connect( s_moodsJob, SIGNAL( finished() ), this, SLOT( moodsReceived() ) );
+            }
+        }
+        else
+        {
+            connect( this, SIGNAL( moodsSaved() ), this, SLOT( loadMoods() ) );
+        }
     }
-
-    QByteArray data = QString( "%1\n%2" ).arg( s_moods.join( "|" ) ).arg( s_styles.join( "|" ) ).toUtf8();
-    dataFile.write( data );
 }
 
-
+void
+EchonestGenerator::loadGenres()
+{
+    if ( s_genres.isEmpty() )
+    {
+        if ( s_genres_lock.tryLockForRead() )
+        {
+            QVariant genres = TomahawkUtils::Cache::instance()->getData( "EchonesGenerator", "genres" );
+            s_genres_lock.unlock();
+            if ( genres.isValid() && genres.canConvert< QStringList >() )
+            {
+                s_genres = genres.toStringList();
+            }
+            else
+            {
+                s_genres_lock.lockForWrite();
+                tLog() << "Genres not in cache or too old, refetching genres ...";
+                s_genresJob = Echonest::Artist::fetchGenres();
+                connect( s_genresJob, SIGNAL( finished() ), this, SLOT( genresReceived() ) );
+            }
+        }
+        else
+        {
+            connect( this, SIGNAL( genresSaved() ), this, SLOT( loadGenres() ) );
+        }
+    }
+}
 
 QStringList
 EchonestGenerator::moods()
@@ -664,15 +722,19 @@ EchonestGenerator::moodsReceived()
     QNetworkReply* r = qobject_cast< QNetworkReply* >( sender() );
     Q_ASSERT( r );
 
-    try {
+    try
+    {
         s_moods = Echonest::Artist::parseTermList( r ).toList();
-    } catch( Echonest::ParseError& e ) {
+    }
+    catch( Echonest::ParseError& e )
+    {
         qWarning() << "Echonest failed to parse moods list";
     }
     s_moodsJob = 0;
 
-    if( !s_styles.isEmpty() )
-        saveStylesAndMoods();
+    TomahawkUtils::Cache::instance()->putData( "EchonesGenerator", 1209600000 /* 2 weeks */, "moods", QVariant::fromValue< QStringList >( s_moods ) );
+    s_moods_lock.unlock();
+    emit moodsSaved();
 }
 
 
@@ -689,13 +751,44 @@ EchonestGenerator::stylesReceived()
     QNetworkReply* r = qobject_cast< QNetworkReply* >( sender() );
     Q_ASSERT( r );
 
-    try {
+    try
+    {
         s_styles = Echonest::Artist::parseTermList( r ).toList();
-    } catch( Echonest::ParseError& e ) {
+    }
+    catch( Echonest::ParseError& e )
+    {
         qWarning() << "Echonest failed to parse styles list";
     }
     s_stylesJob = 0;
 
-    if( !s_moods.isEmpty() )
-        saveStylesAndMoods();
+    TomahawkUtils::Cache::instance()->putData( "EchonesGenerator", 1209600000 /* 2 weeks */, "styles", QVariant::fromValue< QStringList >( s_styles ) );
+    s_styles_lock.unlock();
+    emit stylesSaved();
+}
+
+QStringList
+EchonestGenerator::genres()
+{
+    return s_genres;
+}
+
+void
+EchonestGenerator::genresReceived()
+{
+    QNetworkReply* r = qobject_cast< QNetworkReply* >( sender() );
+    Q_ASSERT( r );
+
+    try
+    {
+        s_genres = Echonest::Artist::parseGenreList( r ).toList();
+    }
+    catch( Echonest::ParseError& e )
+    {
+        qWarning() << "Echonest failed to parse genres list";
+    }
+    s_genresJob = 0;
+
+    TomahawkUtils::Cache::instance()->putData( "EchonesGenerator", 1209600000 /* 2 weeks */, "genres", QVariant::fromValue< QStringList >( s_genres ) );
+    s_genres_lock.unlock();
+    emit genresSaved();
 }

@@ -18,7 +18,7 @@
 
 #include "HeaderWidget.h"
 
-#include "utils/StyleHelper.h"
+#include "utils/TomahawkStyle.h"
 
 #include <QStyle>
 #include <QStylePainter>
@@ -37,10 +37,10 @@ HeaderWidget::~HeaderWidget()
 
 
 void
-HeaderWidget::paintEvent( QPaintEvent* e )
+HeaderWidget::paintEvent( QPaintEvent* /* event */ )
 {
     QStylePainter p( this );
-    QRect r = e->rect();
+    QRect r = rect();
 
-    StyleHelper::horizontalHeader( &p, r );
+    TomahawkStyle::horizontalHeader( &p, r );
 }

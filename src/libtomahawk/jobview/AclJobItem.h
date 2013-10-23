@@ -20,8 +20,9 @@
 #ifndef ACLJOBITEM_H
 #define ACLJOBITEM_H
 
-#include "AclRegistry.h"
 #include "DllMacro.h"
+
+#include "network/acl/AclRegistry.h"
 #include "jobview/JobStatusItem.h"
 
 #include <QStyledItemDelegate>
@@ -43,7 +44,7 @@ public:
 
 signals:
     void update( const QModelIndex& idx );
-    void aclResult( ACLRegistry::ACL result );
+    void aclResult( Tomahawk::ACLStatus::Type result );
 
 protected:
     virtual bool editorEvent( QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index );
@@ -84,7 +85,7 @@ signals:
     void userDecision( ACLRegistry::User user );
 
 public slots:
-    void aclResult( ACLRegistry::ACL result );
+    void aclResult( Tomahawk::ACLStatus::Type result );
     
 private:
     QStyledItemDelegate* m_delegate;

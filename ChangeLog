@@ -1,14 +1,89 @@
+Version 0.8.0:
+    * Playback Queue now saves its state across sessions.
+    * Added "Inbox" feature, showing incoming song recommendations. Dropping
+      a track on a user in the sidebar sends a recommendation to them.
+    * You will now be asked whether you want to trust invalid SSL certificates.
+    * Improved connecting between Tomahawk peers and support having multiple IPs
+      (including IPv6).
+    * Added Trending page, showing you the most played tracks of your friends recently,
+      trending songs and playlists.
+    * Removed Top Loved from sidebar.
+    * JavaScript-Resolver can now handle URLs (e.g. when dropped from a browser)
+      and resolve them to Playlists/Tracks/Artists/Albums.
+    * HTTP(S) streaming is now done by Tomahawk instead of the Phonon backend
+      (fixed HTTPS streaming on MacOS).
+    * Heavily reduced memory footprint during and after indexing the database.
+    * New Loved widget shows what friends have loved tracks throughout the app.
+    * New Artist, Album and Track page design - new fonts, colors, layout.
+    * Retina display and DPI scaling fixes.
+    * New Dashboard layout.
+    * New Stats widget.
+    * New Collection views.
+    * Added Telepathy support.
+    * Plugin refactoring (and .AXE resolver binaries).
+    * Removed Twitter due to change in Twitter's API.
+    * Improved error messages.
+    * Support drag & drop of items from Artist and Album page headers.
+
+Version 0.7.0:
+    * JavaScript Resolvers can now expose collections.
+    * Introduced bundle system for JavaScript Resolvers, called "axes".
+    * Fixed playback-loop caused by duplicate tracks in a playlist.
+    * Improved peer handling and removed connection support through Twitter.
+    * Taking an account offline now also disconnects associated peers.
+    * Improved spotify protocol handling.
+    * Added "Append to Playlist" context menu item.
+    * User-friendlier collection handling: added info-buttons for artists and
+      albums. Double-clicking an item expands it now.
+    * Charts only load on-demand now.
+    * Fixed Diagnostics information not correctly updating.
+    * Fixed issue with hidden sidebar and panels.
+    * Fixed issues with some color schemes.
+    * Fixed playing files with special characters in the filename.
+    * Improved stability.
+    * Added translations for Catalan, Czech, Galician, Greek, Italian and
+      Chinese.
+    * (Windows) Smoother and more responsive audio playback.
+    * (Linux) Fixed grid issues with GTK-styles.
+
+Version 0.6.1:
+    * Improved stability.
+    * Improved UPnP detection and port-forwarding.
+    * Fixed scrolling behaviour of grid-views.
+    * Lots of small design tweaks and fixes.
+
 Version 0.6.0:
-    * Access Control queries now stay on the bottom of the job view,
-      removing the tendency to jump away from the mouse.
+    * Improved icon theme with vector graphics.
+    * Higher resolution artist and album images.
+    * You can now click artists, albums and tracks mentioned in artists'
+      biographies.
+    * New AudioControl logic - only enable Prev/Skip buttons if available.
+    * Added more options to right-click/context menus.
+    * Resolver source icon in Audiocontrols now supports being a link-back URL
+      to original source.
+    * Make friends' currently playing song (in sidebar) clickable.
+    * Improve MusicBrainz plugin to use normalized artist names and avoid
+      duplicate tracks.
+    * Access Control queries now stay on the bottom of the job view, removing
+      the tendency to jump away from the mouse.
     * Improved random mode, preventing songs from being played in too rapid
       succession.
-    * You can now choose between Various view modes for your playlists.
-    * Nicer layout for the Album page.
-    * Follow HTTP redirects when fetching Playlists from the Internet.
+    * You can now choose between various view modes for your playlists.
+    * Nicer layout for the Artist, Album & Track pages.
+    * Follow HTTP redirects when fetching Playlists.
     * Main menu can now be hidden and instead be shown as a toolbar button.
     * Connectivity controls in the toolbar.
     * Cleaned up settings dialog.
+    * Ability to sync Spotify Starred Tracks with Tomahawk's Loved Tracks.
+    * Remove YouTube resolver from plug-in directory on request of YouTube.
+    * Fixed iTunes m3u playlist support.
+    * Support dropping of new Soundcloud user, track, set & likes URLs.
+    * Added HotNewHipHop as available chart.
+    * Added iTunes as available source for New Releases.
+    * Updates and additions to translations including: Japanese, Bulgarian, 
+      Finnish, Russian, Arabic, Chinese, Swedish, Czech and more.
+    * (Windows) Added thumb buttons to Windows 7's taskbar.
+    * (Linux) Allow disabling of playback notifications.
 
 Version 0.5.5:
     * Changed the Spotify config dialog to indicate when the user

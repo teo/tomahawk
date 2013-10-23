@@ -19,9 +19,9 @@
 #include "Breadcrumb.h"
 
 #include "BreadcrumbButton.h"
-#include "utils/StyleHelper.h"
-#include "utils/Logger.h"
+#include "utils/TomahawkStyle.h"
 #include "utils/TomahawkUtilsGui.h"
+#include "utils/Logger.h"
 
 #include <QStylePainter>
 #include <QPushButton>
@@ -72,7 +72,7 @@ Breadcrumb::setRootIcon( const QPixmap& pm )
 
     QPushButton* button = new QPushButton( QIcon( m_rootIcon ), "", this );
     button->setFlat( true );
-    button->setStyleSheet( "QPushButton{ background-color: transparent; border: none; width:16px; height:16px;}" );
+    button->setStyleSheet( "QPushButton{ background-color: transparent; border: none; width:36px; height:36px;}" );
     m_buttonlayout->insertWidget( 0, button );
     m_buttonlayout->insertSpacing( 0,5 );
     m_buttonlayout->insertSpacing( 2,5 );
@@ -83,7 +83,7 @@ void
 Breadcrumb::paintEvent( QPaintEvent* )
 {
     QStylePainter p( this );
-    StyleHelper::horizontalHeader( &p, rect() );
+    TomahawkStyle::horizontalHeader( &p, rect() );
 }
 
 

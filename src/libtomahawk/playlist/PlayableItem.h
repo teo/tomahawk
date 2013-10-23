@@ -24,6 +24,7 @@
 #include <QPersistentModelIndex>
 #include <QPixmap>
 
+#include "Track.h"
 #include "Typedefs.h"
 #include "DllMacro.h"
 
@@ -49,12 +50,17 @@ public:
     const Tomahawk::lrentry_ptr& lrentry() const { return m_lrentry; }
     const Tomahawk::result_ptr& result() const;
 
+    Tomahawk::PlaybackLog playbackLog() const;
+    void setPlaybackLog( const Tomahawk::PlaybackLog& log );
+
     PlayableItem* parent() const { return m_parent; }
+    void forceUpdate() { emit dataChanged(); }
 
     bool isPlaying() const { return m_isPlaying; }
     void setIsPlaying( bool b ) { m_isPlaying = b; emit dataChanged(); }
     bool fetchingMore() const { return m_fetchingMore; }
     void setFetchingMore( bool b ) { m_fetchingMore = b; }
+    void requestRepaint() { emit dataChanged(); }
 
     QString name() const;
     QString artistName() const;
@@ -83,6 +89,8 @@ private:
     PlayableItem* m_parent;
     bool m_fetchingMore;
     bool m_isPlaying;
+
+    Tomahawk::PlaybackLog m_playbackLog;
 };
 
 #endif // PLAYABLEITEM_H

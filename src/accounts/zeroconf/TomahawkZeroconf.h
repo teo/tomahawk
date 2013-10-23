@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013, Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -29,6 +30,7 @@
 #include <QList>
 #include <QHostAddress>
 #include <QHostInfo>
+#include <QNetworkInterface>
 #include <QNetworkProxy>
 #include <QUdpSocket>
 #include <QTimer>
@@ -102,15 +104,15 @@ public slots:
         // Keep newer versions first
         QByteArray advert = QString( "TOMAHAWKADVERT:%1:%2:%3" )
                                .arg( m_port )
-                               .arg( Database::instance()->impl()->dbid() )
+                               .arg( Tomahawk::Database::instance()->impl()->dbid() )
                                .arg( QHostInfo::localHostName() )
-                               .toAscii();
+                               .toLatin1();
         m_sock.writeDatagram( advert.data(), advert.size(), QHostAddress::Broadcast, ZCONF_PORT );
 
         advert = QString( "TOMAHAWKADVERT:%1:%2" )
                     .arg( m_port )
-                    .arg( Database::instance()->impl()->dbid() )
-                    .toAscii();
+                    .arg( Tomahawk::Database::instance()->impl()->dbid() )
+                    .toLatin1();
         m_sock.writeDatagram( advert.data(), advert.size(), QHostAddress::Broadcast, ZCONF_PORT );
     }
 
@@ -129,18 +131,22 @@ private slots:
         QHostAddress sender;
         quint16 senderPort;
         m_sock.readDatagram( datagram.data(), datagram.size(), &sender, &senderPort );
-        qDebug() << "DATAGRAM RCVD" << QString::fromAscii( datagram ) << sender;
+        qDebug() << "DATAGRAM RCVD" << QString::fromLatin1( datagram ) << sender;
+
+        // Ignore our own requests
+        if ( QNetworkInterface::allAddresses().contains( sender ) )
+            return;
 
         // only process msgs originating on the LAN:
         if ( datagram.startsWith( "TOMAHAWKADVERT:" ) &&
             Servent::isIPWhitelisted( sender ) )
         {
-            QStringList parts = QString::fromAscii( datagram ).split( ':' );
+            QStringList parts = QString::fromLatin1( datagram ).split( ':' );
             if ( parts.length() == 4 )
             {
                 bool ok;
                 int port = parts.at(1).toInt( &ok );
-                if ( ok && Database::instance()->impl()->dbid() != parts.at( 2 ) )
+                if ( ok && Tomahawk::Database::instance()->impl()->dbid() != parts.at( 2 ) )
                 {
                     emit tomahawkHostFound( sender.toString(), port, parts.at( 3 ), parts.at( 2 ) );
                 }
@@ -149,7 +155,7 @@ private slots:
             {
                 bool ok;
                 int port = parts.at(1).toInt( &ok );
-                if ( ok && Database::instance()->impl()->dbid() != parts.at( 2 ) )
+                if ( ok && Tomahawk::Database::instance()->impl()->dbid() != parts.at( 2 ) )
                 {
                     qDebug() << "ADVERT received:" << sender << port;
                     Node *n = new Node( sender.toString(), parts.at( 2 ), port );

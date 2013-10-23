@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -51,14 +52,28 @@ public:
     QList<Tomahawk::source_ptr> sources( bool onlyOnline = false ) const;
     unsigned int count() const;
 
+    QList<Tomahawk::collection_ptr> scriptCollections() const;
+
     Tomahawk::source_ptr get( const QString& username, const QString& friendlyName = QString(), bool autoCreate = false );
     Tomahawk::source_ptr get( int id ) const;
+
+public slots:
+    // called by the playlist creation dbcmds
+    void createPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
+    void createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
+    void createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents );
+
+    void onResolverAdded( Tomahawk::Resolver* resolver );
+    void onResolverRemoved( Tomahawk::Resolver* resolver );
 
 signals:
     void ready();
 
     void sourceAdded( const Tomahawk::source_ptr& );
     void sourceRemoved( const Tomahawk::source_ptr& );
+
+    void scriptCollectionAdded( const Tomahawk::collection_ptr& );
+    void scriptCollectionRemoved( const Tomahawk::collection_ptr& );
 
     void sourceLatchedOn( const Tomahawk::source_ptr& from, const Tomahawk::source_ptr& to );
     void sourceLatchedOff( const Tomahawk::source_ptr& from, const Tomahawk::source_ptr& to );
@@ -70,11 +85,16 @@ private slots:
     void latchedOn( const Tomahawk::source_ptr& );
     void latchedOff( const Tomahawk::source_ptr& );
 
+    void addScriptCollection( const Tomahawk::collection_ptr& collection );
+    void removeScriptCollection( const Tomahawk::collection_ptr& collection );
+
 private:
     void add( const Tomahawk::source_ptr& source );
 
     QMap< QString, Tomahawk::source_ptr > m_sources;
     QMap< int, QString > m_sources_id2name;
+
+    QList< Tomahawk::collection_ptr > m_scriptCollections;
 
     bool m_isReady;
     Tomahawk::source_ptr m_local;

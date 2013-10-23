@@ -1,4 +1,7 @@
-include_directories(${ECHONEST_INCLUDE_DIR})
+include_directories(
+    ${ECHONEST_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIR}
+)
 
 list(APPEND simple_plugins
     Echonest
@@ -14,7 +17,7 @@ list(APPEND simple_plugins
 
 foreach(simple_plugin ${simple_plugins})
     STRING(TOLOWER "${simple_plugin}" dir)
-    add_tomahawk_plugin(${dir}
+    tomahawk_add_plugin(${dir}
         TYPE infoplugin EXPORT_MACRO INFOPLUGINDLLEXPORT_PRO
         SOURCES "${dir}/${simple_plugin}Plugin.cpp"
     )

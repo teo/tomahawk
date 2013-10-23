@@ -20,9 +20,7 @@
 #define SIPINFO_H
 
 #include <QSharedPointer>
-#include <QHostInfo>
 
-#include "utils/Logger.h"
 #include "DllMacro.h"
 
 class SipInfoPrivate;
@@ -49,8 +47,8 @@ public:
     void setPort( int port );
     int port() const;
 
-    void setUniqname( const QString& uniqname );
-    const QString uniqname() const;
+    void setNodeId( const QString& nodeId );
+    const QString nodeId() const;
 
     void setKey( const QString& key );
     const QString key() const;
@@ -59,12 +57,13 @@ public:
     const QString toJson() const;
     static const SipInfo fromJson( QString json );
 
+    const QString debugString() const;
+
 private:
     QSharedDataPointer<SipInfoPrivate> d;
 };
 
 DLLEXPORT QDebug operator<<( QDebug dbg, const SipInfo &info );
-
-
+DLLEXPORT bool operator==( const SipInfo& one, const SipInfo& two );
 
 #endif // SIPINFO_H

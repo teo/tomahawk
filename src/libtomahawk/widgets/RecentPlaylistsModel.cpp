@@ -1,33 +1,37 @@
-/*
-    Copyright (C) 2011  Leo Franchi <lfranchi@kde.org>
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-*/
-
+/* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
+ *
+ *   Copyright 2011, Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2013, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *
+ *   Tomahawk is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   Tomahawk is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "RecentPlaylistsModel.h"
 
-#include "TomahawkSettings.h"
 #include "audio/AudioEngine.h"
-#include "SourceList.h"
-#include "utils/Logger.h"
-#include "playlist/dynamic/DynamicPlaylist.h"
+#include "collection/Collection.h"
 #include "database/Database.h"
 #include "database/DatabaseCommand_LoadAllSortedPlaylists.h"
-#include "RecentlyPlayedPlaylistsModel.h"
 #include "network/Servent.h"
+#include "playlist/dynamic/DynamicPlaylist.h"
+#include "utils/Logger.h"
+
+#include "PlaylistEntry.h"
+#include "RecentlyPlayedPlaylistsModel.h"
+#include "SourceList.h"
+#include "TomahawkSettings.h"
+#include "Track.h"
 
 #define REFRESH_TIMEOUT 1000
 
@@ -44,7 +48,8 @@ RecentPlaylistsModel::RecentPlaylistsModel( unsigned int maxPlaylists, QObject* 
     connect( SourceList::instance(), SIGNAL( ready() ), SLOT( onReady() ) );
 
     // Load recent playlists initially
-    onRefresh();
+    if ( SourceList::instance()->isReady() )
+        onRefresh();
 }
 
 
@@ -64,20 +69,21 @@ RecentPlaylistsModel::onRefresh()
         m_timer->stop();
 
     emit loadingStarted();
-   
+
     DatabaseCommand_LoadAllSortedPlaylists* cmd = new DatabaseCommand_LoadAllSortedPlaylists( source_ptr() );
-    cmd->setLimit( 15 );
+    cmd->setLimit( m_maxPlaylists );
     cmd->setSortOrder( DatabaseCommand_LoadAllPlaylists::ModificationTime );
     cmd->setSortAscDesc( DatabaseCommand_LoadAllPlaylists::Descending );
-    connect( cmd, SIGNAL( done( QList<DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair> ) ), this, SLOT( playlistsLoaded( QList<DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair> ) ) );
-    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    connect( cmd, SIGNAL( done( QList<Tomahawk::DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair> ) ),
+             this, SLOT( playlistsLoaded( QList<Tomahawk::DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair> ) ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
 void
 RecentPlaylistsModel::onReady()
 {
-    foreach( const source_ptr& s, SourceList::instance()->sources() )
+    foreach ( const source_ptr& s, SourceList::instance()->sources() )
         onSourceAdded( s );
 
     connect( SourceList::instance(), SIGNAL( sourceAdded( Tomahawk::source_ptr ) ), this, SLOT( onSourceAdded( Tomahawk::source_ptr ) ), Qt::QueuedConnection );
@@ -94,26 +100,18 @@ RecentPlaylistsModel::playlistsLoaded( const QList<DatabaseCommand_LoadAllSorted
     DatabaseCommand_LoadAllSortedPlaylists::SourcePlaylistPair plPair;
     foreach ( plPair, playlistGuids )
     {
-        source_ptr s = SourceList::instance()->get( plPair.first );
-        if ( s.isNull() )
-            continue;
-
-        if ( plPair.first == 0 )
-            s = SourceList::instance()->getLocal();
-
-        playlist_ptr pl = s->collection()->playlist( plPair.second );
-        if ( pl.isNull() )
-            pl = s->collection()->autoPlaylist( plPair.second );
-        if ( pl.isNull() )
-            pl = s->collection()->station( plPair.second );
-
-        if ( pl.isNull() )
+        const playlist_ptr& pl = Playlist::get( plPair.second );
+        if ( !pl )
         {
-            qDebug() << "Found a playlist that is NOT LOADED FOR ANY SOURCE:" << plPair.first << plPair.second;
+            tDebug() << "ERROR: Found a playlist that is not associated with any source:" << plPair.first << plPair.second;
             continue;
         }
-        connect( pl.data(), SIGNAL( changed() ), this, SLOT( updatePlaylist() ) );
+
+        connect( pl.data(), SIGNAL( changed() ), SLOT( updatePlaylist() ) );
         m_playlists << pl;
+
+        if ( !pl->loaded() )
+            pl->loadRevision();
     }
 
     endResetModel();
@@ -126,7 +124,7 @@ RecentPlaylistsModel::playlistsLoaded( const QList<DatabaseCommand_LoadAllSorted
 QVariant
 RecentPlaylistsModel::data( const QModelIndex& index, int role ) const
 {
-    if( !index.isValid() || !hasIndex( index.row(), index.column(), index.parent() ) )
+    if ( !index.isValid() || !hasIndex( index.row(), index.column(), index.parent() ) )
         return QVariant();
 
     playlist_ptr pl = m_playlists[index.row()];
@@ -138,14 +136,14 @@ RecentPlaylistsModel::data( const QModelIndex& index, int role ) const
         return QVariant::fromValue< Tomahawk::playlist_ptr >( pl );
     case RecentlyPlayedPlaylistsModel::ArtistRole:
     {
-        if( m_artists.value( pl ).isEmpty() )
+        if ( m_artists.value( pl ).isEmpty() )
         {
             QStringList artists;
 
-            foreach( const Tomahawk::plentry_ptr& entry, pl->entries() )
+            foreach ( const Tomahawk::plentry_ptr& entry, pl->entries() )
             {
-                if ( !artists.contains( entry->query()->artist() ) )
-                    artists << entry->query()->artist();
+                if ( !artists.contains( entry->query()->track()->artist() ) )
+                    artists << entry->query()->track()->artist();
             }
 
             m_artists[pl] = artists.join( ", " );
@@ -210,12 +208,12 @@ void
 RecentPlaylistsModel::onSourceAdded( const Tomahawk::source_ptr& source )
 {
     connect( source.data(), SIGNAL( online() ), this, SLOT( sourceOnline() ) );
-    connect( source->collection().data(), SIGNAL( playlistsAdded( QList<Tomahawk::playlist_ptr> ) ), SLOT( refresh() ), Qt::QueuedConnection );
-    connect( source->collection().data(), SIGNAL( autoPlaylistsAdded(QList<Tomahawk::dynplaylist_ptr>)), SLOT( refresh() ), Qt::QueuedConnection );
-    connect( source->collection().data(), SIGNAL( stationsAdded(QList<Tomahawk::dynplaylist_ptr>)), SLOT( refresh() ), Qt::QueuedConnection );
-    connect( source->collection().data(), SIGNAL( playlistsDeleted( QList<Tomahawk::playlist_ptr> ) ), SLOT( onPlaylistsRemoved( QList<Tomahawk::playlist_ptr> ) ) );
-    connect( source->collection().data(), SIGNAL( autoPlaylistsDeleted(QList<Tomahawk::dynplaylist_ptr>) ), SLOT( onDynPlaylistsRemoved( QList<Tomahawk::dynplaylist_ptr> ) ) );
-    connect( source->collection().data(), SIGNAL( stationsDeleted(QList<Tomahawk::dynplaylist_ptr>) ), SLOT( onDynPlaylistsRemoved( QList<Tomahawk::dynplaylist_ptr> ) ) );
+    connect( source->dbCollection().data(), SIGNAL( playlistsAdded( QList<Tomahawk::playlist_ptr> ) ), SLOT( refresh() ), Qt::QueuedConnection );
+    connect( source->dbCollection().data(), SIGNAL( autoPlaylistsAdded(QList<Tomahawk::dynplaylist_ptr>)), SLOT( refresh() ), Qt::QueuedConnection );
+    connect( source->dbCollection().data(), SIGNAL( stationsAdded(QList<Tomahawk::dynplaylist_ptr>)), SLOT( refresh() ), Qt::QueuedConnection );
+    connect( source->dbCollection().data(), SIGNAL( playlistsDeleted( QList<Tomahawk::playlist_ptr> ) ), SLOT( onPlaylistsRemoved( QList<Tomahawk::playlist_ptr> ) ) );
+    connect( source->dbCollection().data(), SIGNAL( autoPlaylistsDeleted(QList<Tomahawk::dynplaylist_ptr>) ), SLOT( onDynPlaylistsRemoved( QList<Tomahawk::dynplaylist_ptr> ) ) );
+    connect( source->dbCollection().data(), SIGNAL( stationsDeleted(QList<Tomahawk::dynplaylist_ptr>) ), SLOT( onDynPlaylistsRemoved( QList<Tomahawk::dynplaylist_ptr> ) ) );
 }
 
 
@@ -240,7 +238,7 @@ void
 RecentPlaylistsModel::onDynPlaylistsRemoved( QList< dynplaylist_ptr > playlists )
 {
     QList< playlist_ptr > pls;
-    foreach( const dynplaylist_ptr& p, playlists )
+    foreach ( const dynplaylist_ptr& p, playlists )
         pls << p;
 
     onPlaylistsRemoved( pls );
@@ -250,9 +248,9 @@ RecentPlaylistsModel::onDynPlaylistsRemoved( QList< dynplaylist_ptr > playlists 
 void
 RecentPlaylistsModel::onPlaylistsRemoved( QList< playlist_ptr > playlists )
 {
-    foreach( const playlist_ptr& pl, playlists )
+    foreach ( const playlist_ptr& pl, playlists )
     {
-        if( m_playlists.contains( pl ) )
+        if ( m_playlists.contains( pl ) )
         {
             m_artists.remove( pl );
 

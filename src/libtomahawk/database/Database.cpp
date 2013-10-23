@@ -19,15 +19,63 @@
 
 #include "Database.h"
 
+#include "utils/Logger.h"
+
 #include "DatabaseCommand.h"
 #include "DatabaseImpl.h"
 #include "DatabaseWorker.h"
 #include "IdThreadWorker.h"
-#include "utils/Logger.h"
-#include "Source.h"
+#include "PlaylistEntry.h"
+
+#include "DatabaseCommand_AddFiles.h"
+#include "DatabaseCommand_CreatePlaylist.h"
+#include "DatabaseCommand_DeleteFiles.h"
+#include "DatabaseCommand_DeletePlaylist.h"
+#include "DatabaseCommand_LogPlayback.h"
+#include "DatabaseCommand_RenamePlaylist.h"
+#include "DatabaseCommand_SetPlaylistRevision.h"
+#include "DatabaseCommand_CreateDynamicPlaylist.h"
+#include "DatabaseCommand_DeleteDynamicPlaylist.h"
+#include "DatabaseCommand_SetDynamicPlaylistRevision.h"
+#include "DatabaseCommand_SocialAction.h"
+#include "DatabaseCommand_ShareTrack.h"
+#include "DatabaseCommand_SetCollectionAttributes.h"
+#include "DatabaseCommand_SetTrackAttributes.h"
+#include "DatabaseCommand_ListeningRoomInfo.h"
+#include "DatabaseCommand_RenameListeningRoom.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "collection/Collection.h"
+#endif
+
+#include <boost/concept_check.hpp>
 
 #define DEFAULT_WORKER_THREADS 4
 #define MAX_WORKER_THREADS 16
+
+namespace Tomahawk
+{
+
+dbcmd_ptr
+DatabaseCommandFactory::newInstance()
+{
+    dbcmd_ptr command = dbcmd_ptr( create() );
+
+    notifyCreated( command );
+
+    return command;
+}
+
+
+void
+DatabaseCommandFactory::notifyCreated( const dbcmd_ptr& command )
+{
+    command->setWeakRef( command.toWeakRef() );
+
+    emit created( command );
+}
+
 
 Database* Database::s_instance = 0;
 
@@ -48,6 +96,24 @@ Database::Database( const QString& dbname, QObject* parent )
 {
     s_instance = this;
 
+    // register commands
+    registerCommand<DatabaseCommand_AddFiles>();
+    registerCommand<DatabaseCommand_DeleteFiles>();
+    registerCommand<DatabaseCommand_CreatePlaylist>();
+    registerCommand<DatabaseCommand_DeletePlaylist>();
+    registerCommand<DatabaseCommand_LogPlayback>();
+    registerCommand<DatabaseCommand_RenamePlaylist>();
+    registerCommand<DatabaseCommand_SetPlaylistRevision>();
+    registerCommand<DatabaseCommand_CreateDynamicPlaylist>();
+    registerCommand<DatabaseCommand_DeleteDynamicPlaylist>();
+    registerCommand<DatabaseCommand_SetDynamicPlaylistRevision>();
+    registerCommand<DatabaseCommand_SocialAction>();
+    registerCommand<DatabaseCommand_SetCollectionAttributes>();
+    registerCommand<DatabaseCommand_SetTrackAttributes>();
+    registerCommand<DatabaseCommand_ShareTrack>();
+    registerCommand<DatabaseCommand_ListeningRoomInfo>();
+    registerCommand<DatabaseCommand_RenameListeningRoom>();
+
     if ( MAX_WORKER_THREADS < DEFAULT_WORKER_THREADS )
         m_maxConcurrentThreads = MAX_WORKER_THREADS;
     else
@@ -55,16 +121,15 @@ Database::Database( const QString& dbname, QObject* parent )
 
     tDebug() << Q_FUNC_INFO << "Using" << m_maxConcurrentThreads << "database worker threads";
 
+    connect( m_impl, SIGNAL( indexReady() ), SLOT( markAsReady() ) );
     connect( m_impl, SIGNAL( indexReady() ), SIGNAL( indexReady() ) );
-    connect( m_impl, SIGNAL( indexReady() ), SIGNAL( ready() ) );
-    connect( m_impl, SIGNAL( indexReady() ), SLOT( setIsReadyTrue() ) );
 
     Q_ASSERT( m_workerRW );
     m_workerRW.data()->start();
 
     while ( m_workerThreads.count() < m_maxConcurrentThreads )
     {
-        QWeakPointer< DatabaseWorkerThread > workerThread( new DatabaseWorkerThread( this, false ) );
+        QPointer< DatabaseWorkerThread > workerThread( new DatabaseWorkerThread( this, false ) );
         Q_ASSERT( workerThread );
         workerThread.data()->start();
         m_workerThreads << workerThread;
@@ -82,7 +147,7 @@ Database::~Database()
 
     if ( m_workerRW )
         m_workerRW.data()->quit();
-    foreach ( QWeakPointer< DatabaseWorkerThread > workerThread, m_workerThreads )
+    foreach ( QPointer< DatabaseWorkerThread > workerThread, m_workerThreads )
     {
         if ( workerThread && workerThread.data()->worker() )
             workerThread.data()->quit();
@@ -93,7 +158,7 @@ Database::~Database()
         m_workerRW.data()->wait( 60000 );
         delete m_workerRW.data();
     }
-    foreach ( QWeakPointer< DatabaseWorkerThread > workerThread, m_workerThreads )
+    foreach ( QPointer< DatabaseWorkerThread > workerThread, m_workerThreads )
     {
         if ( workerThread )
         {
@@ -117,9 +182,24 @@ Database::loadIndex()
 
 
 void
-Database::enqueue( const QList< QSharedPointer<DatabaseCommand> >& lc )
+Database::enqueue( const QList< Tomahawk::dbcmd_ptr >& lc )
 {
     Q_ASSERT( m_ready );
+    if ( !m_ready )
+    {
+        tDebug() << "Can't enqueue DatabaseCommand, Database is not ready yet!";
+        return;
+    }
+
+    foreach ( const Tomahawk::dbcmd_ptr& cmd, lc )
+    {
+        DatabaseCommandFactory* factory = commandFactoryByCommandName( cmd->commandname() );
+        if ( factory )
+        {
+            factory->notifyCreated( cmd );
+        }
+    }
+
     tDebug( LOGVERBOSE ) << "Enqueueing" << lc.count() << "commands to rw thread";
     if ( m_workerRW && m_workerRW.data()->worker() )
         m_workerRW.data()->worker().data()->enqueue( lc );
@@ -127,9 +207,21 @@ Database::enqueue( const QList< QSharedPointer<DatabaseCommand> >& lc )
 
 
 void
-Database::enqueue( const QSharedPointer<DatabaseCommand>& lc )
+Database::enqueue( const Tomahawk::dbcmd_ptr& lc )
 {
     Q_ASSERT( m_ready );
+    if ( !m_ready )
+    {
+        tDebug() << "Can't enqueue DatabaseCommand, Database is not ready yet!";
+        return;
+    }
+
+    DatabaseCommandFactory* factory = commandFactoryByCommandName( lc->commandname() );
+    if ( factory )
+    {
+        factory->notifyCreated( lc );
+    }
+
     if ( lc->doesMutates() )
     {
         tDebug( LOGVERBOSE ) << "Enqueueing command to rw thread:" << lc->commandname();
@@ -140,8 +232,8 @@ Database::enqueue( const QSharedPointer<DatabaseCommand>& lc )
     {
         // find thread for commandname with lowest amount of outstanding jobs and enqueue job
         int busyThreads = 0;
-        QWeakPointer< DatabaseWorkerThread > workerThread;
-        QWeakPointer< DatabaseWorker > happyWorker;
+        QPointer< DatabaseWorkerThread > workerThread;
+        QPointer< DatabaseWorker > happyWorker;
         for ( int i = 0; i < m_workerThreads.count(); i++ )
         {
             workerThread = m_workerThreads.at( i );
@@ -158,7 +250,7 @@ Database::enqueue( const QSharedPointer<DatabaseCommand>& lc )
                 happyWorker = workerThread.data()->worker();
         }
 
-//        tDebug( LOGVERBOSE ) << "Enqueueing command to thread:" << happyThread << busyThreads << lc->commandname();
+        tDebug( LOGVERBOSE ) << "Enqueueing command to thread:" << happyWorker << busyThreads << lc->commandname();
         Q_ASSERT( happyWorker );
         happyWorker.data()->enqueue( lc );
     }
@@ -180,3 +272,83 @@ Database::impl()
 
     return m_implHash.value( thread );
 }
+
+
+void
+Database::markAsReady()
+{
+    if ( m_ready )
+        return;
+
+    tLog() << Q_FUNC_INFO << "Database is ready now!";
+    m_ready = true;
+    emit ready();
+}
+
+
+void
+Database::registerCommand( DatabaseCommandFactory* commandFactory )
+{
+    // this is ugly, but we don't have virtual static methods in C++ :(
+    dbcmd_ptr command = commandFactory->newInstance();
+
+    const QString commandName = command->commandname();
+    const QString className = command->metaObject()->className();
+
+    tDebug() << "Registering command" << commandName << "from class" << className;
+
+    if( m_commandFactories.keys().contains( commandName ) )
+    {
+        tLog() << commandName << "is already in " << m_commandFactories.keys();
+    }
+    Q_ASSERT( !m_commandFactories.keys().contains( commandName ) );
+
+    m_commandNameClassNameMapping.insert( commandName, className );
+    m_commandFactories.insert( commandName, commandFactory );
+}
+
+
+DatabaseCommandFactory*
+Database::commandFactoryByClassName(const QString& className)
+{
+    const QString commandName = m_commandNameClassNameMapping.key( className );
+    return commandFactoryByCommandName( commandName );
+}
+
+
+DatabaseCommandFactory*
+Database::commandFactoryByCommandName(const QString& commandName )
+{
+    return m_commandFactories.value( commandName );
+}
+
+
+
+dbcmd_ptr
+Database::createCommandInstance( const QString& commandName )
+{
+    DatabaseCommandFactory* factory = commandFactoryByCommandName( commandName );
+
+    if( !factory )
+    {
+         tLog() << "Unknown database command" << commandName;
+         return dbcmd_ptr();
+    }
+
+    return factory->newInstance();
+}
+
+
+dbcmd_ptr
+Database::createCommandInstance(const QVariant& op, const source_ptr& source)
+{
+    const QString commandName = op.toMap().value( "command" ).toString();
+
+    dbcmd_ptr command = createCommandInstance( commandName );
+    command->setSource( source );
+    QJson::QObjectHelper::qvariant2qobject( op.toMap(), command.data() );
+    return command;
+}
+
+}
+

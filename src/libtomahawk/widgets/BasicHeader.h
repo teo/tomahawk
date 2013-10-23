@@ -20,7 +20,7 @@
 #ifndef BASICHEADER_H
 #define BASICHEADER_H
 
-#include <QtGui/QWidget>
+#include <QWidget>
 
 #include "DllMacro.h"
 
@@ -42,7 +42,7 @@ public slots:
     virtual void setPixmap( const QPixmap& p );
 
 protected:
-    void paintEvent( QPaintEvent* );
+    virtual void paintEvent( QPaintEvent* event );
 
     QLabel* m_imageLabel;
     ElidedLabel* m_captionLabel;
@@ -50,8 +50,6 @@ protected:
 
     QBoxLayout* m_mainLayout;
     QBoxLayout* m_verticalLayout;
-
-    static QPixmap* s_tiledHeader;
 };
 
 #endif // BASICHEADER_H

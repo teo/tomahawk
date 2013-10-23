@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi            <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac           <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,15 +21,18 @@
 #ifndef SCRIPTRESOLVER_H
 #define SCRIPTRESOLVER_H
 
-#include <QProcess>
+#include "Query.h"
+#include "Artist.h"
+#include "Album.h"
+#include "collection/Collection.h"
+#include "ExternalResolverGui.h"
+#include "DllMacro.h"
 
 #include <qjson/parser.h>
 #include <qjson/serializer.h>
 #include <qjson/qobjecthelper.h>
 
-#include "Query.h"
-#include "ExternalResolverGui.h"
-#include "DllMacro.h"
+#include <QProcess>
 
 class QWidget;
 
@@ -39,17 +43,18 @@ Q_OBJECT
 public:
     explicit ScriptResolver( const QString& exe );
     virtual ~ScriptResolver();
-    static ExternalResolver* factory( const QString& exe );
+    static ExternalResolver* factory( const QString& exe, const QStringList& );
 
-    virtual QString name() const            { return m_name; }
-    virtual QPixmap icon() const            { return m_icon; }
-    virtual unsigned int weight() const     { return m_weight; }
-    virtual unsigned int preference() const { return m_preference; }
-    virtual unsigned int timeout() const    { return m_timeout; }
+    virtual QString name() const              { return m_name; }
+    virtual QPixmap icon() const              { return m_icon; }
+    virtual unsigned int weight() const       { return m_weight; }
+    virtual unsigned int preference() const   { return m_preference; }
+    virtual unsigned int timeout() const      { return m_timeout; }
+    virtual Capabilities capabilities() const { return m_capabilities; }
 
     virtual void setIcon( const QPixmap& icon );
 
-    virtual QWidget* configUI() const;
+    virtual AccountConfigWidget* configUI() const;
     virtual void saveConfig();
 
     virtual ExternalResolver::ErrorState error() const;
@@ -59,6 +64,8 @@ public:
 
     void sendMessage( const QVariantMap& map );
 
+    virtual bool canParseUrl( const QString&, UrlType ) { return false; }
+
 signals:
     void terminated();
     void customMessage( const QString& msgType, const QVariantMap& msg );
@@ -67,6 +74,13 @@ public slots:
     virtual void stop();
     virtual void resolve( const Tomahawk::query_ptr& query );
     virtual void start();
+
+    // TODO: implement. Or not. Not really an issue while Spotify doesn't do browsable personal cloud storage.
+    virtual void artists( const Tomahawk::collection_ptr& ) {}
+    virtual void albums( const Tomahawk::collection_ptr&, const Tomahawk::artist_ptr& ) {}
+    virtual void tracks( const Tomahawk::collection_ptr&, const Tomahawk::album_ptr& ) {}
+    virtual void lookupUrl( const QString&  ) {}
+
 
 private slots:
     void readStderr();
@@ -87,7 +101,8 @@ private:
     QString m_name;
     QPixmap m_icon;
     unsigned int m_weight, m_preference, m_timeout, m_num_restarts;
-    QWeakPointer< QWidget > m_configWidget;
+    Capabilities m_capabilities;
+    QPointer< AccountConfigWidget > m_configWidget;
 
     quint32 m_msgsize;
     QByteArray m_msg;

@@ -23,16 +23,17 @@
 #include <QtPlugin>
 
 #include "audio/AudioEngine.h"
+#include "audio/AudioEngine.h"
 #include "infosystem/InfoSystemWorker.h"
-#include "Album.h"
-#include "Artist.h"
-#include "Result.h"
-#include "TomahawkSettings.h"
-#include "GlobalActionManager.h"
 #include "utils/Logger.h"
 #include "utils/TomahawkUtils.h"
-#include "audio/AudioEngine.h"
+#include "Album.h"
+#include "Artist.h"
+#include "GlobalActionManager.h"
+#include "PlaylistInterface.h"
+#include "Result.h"
 #include "Source.h"
+#include "TomahawkSettings.h"
 
 #include "MprisPlugin.h"
 #include "MprisPluginRootAdaptor.h"
@@ -84,7 +85,7 @@ MprisPlugin::init()
     Tomahawk::playlistinterface_ptr playlist = AudioEngine::instance()->playlist();
     if ( !playlist.isNull() )
     {
-        connect( playlist.data(), SIGNAL( trackCountChanged( unsigned int ) ),
+        connect( playlist.data(), SIGNAL( itemCountChanged( unsigned int ) ),
                                     SLOT( onTrackCountChanged( unsigned int ) ) );
     }
 
@@ -267,16 +268,16 @@ MprisPlugin::metadata() const
     if ( track )
     {
         metadataMap.insert( "mpris:trackid", QVariant::fromValue(QDBusObjectPath(QString( "/track/" ) + track->id().replace( "-", "" ))) );
-        metadataMap.insert( "mpris:length", static_cast<qlonglong>(track->duration()) * 1000000 );
-        metadataMap.insert( "xesam:album", track->album()->name() );
-        metadataMap.insert( "xesam:artist", QStringList( track->artist()->name() ) );
-        metadataMap.insert( "xesam:title", track->track() );
+        metadataMap.insert( "mpris:length", static_cast<qlonglong>(track->track()->duration()) * 1000000 );
+        metadataMap.insert( "xesam:album", track->track()->album() );
+        metadataMap.insert( "xesam:artist", QStringList( track->track()->artist() ) );
+        metadataMap.insert( "xesam:title", track->track()->track() );
 
         // Only return art if tempfile exists, and if its name contains the same "artist_album_tomahawk_cover.png"
         if ( !m_coverTempFile.isEmpty() )
         {
             QFile coverFile( m_coverTempFile );
-            if ( coverFile.exists() && coverFile.fileName().contains( track->artist()->name() + "_" + track->album()->name() + "_tomahawk_cover.png" ) )
+            if ( coverFile.exists() && coverFile.fileName().contains( track->track()->artist() + "_" + track->track()->album() + "_tomahawk_cover.png" ) )
                 metadataMap.insert( "mpris:artUrl", QString( QUrl::fromLocalFile( m_coverTempFile ).toEncoded() ) );
         }
     }
@@ -363,12 +364,9 @@ MprisPlugin::Next()
 
 
 void
-MprisPlugin::OpenUri( const QString& Uri )
+MprisPlugin::OpenUri( const QString& uri )
 {
-    if ( Uri.contains( "tomahawk://" ) )
-        GlobalActionManager::instance()->parseTomahawkLink( Uri );
-    else if ( Uri.contains( "spotify:" ) )
-        GlobalActionManager::instance()->openSpotifyLink( Uri );
+    GlobalActionManager::instance()->openUrl( uri );
 }
 
 
@@ -551,7 +549,7 @@ MprisPlugin::onPlaylistChanged( Tomahawk::playlistinterface_ptr playlist )
     disconnect( this, SLOT( onTrackCountChanged( unsigned int ) ) );
 
     if ( !playlist.isNull() )
-        connect( playlist.data(), SIGNAL( trackCountChanged( unsigned int ) ),
+        connect( playlist.data(), SIGNAL( itemCountChanged( unsigned int ) ),
             SLOT( onTrackCountChanged( unsigned int ) ) );
 
     // Notify relevant changes
@@ -568,7 +566,6 @@ MprisPlugin::onTrackCountChanged( unsigned int tracks )
     Q_UNUSED( tracks );
     notifyPropertyChanged( "org.mpris.MediaPlayer2.Player", "CanGoNext" );
     notifyPropertyChanged( "org.mpris.MediaPlayer2.Player", "CanGoPrevious" );
-
 }
 
 
@@ -589,7 +586,7 @@ MprisPlugin::notifyPropertyChanged( const QString& interface, const QString& pro
         "PropertiesChanged" );
     signal << interface;
     QVariantMap changedProps;
-    changedProps.insert(propertyName, property(propertyName.toAscii()));
+    changedProps.insert(propertyName, property(propertyName.toLatin1()));
     signal << changedProps;
     signal << QStringList();
     QDBusConnection::sessionBus().send(signal);

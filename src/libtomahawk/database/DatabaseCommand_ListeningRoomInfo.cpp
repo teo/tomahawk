@@ -22,14 +22,17 @@
 #include "network/Servent.h"
 #include "Source.h"
 #include "ListeningRoom.h"
+#include "utils/Logger.h"
 
 #ifndef ENABLE_HEADLESS
 #include "ViewManager.h"
 #endif
 
+#include <QDateTime>
 
-using namespace Tomahawk;
 
+namespace Tomahawk
+{
 
 DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( QObject* parent )
     : DatabaseCommandLoggable( parent )
@@ -159,4 +162,6 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
         room->reportDeleted( room );
     }
 }
+
+} //ns
 

@@ -4,6 +4,7 @@
  *             2011, Dominik Schmidt <dev@dominik-schmidt.de>
  *             2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013, Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -22,28 +23,38 @@
 #ifndef SIPPLUGIN_H
 #define SIPPLUGIN_H
 
-#include "SipInfo.h"
+#include "Typedefs.h"
 
 #include <QObject>
 #include <QString>
-#include <QNetworkProxy>
 
-#include "accounts/Account.h"
 #ifndef ENABLE_HEADLESS
     #include <QMenu>
 #endif
 
 #include "DllMacro.h"
 
-class SipPlugin;
+class SipInfo;
+namespace Tomahawk
+{
+    namespace Accounts
+    {
+        class Account;
+    }
+    class PeerInfo;
+}
 
 class DLLEXPORT SipPlugin : public QObject
 {
     Q_OBJECT
 
+friend class Tomahawk::PeerInfo;
+
 public:
+    enum AddContactOptions { NoOptions = 0, SendInvite = 1 };
+
     SipPlugin();
-    explicit SipPlugin( Tomahawk::Accounts::Account *account, QObject* parent = 0 );
+    explicit SipPlugin( Tomahawk::Accounts::Account* account, QObject* parent = 0 );
     virtual ~SipPlugin();
 
     // plugin id is "pluginfactoryname_someuniqueid".  get it from SipPluginFactory::generateId
@@ -59,7 +70,7 @@ public:
     virtual Tomahawk::Accounts::Account* account() const;
 
     // peer infos
-    virtual const QStringList peersOnline() const;
+    virtual const QList< Tomahawk::peerinfo_ptr > peersOnline() const;
 
 public slots:
     virtual void connectPlugin() = 0;
@@ -67,38 +78,31 @@ public slots:
     virtual void checkSettings() = 0;
     virtual void configurationChanged() = 0;
 
-    virtual void addContact( const QString &jid, const QString& msg = QString() ) = 0;
-    virtual void sendMsg( const QString& to, const SipInfo& info ) = 0;
+    virtual bool addContact( const QString& peerId, AddContactOptions options = NoOptions, const QString& msg = QString() ) = 0;
+
+    /**
+     * Send a list of SipInfos to all contacts.
+     */
+    virtual void sendSipInfos( const Tomahawk::peerinfo_ptr& receiver, const QList<SipInfo>& infos ) = 0;
 
 signals:
-    void peerOnline( const QString& );
-    void peerOffline( const QString& );
-    void msgReceived( const QString& from, const QString& msg );
-    void sipInfoReceived( const QString& peerId, const SipInfo& info );
-    void softwareVersionReceived( const QString& peerId, const QString& versionString );
+    void peerStatusChanged( const Tomahawk::peerinfo_ptr& );
+    void dataError( bool );
+    void inviteSentSuccess( const QString& inviteId );
+    void inviteSentFailure( const QString& inviteId );
 
 #ifndef ENABLE_HEADLESS
     // new data for own source
     void avatarReceived ( const QPixmap& avatar );
 
-    // new data for other sources;
-    void avatarReceived ( const QString& from,  const QPixmap& avatar);
-
     void addMenu( QMenu* menu );
     void removeMenu( QMenu* menu );
 #endif
 
-    void dataError( bool );
-
-private slots:
-    void onPeerOnline( const QString &peerId );
-    void onPeerOffline( const QString &peerId );
-
 protected:
-    Tomahawk::Accounts::Account *m_account;
+    void setAllPeersOffline();
 
-private:
-    QStringList m_peersOnline;
+    Tomahawk::Accounts::Account *m_account;
 };
 
 #endif

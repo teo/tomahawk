@@ -25,7 +25,8 @@
 
 #include "DllMacro.h"
 
-using namespace Tomahawk;
+namespace Tomahawk
+{
 
 class DLLEXPORT DatabaseCommand_SetPlaylistRevision : public DatabaseCommandLoggable
 {
@@ -72,32 +73,9 @@ public:
     virtual bool localOnly() const { return m_localOnly; }
     virtual bool groupable() const { return true; }
 
-    void setAddedentriesV( const QVariantList& vlist )
-    {
-        m_addedentries.clear();
-        foreach( const QVariant& v, vlist )
-        {
-            PlaylistEntry* pep = new PlaylistEntry;
-            QJson::QObjectHelper::qvariant2qobject( v.toMap(), pep );
+    void setAddedentriesV( const QVariantList& vlist );
 
-            if ( pep->isValid() )
-                m_addedentries << plentry_ptr( pep );
-        }
-    }
-
-    QVariantList addedentriesV() const
-    {
-        QVariantList vlist;
-        foreach( const plentry_ptr& pe, m_addedentries )
-        {
-            if ( !pe->isValid() )
-                continue;
-
-            QVariant v = QJson::QObjectHelper::qobject2qvariant( pe.data() );
-            vlist << v;
-        }
-        return vlist;
-    }
+    QVariantList addedentriesV() const;
 
     void setPlaylistguid( const QString& s ) { m_playlistguid = s; }
 
@@ -113,21 +91,20 @@ public:
     QVariantList orderedguids() const { return m_orderedguids; }
 
 protected:
+    bool m_failed;
     bool m_applied;
     QStringList m_previous_rev_orderedguids;
     QString m_playlistguid;
     QString m_newrev, m_oldrev;
     QMap<QString, Tomahawk::plentry_ptr> m_addedmap;
 
-    QString m_currentRevision;
-
 private:
-    QString hintFromQuery( const query_ptr& query ) const;
-
     QVariantList m_orderedguids;
     QList<Tomahawk::plentry_ptr> m_addedentries, m_entries;
 
     bool m_localOnly, m_metadataUpdate;
 };
+
+}
 
 #endif // DATABASECOMMAND_SETPLAYLISTREVISION_H

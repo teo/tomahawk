@@ -18,11 +18,15 @@
 
 #include "DatabaseCommand_LoadFiles.h"
 
-#include "DatabaseImpl.h"
-#include "Collection.h"
+#include "collection/Collection.h"
 #include "utils/Logger.h"
+
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
 #include "Source.h"
 
+namespace Tomahawk
+{
 
 DatabaseCommand_LoadFiles::DatabaseCommand_LoadFiles( unsigned int id, QObject* parent )
     : DatabaseCommand( parent )
@@ -56,4 +60,6 @@ DatabaseCommand_LoadFiles::exec( DatabaseImpl* dbi )
         emit result( resultList.first() );
     else
         emit results( resultList );
+}
+
 }

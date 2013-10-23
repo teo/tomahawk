@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,16 +20,21 @@
 
 #include "AlbumPlaylistInterface.h"
 
-#include "Artist.h"
+#include "utils/Logger.h"
+#include "collection/TracksRequest.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "database/DatabaseCommand_AllTracks.h"
+
+#include "Artist.h"
 #include "Pipeline.h"
 #include "Query.h"
+#include "Result.h"
 #include "Source.h"
 #include "SourceList.h"
 
-#include "utils/Logger.h"
+#include <QDateTime>
+
 
 using namespace Tomahawk;
 
@@ -36,42 +42,47 @@ using namespace Tomahawk;
 AlbumPlaylistInterface::AlbumPlaylistInterface( Tomahawk::Album* album, Tomahawk::ModelMode mode, const Tomahawk::collection_ptr& collection )
     : Tomahawk::PlaylistInterface()
     , m_currentItem( 0 )
-    , m_currentTrack( 0 )
     , m_infoSystemLoaded( false )
     , m_databaseLoaded( false )
     , m_mode( mode )
     , m_collection( collection )
-    , m_album( QWeakPointer< Tomahawk::Album >( album ) )
+    , m_album( QPointer< Tomahawk::Album >( album ) )
+    , m_lastQueryTimestamp( 0 )
 {
 }
 
 
 AlbumPlaylistInterface::~AlbumPlaylistInterface()
 {
-    m_album.clear();
+    m_album = 0;
 }
 
 
-Tomahawk::result_ptr
-AlbumPlaylistInterface::siblingItem( int itemsAway, bool readOnly )
+void
+AlbumPlaylistInterface::setCurrentIndex( qint64 index )
 {
-    Q_UNUSED( readOnly );
+    PlaylistInterface::setCurrentIndex( index );
 
-    int p = m_currentTrack;
+    m_currentItem = m_queries.at( index )->results().first();
+}
+
+
+qint64
+AlbumPlaylistInterface::siblingIndex( int itemsAway, qint64 rootIndex ) const
+{
+    qint64 p = m_currentIndex;
+    if ( rootIndex >= 0 )
+        p = rootIndex;
+
     p += itemsAway;
 
     if ( p < 0 )
-        return Tomahawk::result_ptr();
+        return -1;
 
     if ( p >= m_queries.count() )
-        return Tomahawk::result_ptr();
+        return -1;
 
-    if ( !m_queries.at( p )->numResults() )
-        return siblingItem( itemsAway + 1 );
-
-    m_currentTrack = p;
-    m_currentItem = m_queries.at( p )->results().first();
-    return m_currentItem;
+    return p;
 }
 
 
@@ -83,46 +94,26 @@ AlbumPlaylistInterface::currentItem() const
 
 
 bool
-AlbumPlaylistInterface::hasNextItem()
-{
-    int p = m_currentTrack;
-    p++;
-    if ( p < 0 || p >= m_queries.count() )
-        return false;
-
-    return true;
-}
-
-
-bool
-AlbumPlaylistInterface::hasPreviousItem()
-{
-    int p = m_currentTrack;
-    p--;
-    if ( p < 0 || p >= m_queries.count() )
-        return false;
-
-    return true;
-}
-
-
-bool
 AlbumPlaylistInterface::setCurrentTrack( unsigned int albumpos )
 {
-    albumpos--;
+    Q_UNUSED( albumpos );
+    Q_ASSERT( false );
+    return false;
+
+/*    albumpos--;
     if ( ( int ) albumpos >= m_queries.count() )
         return false;
 
     m_currentTrack = albumpos;
     m_currentItem = m_queries.at( albumpos )->results().first();
-    return true;
+    return true;*/
 }
 
 
 QList< Tomahawk::query_ptr >
-AlbumPlaylistInterface::tracks()
+AlbumPlaylistInterface::tracks() const
 {
-    if ( m_queries.isEmpty() && m_album )
+    if ( m_queries.isEmpty() && m_album && QDateTime::currentMSecsSinceEpoch() - m_lastQueryTimestamp > 10000 /*10s*/ )
     {
         if ( ( m_mode == Mixed || m_mode == InfoSystemMode ) && !m_infoSystemLoaded )
         {
@@ -145,17 +136,31 @@ AlbumPlaylistInterface::tracks()
             connect( Tomahawk::InfoSystem::InfoSystem::instance(),
                     SIGNAL( finished( QString ) ),
                     SLOT( infoSystemFinished( QString ) ) );
+
+            const_cast< int& >( m_lastQueryTimestamp ) = QDateTime::currentMSecsSinceEpoch();
         }
         else if ( m_mode == DatabaseMode && !m_databaseLoaded )
         {
-            DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_collection );
-            cmd->setAlbum( m_album );
-            cmd->setSortOrder( DatabaseCommand_AllTracks::AlbumPosition );
+            if ( m_collection.isNull() ) //we do a dbcmd directly, for the SuperCollection I guess?
+            {
+                DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_collection );
+                cmd->setAlbum( m_album->weakRef() );
+                cmd->setSortOrder( DatabaseCommand_AllTracks::AlbumPosition );
+                connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr>, QVariant ) ),
+                                SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ) );
+                Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
+            }
+            else
+            {
+                Tomahawk::album_ptr ap = Album::get( m_album->id(), m_album->name(), m_album->artist() );
 
-            connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr>, QVariant ) ),
-                            SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ) );
+                Tomahawk::TracksRequest* cmd = m_collection->requestTracks( ap );
+                connect( dynamic_cast< QObject* >( cmd ), SIGNAL( tracks( QList<Tomahawk::query_ptr> ) ),
+                         this, SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ), Qt::UniqueConnection );
 
-            Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+                cmd->enqueue();
+            }
+            const_cast< int& >( m_lastQueryTimestamp ) = QDateTime::currentMSecsSinceEpoch();
         }
     }
 
@@ -190,13 +195,15 @@ AlbumPlaylistInterface::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData re
 
                 foreach ( const QString& trackName, tracks )
                 {
-                    query_ptr query = Query::get( inputInfo[ "artist" ], trackName, inputInfo[ "album" ] );
-                    query->setAlbumPos( trackNo++ );
-                    ql << query;
+                    track_ptr track = Track::get( inputInfo[ "artist" ], trackName, inputInfo[ "album" ], 0, QString(), trackNo++ );
+                    query_ptr query = Query::get( track );
+                    if ( query )
+                        ql << query;
                 }
                 Pipeline::instance()->resolve( ql );
 
                 m_queries << ql;
+                checkQueries();
             }
 
             break;
@@ -230,15 +237,25 @@ AlbumPlaylistInterface::infoSystemFinished( const QString& infoId )
 
     if ( m_queries.isEmpty() && m_mode == Mixed )
     {
-        DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_collection );
-        cmd->setAlbum( m_album );
-        //this takes discnumber into account as well
-        cmd->setSortOrder( DatabaseCommand_AllTracks::AlbumPosition );
+        if ( m_collection.isNull() ) //we do a dbcmd directly, for the SuperCollection I guess?
+        {
+            DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_collection );
+            cmd->setAlbum( m_album->weakRef() );
+            cmd->setSortOrder( DatabaseCommand_AllTracks::AlbumPosition );
+            connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr>, QVariant ) ),
+                            SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ) );
+            Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
+        }
+        else
+        {
+            Tomahawk::album_ptr ap = Album::get( m_album->id(), m_album->name(), m_album->artist() );
 
-        connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr>, QVariant ) ),
-                        SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ) );
+            Tomahawk::TracksRequest* cmd = m_collection->requestTracks( ap );
+            connect( dynamic_cast< QObject* >( cmd ), SIGNAL( tracks( QList<Tomahawk::query_ptr> ) ),
+                     this, SLOT( onTracksLoaded( QList<Tomahawk::query_ptr> ) ), Qt::UniqueConnection );
 
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+            cmd->enqueue();
+        }
     }
     else
     {
@@ -259,6 +276,73 @@ AlbumPlaylistInterface::onTracksLoaded( const QList< query_ptr >& tracks )
     else
         m_queries << tracks;
 
+    checkQueries();
+
     m_finished = true;
     emit tracksLoaded( m_mode, m_collection );
+}
+
+
+qint64
+AlbumPlaylistInterface::indexOfResult( const Tomahawk::result_ptr& result ) const
+{
+    int i = 0;
+    foreach ( const Tomahawk::query_ptr& query, m_queries )
+    {
+        if ( query->numResults() && query->results().contains( result ) )
+            return i;
+
+        i++;
+    }
+
+    return -1;
+}
+
+
+qint64
+AlbumPlaylistInterface::indexOfQuery( const Tomahawk::query_ptr& query ) const
+{
+    int i = 0;
+    foreach ( const Tomahawk::query_ptr& q, m_queries )
+    {
+        if ( q->equals( query ) )
+            return i;
+
+        i++;
+    }
+
+    return -1;
+}
+
+
+query_ptr
+AlbumPlaylistInterface::queryAt( qint64 index ) const
+{
+    if ( index >= 0 && index < m_queries.count() )
+    {
+        return m_queries.at( index );
+    }
+
+    return Tomahawk::query_ptr();
+}
+
+
+result_ptr
+AlbumPlaylistInterface::resultAt( qint64 index ) const
+{
+    Tomahawk::query_ptr query = queryAt( index );
+    if ( query && query->numResults() )
+        return query->results().first();
+
+    return Tomahawk::result_ptr();
+}
+
+
+void
+AlbumPlaylistInterface::checkQueries()
+{
+    foreach ( const Tomahawk::query_ptr& query, m_queries )
+    {
+        connect( query.data(), SIGNAL( playableStateChanged( bool ) ), SLOT( onItemsChanged() ), Qt::UniqueConnection );
+    }
 }

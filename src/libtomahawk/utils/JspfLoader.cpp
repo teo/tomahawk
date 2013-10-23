@@ -19,18 +19,20 @@
 
 #include "JspfLoader.h"
 
+#include "utils/Logger.h"
+#include "utils/NetworkReply.h"
+#include "utils/TomahawkUtils.h"
+#include "utils/NetworkAccessManager.h"
+
+#include "Playlist.h"
+#include "SourceList.h"
+#include "Track.h"
+
 #include <QApplication>
 #include <QDomDocument>
 #include <QMessageBox>
 
 #include <qjson/parser.h>
-
-#include "SourceList.h"
-#include "Playlist.h"
-
-#include "utils/NetworkReply.h"
-#include "utils/TomahawkUtils.h"
-#include "utils/Logger.h"
 
 using namespace Tomahawk;
 
@@ -60,8 +62,8 @@ JSPFLoader::load( const QUrl& url )
 {
     QNetworkRequest request( url );
 
-    Q_ASSERT( TomahawkUtils::nam() != 0 );
-    NetworkReply* reply = new NetworkReply( TomahawkUtils::nam()->get( request ) );
+    Q_ASSERT( Tomahawk::Utils::nam() != 0 );
+    NetworkReply* reply = new NetworkReply( Tomahawk::Utils::nam()->get( request ) );
 
     connect( reply, SIGNAL( finished() ), SLOT( networkLoadFinished() ) );
     connect( reply, SIGNAL( error( QNetworkReply::NetworkError ) ), SLOT( networkError( QNetworkReply::NetworkError ) ) );
@@ -178,11 +180,11 @@ JSPFLoader::gotBody()
                 continue;
             }
 
-            query_ptr q = Tomahawk::Query::get( artist, track, album, uuid() );
-            if ( q.isNull() )
+            track_ptr t = Tomahawk::Track::get( artist, track, album, duration.toInt() / 1000 );
+            query_ptr q = Tomahawk::Query::get( t );
+            if ( !q )
                 continue;
 
-            q->setDuration( duration.toInt() / 1000 );
             if ( !url.isEmpty() )
             {
                 q->setResultHint( url );

@@ -26,9 +26,12 @@
 #include "DllMacro.h"
 
 #include <phonon/abstractmediastream.h>
+#include <QByteArray>
+#include <QNetworkReply>
+#include <QSharedPointer>
 
-class QNetworkReply;
 class QIODevice;
+class QTimer;
 
 namespace Tomahawk
 {
@@ -37,16 +40,23 @@ class DLLEXPORT QNR_IODeviceStream : public Phonon::AbstractMediaStream
 {
     Q_OBJECT
 public:
-    explicit QNR_IODeviceStream(QIODevice *ioDevice, QObject *parent = 0);
+    explicit QNR_IODeviceStream( const QSharedPointer<QNetworkReply>& reply, QObject *parent = 0 );
     ~QNR_IODeviceStream();
 
-    void reset();
-    void needData();
-    void seekStream(qint64);
+    virtual void enoughData();
+    virtual void needData();
+    virtual void reset();
+    virtual void seekStream( qint64 offset );
+
+private slots:
+    void moreData();
+    void readyRead();
 
 private:
-    QIODevice *_ioDevice;
-    QNetworkReply *_networkReply;
+    QByteArray m_data;
+    QSharedPointer<QNetworkReply> m_networkReply;
+    qint64 m_pos;
+    QTimer* m_timer;
 };
 
 } // namespace Tomahawk

@@ -1,7 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
- *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2012-2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,30 +19,37 @@
 
 #include "BasicHeader.h"
 
-#include <QtGui/QLabel>
-#include <QtGui/QPixmap>
-#include <QtGui/QPaintEvent>
-#include <QtGui/QPainter>
-#include <QtGui/QBoxLayout>
-
-#include "utils/TomahawkUtilsGui.h"
 #include "ElidedLabel.h"
+#include "utils/TomahawkStyle.h"
+#include "utils/TomahawkUtilsGui.h"
+#include "utils/Logger.h"
+
+#include <QLabel>
+#include <QPixmap>
+#include <QPaintEvent>
+#include <QPainter>
+#include <QBoxLayout>
+#include <QGraphicsDropShadowEffect>
 
 using namespace Tomahawk;
-
-QPixmap* BasicHeader::s_tiledHeader = 0;
 
 
 BasicHeader::BasicHeader( QWidget* parent )
     : QWidget( parent )
 {
+    QLayout* l = new QVBoxLayout;
+    TomahawkUtils::unmarginLayout( l );
+    setLayout( l );
+
     m_mainLayout = new QHBoxLayout;
-    setLayout( m_mainLayout );
 
     m_imageLabel = new QLabel( this );
-    m_imageLabel->setFixedSize( 64, 64 );
+    m_imageLabel->setMargin( 0 );
+    m_imageLabel->setFixedSize( TomahawkUtils::defaultIconSize().width() * 3,
+                                TomahawkUtils::defaultIconSize().height() * 3 );
+
     m_mainLayout->addWidget( m_imageLabel );
-    m_mainLayout->addSpacing( 16 );
+    m_mainLayout->addSpacing( TomahawkUtils::defaultIconSize().width() / 4 );
 
     m_verticalLayout = new QVBoxLayout;
     m_mainLayout->addLayout( m_verticalLayout );
@@ -53,49 +60,81 @@ BasicHeader::BasicHeader( QWidget* parent )
     m_verticalLayout->addWidget( m_descriptionLabel );
     m_verticalLayout->addStretch();
 
-    m_mainLayout->addSpacing( 16 );
+    m_mainLayout->addSpacing( TomahawkUtils::defaultIconSize().width() / 4 );
+    m_mainLayout->setStretchFactor( m_verticalLayout, 2 );
 
     QPalette pal = palette();
-    pal.setColor( QPalette::Foreground, Qt::white );
+    pal.setColor( QPalette::Foreground, TomahawkStyle::HEADER_TEXT );
+    pal.setBrush( backgroundRole(), TomahawkStyle::HEADER_BACKGROUND );
 
     m_captionLabel->setPalette( pal );
     m_descriptionLabel->setPalette( pal );
 
     QFont font = m_captionLabel->font();
-    font.setPointSize( TomahawkUtils::defaultFontSize() + 4 );
+    
+    int captionFontSize = TomahawkUtils::defaultFontSize() + 6;
+    font.setPointSize( captionFontSize );
     font.setBold( true );
+    font.setFamily( "Titillium Web" );
+    
     m_captionLabel->setFont( font );
     m_captionLabel->setElideMode( Qt::ElideRight );
     m_captionLabel->setAlignment( Qt::AlignTop | Qt::AlignLeft );
+    m_captionLabel->setMargin( 2 );
+    m_captionLabel->setMinimumHeight( QFontMetrics( font ).height() + 2 * m_captionLabel->margin() );
 
-    font.setPointSize( TomahawkUtils::defaultFontSize() + 1 );
+    int descriptionFontSize = TomahawkUtils::defaultFontSize() + 2;
+    font.setPointSize( descriptionFontSize );
     font.setBold( false );
     m_descriptionLabel->setFont( font );
+    m_descriptionLabel->setElideMode( Qt::ElideRight );
     m_descriptionLabel->setAlignment( Qt::AlignTop | Qt::AlignLeft );
+    m_descriptionLabel->setMargin( 2 );
+    m_descriptionLabel->setMinimumHeight( QFontMetrics( font ).height() + 2 * m_descriptionLabel->margin() );
+    m_descriptionLabel->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
 
-    m_captionLabel->setMargin( 2 );
-    m_descriptionLabel->setMargin( 1 );
+/*    QGraphicsDropShadowEffect* effect = new QGraphicsDropShadowEffect();
+    effect->setBlurRadius( 4 );
+    effect->setXOffset( 0 );
+    effect->setYOffset( 0 );
+    effect->setColor( Qt::white );
+    m_captionLabel->setGraphicsEffect( effect );*/
+//    m_descriptionLabel->setGraphicsEffect( effect );
 
-    TomahawkUtils::unmarginLayout( layout() );
-    layout()->setContentsMargins( 8, 4, 8, 4 );
+    QFrame* lineAbove = new QFrame( this );
+    lineAbove->setStyleSheet( QString( "QFrame { border: 1px solid %1; }" ).arg( TomahawkStyle::HEADER_BACKGROUND.name() ) );
+    lineAbove->setFrameShape( QFrame::HLine );
+    lineAbove->setMaximumHeight( 1 );
+    QFrame* lineBelow = new QFrame( this );
+    lineBelow->setStyleSheet( QString( "QFrame { border: 1px solid black; }" ) );
+    lineBelow->setFrameShape( QFrame::HLine );
+    lineBelow->setMaximumHeight( 1 );
+
+    l->addItem( m_mainLayout );
+    l->addWidget( lineAbove );
+    l->addWidget( lineBelow );
+
+    TomahawkUtils::unmarginLayout( m_mainLayout );
+
+    // on 72dpi, 1px = 1pt
+    // margins that should be around 8 4 8 4 on ~100dpi
+    int leftRightMargin = TomahawkUtils::defaultFontHeight() / 3;
+    int topBottomMargin = TomahawkUtils::defaultFontHeight() / 6;
+
+    m_mainLayout->setContentsMargins( leftRightMargin, topBottomMargin,
+                                      leftRightMargin, topBottomMargin );
     setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
-    setFixedHeight( 80 );
+    // top-margin + header + layout spacing + description + bottom-margin
+    setFixedHeight( qMax( topBottomMargin + m_captionLabel->height() + TomahawkUtils::defaultIconSize().height() / 4 + m_descriptionLabel->height() + topBottomMargin,
+                          topBottomMargin + m_imageLabel->height() + topBottomMargin ) );
 
-    pal = palette();
-    pal.setColor( QPalette::Window, QColor( "#454e59" ) );
-
-    setPalette( pal );
     setAutoFillBackground( true );
-
-    if ( !s_tiledHeader )
-        s_tiledHeader = new QPixmap( TomahawkUtils::createTiledPixmap( 2000, height(), QImage( RESPATH "images/playlist-header-tiled.png" ) ) );
+    setPalette( pal );
 }
 
 
 BasicHeader::~BasicHeader()
 {
-    delete s_tiledHeader;
-    s_tiledHeader = 0;
 }
 
 
@@ -121,20 +160,18 @@ BasicHeader::setPixmap( const QPixmap& p )
 
 
 void
-BasicHeader::paintEvent( QPaintEvent* )
+BasicHeader::paintEvent( QPaintEvent* event )
 {
-    if ( !s_tiledHeader || s_tiledHeader->isNull() || width() > s_tiledHeader->width() )
-    {
-        delete s_tiledHeader;
-        s_tiledHeader = new QPixmap( TomahawkUtils::createTiledPixmap( width(), height(), QImage( RESPATH "images/playlist-header-tiled.png" ) ) );
-    }
+    QWidget::paintEvent( event );
 
-    if ( !s_tiledHeader || s_tiledHeader->isNull() )
-        return;
+/*    QPainter painter( this );
+    painter.setRenderHint( QPainter::Antialiasing );
 
-    QPainter p( this );
+    QLinearGradient gradient( QPoint( 0, 0 ), QPoint( 0, 1 ) );
+    gradient.setCoordinateMode( QGradient::ObjectBoundingMode );
+    gradient.setColorAt( 0.0, TomahawkStyle::HEADER_LOWER );
+    gradient.setColorAt( 1.0, TomahawkStyle::HEADER_UPPER );
 
-    // Truncate bg pixmap and paint into bg
-    p.drawPixmap( rect(), *s_tiledHeader, rect() );
+    painter.setBrush( gradient );
+    painter.fillRect( rect(), gradient );*/
 }
-

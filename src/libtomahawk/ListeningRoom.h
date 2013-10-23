@@ -25,7 +25,7 @@
 #include <QVariant>
 #include <QSharedPointer>
 #include <QQueue>
-#include "qobjecthelper.h"
+#include <qjson/qobjecthelper.h>
 
 #include "Typedefs.h"
 #include "DllMacro.h"

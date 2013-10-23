@@ -282,7 +282,7 @@ ListeningRoomWidget::onListenersChanged()
             // I need to ask the DatabaseImpl directly because Source::userName() answers just
             // "My Collection" instead of the dbid if the source is local.
             // This is probably a FIXME.
-            if ( lr->listenerIds().contains( Database::instance()->impl()->dbid() ) )
+            if ( lr->listenerIds().contains( Tomahawk::Database::instance()->impl()->dbid() ) )
             {
                 m_header->setButtonState( ListeningRoomHeader::Leave );
             }
@@ -333,7 +333,8 @@ ListeningRoomWidget::onDataChanged( const QModelIndex& topLeft, const QModelInde
         m_currentRow = ( m_model->currentItem() == QModelIndex() ) ? -1 : m_model->currentItem().row();
         m_view->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowAfter, m_currentRow );
         m_historyView->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowBefore, m_currentRow );
-        m_currentTrackWidget->setItem( m_model->currentItem() );
+        if ( m_currentRow > -1 )
+            m_currentTrackWidget->setItem( m_model->currentItem() );
     }
 }
 
@@ -353,7 +354,7 @@ ListeningRoomWidget::onHistoryItemActivated( const QModelIndex& idx )
             const Tomahawk::lrentry_ptr& lre = item->lrentry();
             entries.append( lre );
             m_model->insertEntriesFromView( entries, m_currentRow + 1 );
-            playlistInterface()->nextItem();
+            playlistInterface()->nextResult();
         }
     }
     else

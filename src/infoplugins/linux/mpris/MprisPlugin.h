@@ -20,9 +20,18 @@
 #ifndef MPRISPLUGIN_H
 #define MPRISPLUGIN_H
 
+#include "Query.h"
+#include "Source.h"
 #include "audio/AudioEngine.h"
 #include "infosystem/InfoSystem.h"
-#include "infoplugins/InfoPluginDllMacro.h"
+
+#include "../../InfoPluginDllMacro.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "PlaylistInterface.h"
+#endif
+
 
 #include <QObject>
 #include <QVariant>
@@ -36,6 +45,7 @@ namespace InfoSystem
 
 class INFOPLUGINDLLEXPORT MprisPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 
@@ -143,7 +153,7 @@ public slots:
 
 protected slots:
     virtual void init();
-    
+
     virtual void getInfo( Tomahawk::InfoSystem::InfoRequestData requestData )
     {
         Q_UNUSED( requestData );

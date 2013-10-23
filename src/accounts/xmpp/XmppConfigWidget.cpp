@@ -23,7 +23,9 @@
 
 
 #include "accounts/AccountManager.h"
+#include "accounts/ConfigStorage.h"
 #include "utils/Logger.h"
+#include "utils/TomahawkUtilsGui.h"
 
 #include <QMessageBox>
 
@@ -33,10 +35,11 @@ namespace Tomahawk
 namespace Accounts
 {
 
-XmppConfigWidget::XmppConfigWidget( XmppAccount* account, QWidget *parent ) :
-    QWidget( parent ),
-    m_ui( new Ui::XmppConfigWidget ),
-    m_account( account )
+XmppConfigWidget::XmppConfigWidget( XmppAccount* account, QWidget *parent )
+    : AccountConfigWidget( parent )
+    , m_ui( new Ui::XmppConfigWidget )
+    , m_account( account )
+    , m_disableChecksForGoogle( false )
 {
     m_ui->setupUi( this );
 
@@ -47,8 +50,41 @@ XmppConfigWidget::XmppConfigWidget( XmppAccount* account, QWidget *parent ) :
     m_ui->xmppPublishTracksCheckbox->setChecked( account->configuration().contains( "publishtracks" ) ? account->configuration()[ "publishtracks" ].toBool() : true);
     m_ui->xmppEnforceSecureCheckbox->setChecked( account->configuration().contains( "enforcesecure" ) ? account->configuration()[ "enforcesecure" ].toBool() : false);
     m_ui->jidExistsLabel->hide();
+    m_ui->xmppConfigFrame->hide();
+
 
     connect( m_ui->xmppUsername, SIGNAL( textChanged( QString ) ), SLOT( onCheckJidExists( QString ) ) );
+
+    if ( m_account->configuration()[ "read-only" ].toBool() )
+    {
+        m_ui->xmppUsername->setEnabled( false );
+        m_ui->xmppPassword->setEnabled( false );
+        m_ui->xmppServer->setEnabled( false );
+        m_ui->xmppPort->setEnabled( false );
+        m_ui->xmppEnforceSecureCheckbox->setEnabled( false );
+        m_ui->xmppPublishTracksCheckbox->setEnabled( false );
+    }
+
+    ConfigStorage* cs = AccountManager::instance()->configStorageForAccount( m_account->accountId() );
+    if ( cs->id() != "localconfigstorage" )
+    {
+        m_ui->xmppBlurb->hide();
+        m_ui->xmppConfigFrame->show();
+        m_ui->xmppConfigLabel->setText( tr( "Account provided by %1." )
+            .arg( cs->prettyName() ) );
+        m_ui->xmppConfigIcon->setPixmap( cs->icon().scaled( TomahawkUtils::defaultIconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation ) );
+        m_ui->xmppConfigLaunchDialog->setIcon( TomahawkUtils::defaultPixmap( TomahawkUtils::Configure ) );
+        connect( m_ui->xmppConfigLaunchDialog, SIGNAL( clicked() ),
+                 this, SLOT( launchExternalConfigDialog() ) );
+    }
+}
+
+
+void
+XmppConfigWidget::launchExternalConfigDialog()
+{
+    ConfigStorage* cs = AccountManager::instance()->configStorageForAccount( m_account->accountId() );
+    cs->execConfigDialog( this );
 }
 
 
@@ -80,7 +116,7 @@ XmppConfigWidget::saveConfig()
 
 
 void
-XmppConfigWidget::onCheckJidExists( QString jid )
+XmppConfigWidget::onCheckJidExists( const QString &jid )
 {
     QList< Tomahawk::Accounts::Account* > accounts = Tomahawk::Accounts::AccountManager::instance()->accounts( Tomahawk::Accounts::SipType );
     foreach( Tomahawk::Accounts::Account* account, accounts )
@@ -106,6 +142,35 @@ XmppConfigWidget::onCheckJidExists( QString jid )
     }
     m_ui->jidExistsLabel->hide();
     emit dataError( false );
+}
+
+
+void
+XmppConfigWidget::checkForErrors()
+{
+    const QString username = m_ui->xmppUsername->text().trimmed();
+    const QStringList usernameParts = username.split( '@', QString::KeepEmptyParts );
+
+    QString errorMessage;
+    if( username.isEmpty() )
+    {
+        errorMessage.append( tr( "You forgot to enter your username!" ) );
+    }
+
+    //HACK: don't check for xmpp id being an "email address"
+    if( !m_disableChecksForGoogle )
+    {
+        if( usernameParts.count() != 2 || usernameParts.at( 0 ).isEmpty() || ( usernameParts.count() == 2 && usernameParts.at( 1 ).isEmpty() ) )
+        {
+            errorMessage.append( tr( "Your Xmpp Id should look like an email address" ) );
+        }
+    }
+
+    if( !errorMessage.isEmpty() )
+    {
+        errorMessage.append( tr( "\n\nExample:\nusername@jabber.org" ) );
+        m_errors.append( errorMessage );
+    }
 }
 
 

@@ -55,7 +55,7 @@ public:
     static bool handlesUrl( const QString& url );
 
 public slots:
-    void lookupFinished();
+    void lookupFinished( const QUrl& url );
 
 signals:
     void urls( const QStringList& urls );
@@ -66,7 +66,6 @@ private:
 
 #ifndef ENABLE_HEADLESS
     static QPixmap pixmap();
-    static QPixmap* s_pixmap;
 #endif
 
     QStringList m_links;

@@ -18,19 +18,16 @@
 
 #include "DatabaseCommand_CreateDynamicPlaylist.h"
 
-#include "DatabaseImpl.h"
-#include "TomahawkSqlQuery.h"
 #include "playlist/dynamic/DynamicPlaylist.h"
 #include "playlist/dynamic/DynamicControl.h"
 #include "playlist/dynamic/GeneratorInterface.h"
-
-#include "Source.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
 
-#ifndef ENABLE_HEADLESS
-    #include "ViewManager.h"
-#endif
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
+#include "SourceList.h"
+#include "TomahawkSqlQuery.h"
 
 #include <QSqlQuery>
 #include <QSqlDriver>
@@ -102,7 +99,7 @@ void
 DatabaseCommand_CreateDynamicPlaylist::postCommitHook()
 {
     qDebug() << Q_FUNC_INFO;
-    if ( source().isNull() || source()->collection().isNull() )
+    if ( source().isNull() || source()->dbCollection().isNull() )
     {
         qDebug() << "Source has gone offline, not emitting to GUI.";
         return;
@@ -113,15 +110,14 @@ DatabaseCommand_CreateDynamicPlaylist::postCommitHook()
 
     qDebug() << Q_FUNC_INFO << "..reporting..";
     if( m_playlist.isNull() ) {
-        source_ptr src = source();
-#ifndef ENABLE_HEADLESS
-        QMetaObject::invokeMethod( ViewManager::instance(),
+        QMetaObject::invokeMethod( SourceList::instance(),
                                    "createDynamicPlaylist",
                                    Qt::BlockingQueuedConnection,
-                                   QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
+                                   QGenericArgument( "Tomahawk::source_ptr", (const void*)&source() ),
                                    Q_ARG( QVariant, m_v ) );
-#endif
-    } else {
+    }
+    else
+    {
         m_playlist->reportCreated( m_playlist );
     }
     if( source()->isLocal() )

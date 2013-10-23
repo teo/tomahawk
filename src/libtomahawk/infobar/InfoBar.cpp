@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2012,      Leo Franchi            <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac           <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,15 +27,16 @@
 #include <QPaintEvent>
 #include <QPainter>
 
+#include "Source.h"
 #include "ViewManager.h"
 #include "thirdparty/Qocoa/qsearchfield.h"
+#include "widgets/QueryLabel.h"
+#include "utils/TomahawkStyle.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
-#include "widgets/QueryLabel.h"
-#include "Source.h"
 
 #define ANIMATION_TIME 400
-#define IMAGE_HEIGHT 64
+#define IMAGE_HEIGHT 48
 
 using namespace Tomahawk;
 
@@ -45,60 +47,92 @@ InfoBar::InfoBar( QWidget* parent )
     , m_queryLabel( 0 )
 {
     ui->setupUi( this );
-    TomahawkUtils::unmarginLayout( layout() );
-    layout()->setContentsMargins( 8, 4, 8, 4 );
 
-    QFont boldFont = ui->captionLabel->font();
-    boldFont.setPointSize( TomahawkUtils::defaultFontSize() + 4 );
-    boldFont.setBold( true );
-    ui->captionLabel->setFont( boldFont );
+    ui->imageLabel->setMargin( 0 );
+    ui->imageLabel->setFixedSize( TomahawkUtils::defaultIconSize().width() * 3,
+                                  TomahawkUtils::defaultIconSize().height() * 3 );
+
+    ui->horizontalLayout->insertSpacing( 1, TomahawkUtils::defaultIconSize().width() / 4 );
+    ui->horizontalLayout->setStretchFactor( ui->verticalLayout, 2 );
+
+    QFont font = ui->captionLabel->font();
+
+    int captionFontSize = TomahawkUtils::defaultFontSize() + 6;
+    font.setPointSize( captionFontSize );
+    font.setBold( true );
+    font.setFamily( "Titillium Web" );
+
+    ui->captionLabel->setFont( font );
     ui->captionLabel->setElideMode( Qt::ElideRight );
+    ui->captionLabel->setAlignment( Qt::AlignTop | Qt::AlignLeft );
+    ui->captionLabel->setMargin( 2 );
+    ui->captionLabel->setMinimumHeight( QFontMetrics( font ).height() + 2 * ui->captionLabel->margin() );
 
-    QFontMetrics boldFontMetrics( boldFont );
-    boldFont.setPointSize( TomahawkUtils::defaultFontSize() + 1 );
-    boldFont.setBold( false );
-    ui->descriptionLabel->setFont( boldFont );
+    int descriptionFontSize = TomahawkUtils::defaultFontSize() + 2;
+    font.setPointSize( descriptionFontSize );
+    font.setBold( false );
+    ui->descriptionLabel->setFont( font );
+    ui->descriptionLabel->setElideMode( Qt::ElideRight );
+    ui->descriptionLabel->setAlignment( Qt::AlignTop | Qt::AlignLeft );
+    ui->descriptionLabel->setMargin( 2 );
+    ui->descriptionLabel->setMinimumHeight( QFontMetrics( font ).height() + 2 * ui->descriptionLabel->margin() );
 
-    boldFontMetrics = QFontMetrics( boldFont );
     QFont regFont = ui->longDescriptionLabel->font();
     regFont.setPointSize( TomahawkUtils::defaultFontSize() );
     ui->longDescriptionLabel->setFont( regFont );
+    ui->longDescriptionLabel->setMargin( 4 );
 
     m_whitePal = ui->captionLabel->palette();
-    m_whitePal.setColor( QPalette::Foreground, Qt::white );
+    m_whitePal.setColor( QPalette::Foreground, TomahawkStyle::HEADER_TEXT );
+    m_whitePal.setBrush( backgroundRole(), TomahawkStyle::HEADER_BACKGROUND );
 
     ui->captionLabel->setPalette( m_whitePal );
     ui->descriptionLabel->setPalette( m_whitePal );
     ui->longDescriptionLabel->setPalette( m_whitePal );
-
-    ui->captionLabel->setMargin( 2 );
-    ui->descriptionLabel->setMargin( 1 );
-    ui->longDescriptionLabel->setMargin( 4 );
 
     ui->captionLabel->setText( QString() );
     ui->descriptionLabel->setText( QString() );
     ui->longDescriptionLabel->setText( QString() );
     ui->imageLabel->setText( QString() );
 
+    ui->lineAbove->setStyleSheet( QString( "QFrame { border: 1px solid %1; }" ).arg( TomahawkStyle::HEADER_BACKGROUND.name() ) );
+    ui->lineAbove->setFrameShape( QFrame::HLine );
+    ui->lineBelow->setStyleSheet( QString( "QFrame { border: 1px solid black; }" ) );
+    ui->lineBelow->setFrameShape( QFrame::HLine );
+
     m_queryLabel = new QueryLabel( this );
     m_queryLabel->setType( QueryLabel::Artist );
     m_queryLabel->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
-    m_queryLabel->setTextPen( palette().brightText().color() );
-    m_queryLabel->setFont( boldFont );
+    m_queryLabel->setFont( font );
     m_queryLabel->hide();
     connect( m_queryLabel, SIGNAL( clickedArtist() ), this, SLOT( artistClicked() ) );
 
     m_searchWidget = new QSearchField( this );
     m_searchWidget->setPlaceholderText( tr( "Filter..." ) );
-    m_searchWidget->setMinimumWidth( 180 );
+    m_searchWidget->setMinimumWidth( 220 );
     connect( m_searchWidget, SIGNAL( textChanged( QString ) ), this, SLOT( onFilterEdited() ) );
 
     ui->horizontalLayout->addWidget( m_searchWidget );
 
-    setAutoFillBackground( true );
+    QPalette pal = m_whitePal;
+    pal.setBrush( backgroundRole(), TomahawkStyle::HEADER_BACKGROUND );
 
-    setFixedHeight( 80 );
-    m_bgTile = TomahawkUtils::createTiledPixmap( 2000, height(), QImage( RESPATH "images/playlist-header-tiled.png" ) );
+    TomahawkUtils::unmarginLayout( ui->horizontalLayout );
+
+    // on 72dpi, 1px = 1pt
+    // margins that should be around 8 4 8 4 on ~100dpi
+    int leftRightMargin = TomahawkUtils::defaultFontHeight() / 3;
+    int topBottomMargin = TomahawkUtils::defaultFontHeight() / 6;
+
+    ui->horizontalLayout->setContentsMargins( leftRightMargin, topBottomMargin,
+                                              leftRightMargin, topBottomMargin );
+    setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+    // top-margin + header + layout spacing + description + bottom-margin
+    setFixedHeight( qMax( topBottomMargin + ui->captionLabel->height() + TomahawkUtils::defaultIconSize().height() / 4 + ui->descriptionLabel->height() + topBottomMargin,
+                          topBottomMargin + ui->imageLabel->height() + topBottomMargin ) );
+
+    setAutoFillBackground( true );
+    setPalette( pal );
 
     connect( ViewManager::instance(), SIGNAL( filterAvailable( bool ) ), SLOT( setFilterAvailable( bool ) ) );
 }
@@ -186,7 +220,7 @@ InfoBar::setLongDescription( const QString& s )
 void
 InfoBar::setPixmap( const QPixmap& p )
 {
-    ui->imageLabel->setPixmap( p.scaledToHeight( IMAGE_HEIGHT, Qt::SmoothTransformation ) );
+    ui->imageLabel->setPixmap( p.scaledToHeight( ui->imageLabel->height(), Qt::SmoothTransformation ) );
 }
 
 
@@ -282,29 +316,30 @@ InfoBar::onFilterEdited()
     emit filterTextChanged( m_searchWidget->text() );
 }
 
+
 void
-InfoBar::paintEvent( QPaintEvent* e )
+InfoBar::paintEvent( QPaintEvent* event )
 {
-    Q_UNUSED( e );
+    QWidget::paintEvent( event );
 
-    if ( m_bgTile.isNull() || width() > m_bgTile.width() )
-        m_bgTile = TomahawkUtils::createTiledPixmap( width(), height(), QImage( RESPATH "images/playlist-header-tiled.png" ) );
+/*    QPainter painter( this );
+    painter.setRenderHint( QPainter::Antialiasing );
 
-    if ( m_bgTile.isNull() )
-        return;
+    QLinearGradient gradient( QPoint( 0, 0 ), QPoint( 0, 1 ) );
+    gradient.setCoordinateMode( QGradient::ObjectBoundingMode );
+    gradient.setColorAt( 0.0, TomahawkStyle::HEADER_LOWER );
+    gradient.setColorAt( 1.0, TomahawkStyle::HEADER_UPPER );
 
-    QPainter p( this );
-
-    // Truncate bg pixmap and paint into bg
-    p.drawPixmap( rect(), m_bgTile, rect() );
+    painter.setBrush( gradient );
+    painter.fillRect( rect(), gradient );*/
 }
 
 
 void
-InfoBar::changeEvent( QEvent* e )
+InfoBar::changeEvent( QEvent* event )
 {
-    QWidget::changeEvent( e );
-    switch ( e->type() )
+    QWidget::changeEvent( event );
+    switch ( event->type() )
     {
         case QEvent::LanguageChange:
 //            ui->retranslateUi( this );

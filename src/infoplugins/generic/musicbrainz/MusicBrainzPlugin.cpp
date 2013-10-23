@@ -19,12 +19,12 @@
 
 #include "MusicBrainzPlugin.h"
 
-#include <QNetworkReply>
-#include <QDomDocument>
-#include <QtPlugin>
-
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
+#include "utils/NetworkAccessManager.h"
+
+#include <QNetworkReply>
+#include <QDomDocument>
 
 using namespace Tomahawk::InfoSystem;
 
@@ -65,7 +65,7 @@ MusicBrainzPlugin::getInfo( Tomahawk::InfoSystem::InfoRequestData requestData )
             Tomahawk::InfoSystem::InfoStringHash criteria;
             criteria["artist"] = hash["artist"];
 
-            emit getCachedInfo( criteria, 2419200000, requestData );
+            emit getCachedInfo( criteria, Q_INT64_C(2419200000), requestData );
             break;
         }
 
@@ -75,7 +75,7 @@ MusicBrainzPlugin::getInfo( Tomahawk::InfoSystem::InfoRequestData requestData )
             criteria["artist"] = hash["artist"];
             criteria["album"] = hash["album"];
 
-            emit getCachedInfo( criteria, 2419200000, requestData );
+            emit getCachedInfo( criteria, Q_INT64_C(2419200000), requestData );
 
             break;
         }
@@ -106,10 +106,12 @@ MusicBrainzPlugin::notInCacheSlot( InfoStringHash criteria, InfoRequestData requ
 
             QString requestString( "http://musicbrainz.org/ws/2/release-group" );
             QUrl url( requestString );
-            url.addQueryItem( "query", querySt );
-            url.addQueryItem( "limit", "100" );
+
+            TomahawkUtils::urlAddQueryItem( url, "query", querySt );
+            TomahawkUtils::urlAddQueryItem( url, "limit", "100" );
+
             tDebug() << Q_FUNC_INFO << url.toString();
-            QNetworkReply* reply = TomahawkUtils::nam()->get( QNetworkRequest( url ) );
+            QNetworkReply* reply = Tomahawk::Utils::nam()->get( QNetworkRequest( url ) );
             reply->setProperty( "requestData", QVariant::fromValue< Tomahawk::InfoSystem::InfoRequestData >( requestData ) );
 
             connect( reply, SIGNAL( finished() ), SLOT( gotReleaseGroupsSlot() ) );
@@ -124,10 +126,12 @@ MusicBrainzPlugin::notInCacheSlot( InfoStringHash criteria, InfoRequestData requ
 
             QString requestString( "http://musicbrainz.org/ws/2/release" );
             QUrl url( requestString );
-            url.addQueryItem( "query", querySt );
-            url.addQueryItem( "limit", "100" );
+
+            TomahawkUtils::urlAddQueryItem( url, "query", querySt );
+            TomahawkUtils::urlAddQueryItem( url, "limit", "100" );
+
             tDebug() << Q_FUNC_INFO << url.toString();
-            QNetworkReply* reply = TomahawkUtils::nam()->get( QNetworkRequest( url ) );
+            QNetworkReply* reply = Tomahawk::Utils::nam()->get( QNetworkRequest( url ) );
             reply->setProperty( "requestData", QVariant::fromValue< Tomahawk::InfoSystem::InfoRequestData >( requestData ) );
 
             connect( reply, SIGNAL( finished() ), SLOT( gotReleasesSlot() ) );
@@ -176,7 +180,7 @@ MusicBrainzPlugin::gotReleaseGroupsSlot()
                 QString groupTitle = releaseGroupsNL.at(i).firstChildElement("title").text();
                 QString a = releaseGroupsNL.at(i).firstChildElement( "artist-credit" ).firstChildElement( "name-credit" ).firstChildElement( "artist" ).firstChildElement( "name" ).text();
                 QString id = releaseGroupsNL.at(i).firstChildElement( "artist-credit" ).firstChildElement( "name-credit" ).firstChildElement( "artist" ).attribute( "id" );
-                if ( !albums.contains( groupTitle ) && hash["artist"] == a && id == popularId )
+                if ( !albums.contains( groupTitle ) && id == popularId && a.normalized( QString::NormalizationForm_KC ) == hash["artist"].normalized( QString::NormalizationForm_KC ) )
                 {
                     albums << groupTitle;
                     tDebug() << Q_FUNC_INFO << groupTitle;
@@ -190,7 +194,7 @@ MusicBrainzPlugin::gotReleaseGroupsSlot()
             Tomahawk::InfoSystem::InfoStringHash origData = requestData.input.value< Tomahawk::InfoSystem::InfoStringHash>();
             Tomahawk::InfoSystem::InfoStringHash criteria;
             criteria["artist"] = origData["artist"];
-            emit updateCache( criteria, 0, requestData.type, returnedData );
+            emit updateCache( criteria, Q_INT64_C(0), requestData.type, returnedData );
             break;
         }
 
@@ -230,10 +234,10 @@ MusicBrainzPlugin::gotReleasesSlot()
 
             QString requestString = QString( "http://musicbrainz.org/ws/2/release/%1" ).arg( release_id );
             QUrl url( requestString );
-            url.addQueryItem( "inc", "recordings" );
+            TomahawkUtils::urlAddQueryItem( url, "inc", "recordings" );
             tDebug() << Q_FUNC_INFO << url.toString();
 
-            QNetworkReply* newReply = TomahawkUtils::nam()->get( QNetworkRequest( url ) );
+            QNetworkReply* newReply = Tomahawk::Utils::nam()->get( QNetworkRequest( url ) );
             newReply->setProperty( "requestData", oldReply->property( "requestData" ) );
             connect( newReply, SIGNAL( finished() ), SLOT( gotRecordingsSlot() ) );
 
@@ -273,7 +277,11 @@ MusicBrainzPlugin::gotRecordingsSlot()
     for ( int i = 0; i < tracksNL.count(); i++ )
     {
         QString track = tracksNL.at(i).firstChildElement( "recording" ).firstChildElement( "title" ).text();
-        tracksSL << track;
+        if ( !tracksSL.contains( track ) )
+        {
+            tracksSL << track;
+            tDebug(LOGVERBOSE) << Q_FUNC_INFO << track;
+        }
     }
 
     Tomahawk::InfoSystem::InfoRequestData requestData = reply->property( "requestData" ).value< Tomahawk::InfoSystem::InfoRequestData >();
@@ -285,7 +293,7 @@ MusicBrainzPlugin::gotRecordingsSlot()
     Tomahawk::InfoSystem::InfoStringHash criteria;
     criteria["artist"] = origData["artist"];
     criteria["album"] = origData["album"];
-    emit updateCache( criteria, 0, requestData.type, returnedData );
+    emit updateCache( criteria, Q_INT64_C(0), requestData.type, returnedData );
 }
 
 Q_EXPORT_PLUGIN2( Tomahawk::InfoSystem::InfoPlugin, Tomahawk::InfoSystem::MusicBrainzPlugin )

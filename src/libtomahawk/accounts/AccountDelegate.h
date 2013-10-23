@@ -23,6 +23,14 @@
 #include <QStyledItemDelegate>
 #include "accounts/AccountModel.h"
 
+
+#ifdef Q_OS_MAC
+#define ACCOUNT_DELEGATE_ROW_HEIGHT_MULTIPLIER 4.9
+#else
+#define ACCOUNT_DELEGATE_ROW_HEIGHT_MULTIPLIER 5.7
+#endif
+
+
 class AnimatedSpinner;
 
 namespace Tomahawk
@@ -45,7 +53,6 @@ public slots:
     void startInstalling( const QPersistentModelIndex& idx );
     void doneInstalling ( const QPersistentModelIndex& idx );
     void errorInstalling ( const QPersistentModelIndex& idx );
-
 
     void doUpdateIndex( const QPersistentModelIndex& idx );
 
@@ -71,7 +78,6 @@ private:
 
     QRect checkRectForIndex( const QStyleOptionViewItem &option, const QModelIndex &idx ) const;
 
-    QPixmap m_offlineIcon, m_onlineIcon, m_defaultCover, m_onHoverStar, m_ratingStarPositive, m_ratingStarNegative, m_removeIcon;
     int m_hoveringOver;
     QPersistentModelIndex m_hoveringItem, m_configPressed;
     mutable QHash< QPersistentModelIndex, QRect > m_cachedButtonRects;
@@ -86,6 +92,7 @@ private:
 };
 
 }
+
 }
 
 #endif // ACCOUNTDELEGATE_H

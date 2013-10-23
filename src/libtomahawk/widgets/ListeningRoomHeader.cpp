@@ -91,7 +91,7 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
         else
         {
             QLabel* avatar = new QLabel( m_listenersWidget );
-            QPixmap pxmp = s->avatar( Tomahawk::Source::FancyStyle );
+            QPixmap pxmp = s->avatar( TomahawkUtils::RoundedCorners );
             if ( pxmp.isNull() )
             {
                 if ( m_defaultAvatar.isNull() )

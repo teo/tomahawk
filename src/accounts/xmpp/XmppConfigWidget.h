@@ -21,7 +21,7 @@
 #define JABBERACCOUNTCONFIGWIDGET_H
 
 #include "accounts/AccountDllMacro.h"
-
+#include "accounts/AccountConfigWidget.h"
 #include <QWidget>
 
 namespace Ui
@@ -39,7 +39,7 @@ class XmppAccount;
 class GoogleWrapper;
 
 
-class ACCOUNTDLLEXPORT XmppConfigWidget : public QWidget
+class ACCOUNTDLLEXPORT XmppConfigWidget : public AccountConfigWidget
 {
     Q_OBJECT
 
@@ -49,16 +49,22 @@ public:
 
     void saveConfig();
 
+    virtual void checkForErrors();
+
 signals:
     void dataError( bool exists );
 
 private slots:
-    void onCheckJidExists( QString jid );
+    void onCheckJidExists( const QString& jid );
+    void launchExternalConfigDialog();
 
 private:
     Ui::XmppConfigWidget *m_ui;
     XmppAccount *m_account;
 
+    bool m_serverWasEditedByUser;
+
+    bool m_disableChecksForGoogle;
     friend class GoogleWrapper; // So google wrapper can modify the labels and text
 };
 

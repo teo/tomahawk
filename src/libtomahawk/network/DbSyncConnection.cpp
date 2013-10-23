@@ -35,10 +35,13 @@
 #include "database/DatabaseCommand.h"
 #include "database/DatabaseCommand_CollectionStats.h"
 #include "database/DatabaseCommand_LoadOps.h"
+#include "utils/Logger.h"
+
+#include "Msg.h"
+#include "MsgProcessor.h"
 #include "RemoteCollection.h"
 #include "Source.h"
 #include "SourceList.h"
-#include "utils/Logger.h"
 
 using namespace Tomahawk;
 
@@ -51,8 +54,9 @@ DBSyncConnection::DBSyncConnection( Servent* s, const source_ptr& src )
 {
     qDebug() << Q_FUNC_INFO << src->id() << thread();
 
-    connect( this,            SIGNAL( stateChanged( DBSyncConnection::State, DBSyncConnection::State, QString ) ),
-             m_source.data(),   SLOT( onStateChanged( DBSyncConnection::State, DBSyncConnection::State, QString ) ) );
+    // Be aware of namespaces in these signals/slots!
+    connect( this,            SIGNAL( stateChanged( Tomahawk::DBSyncConnectionState, Tomahawk::DBSyncConnectionState, QString ) ),
+             m_source.data(),   SLOT( onStateChanged( Tomahawk::DBSyncConnectionState, Tomahawk::DBSyncConnectionState, QString ) ) );
     connect( m_source.data(), SIGNAL( commandsFinished() ),
              this,              SLOT( lastOpApplied() ) );
 
@@ -71,12 +75,12 @@ DBSyncConnection::~DBSyncConnection()
 
 
 void
-DBSyncConnection::changeState( State newstate )
+DBSyncConnection::changeState( DBSyncConnectionState newstate )
 {
     if ( m_state == SHUTDOWN )
         return;
 
-    State s = m_state;
+    DBSyncConnectionState s = m_state;
     m_state = newstate;
     qDebug() << "DBSYNC State changed from" << s << "to" << newstate << "- source:" << m_source->id();
     emit stateChanged( newstate, s, "" );
@@ -127,7 +131,7 @@ DBSyncConnection::check()
         tDebug( LOGVERBOSE ) << "Fetching lastCmdGuid from database!";
         DatabaseCommand_CollectionStats* cmd_them = new DatabaseCommand_CollectionStats( m_source );
         connect( cmd_them, SIGNAL( done( QVariantMap ) ), SLOT( gotThem( QVariantMap ) ) );
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd_them) );
+        Database::instance()->enqueue( dbcmd_ptr(cmd_them) );
     }
     else
     {
@@ -178,7 +182,7 @@ DBSyncConnection::handleMsg( msg_ptr msg )
         DatabaseCommand_CollectionStats* cmd = new DatabaseCommand_CollectionStats( m_source );
         connect( cmd,           SIGNAL( done( const QVariantMap & ) ),
                  m_source.data(), SLOT( setStats( const QVariantMap& ) ), Qt::QueuedConnection );
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>(cmd) );
+        Database::instance()->enqueue( Tomahawk::dbcmd_ptr(cmd) );
         return;
     }
 
@@ -187,7 +191,7 @@ DBSyncConnection::handleMsg( msg_ptr msg )
     QVariantMap m = msg->json().toMap();
     if ( m.empty() )
     {
-        tLog() << "Failed to parse msg in dbsync" << m_source->id() << m_source->friendlyName();
+        tLog() << "Failed to parse msg in dbsync from:" << m_source->id() << m_source->friendlyName() << msg->payload();
         Q_ASSERT( false );
         return;
     }
@@ -195,11 +199,10 @@ DBSyncConnection::handleMsg( msg_ptr msg )
     // a db sync op msg
     if ( msg->is( Msg::DBOP ) )
     {
-        DatabaseCommand* cmd = DatabaseCommand::factory( m, m_source );
-        if ( cmd )
+        dbcmd_ptr cmd = Database::instance()->createCommandInstance( m, m_source );
+        if ( !cmd.isNull() )
         {
-            QSharedPointer<DatabaseCommand> cmdsp = QSharedPointer<DatabaseCommand>(cmd);
-            m_source->addCommand( cmdsp );
+            m_source->addCommand( cmd );
         }
 
         if ( !msg->is( Msg::FRAGMENT ) ) // last msg in this batch
@@ -213,7 +216,7 @@ DBSyncConnection::handleMsg( msg_ptr msg )
     if ( m.value( "method" ).toString() == "fetchops" )
     {
         ++m_fetchCount;
-        tDebug() << "Fetching new dbops:" << m["lastop"].toString() << m_fetchCount;
+        tDebug( LOGVERBOSE ) << "Fetching new dbops:" << m["lastop"].toString() << m_fetchCount;
         m_uscache = m;
         sendOps();
         return;
@@ -221,7 +224,7 @@ DBSyncConnection::handleMsg( msg_ptr msg )
 
     if ( m.value( "method" ).toString() == "trigger" )
     {
-        tLog() << "Got trigger msg on dbsyncconnection, checking for new stuff.";
+        tLog( LOGVERBOSE ) << "Got trigger msg on dbsyncconnection, checking for new stuff.";
         check();
         return;
     }
@@ -254,7 +257,7 @@ DBSyncConnection::sendOps()
 
     m_uscache.clear();
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 

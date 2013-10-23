@@ -20,7 +20,6 @@
  */
 
 #include "NewReleasesWidget.h"
-#include "WhatsHotWidget_p.h"
 #include "ui_NewReleasesWidget.h"
 
 #include "ViewManager.h"
@@ -37,7 +36,7 @@
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
 #include "Pipeline.h"
-
+#include "utils/AnimatedSpinner.h"
 #include <QPainter>
 #include <QStandardItemModel>
 #include <QStandardItem>
@@ -57,6 +56,8 @@ NewReleasesWidget::NewReleasesWidget( QWidget* parent )
     , ui( new Ui::NewReleasesWidget )
     , m_sortedProxy( 0 )
     , m_workerThread( 0 )
+    , m_spinner( 0 )
+    , m_loading( true )
 {
     ui->setupUi( this );
 
@@ -69,11 +70,9 @@ NewReleasesWidget::NewReleasesWidget( QWidget* parent )
     m_sortedProxy->setDynamicSortFilter( true );
     m_sortedProxy->setFilterCaseSensitivity( Qt::CaseInsensitive );
 
-    ui->breadCrumbLeft->setRootIcon( QPixmap( RESPATH "images/new-releases.png" ) );
+    ui->breadCrumbLeft->setRootIcon( TomahawkUtils::defaultPixmap( TomahawkUtils::NewReleases, TomahawkUtils::Original ) );
 
     connect( ui->breadCrumbLeft, SIGNAL( activateIndex( QModelIndex ) ), SLOT( leftCrumbIndexChanged(QModelIndex) ) );
-
-    //m_playlistInterface = Tomahawk::playlistinterface_ptr( new ChartsPlaylistInterface( this ) );
 
     m_workerThread = new QThread( this );
     m_workerThread->start();
@@ -83,6 +82,10 @@ NewReleasesWidget::NewReleasesWidget( QWidget* parent )
              SLOT( infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData, QVariant ) ) );
 
     connect( Tomahawk::InfoSystem::InfoSystem::instance(), SIGNAL( finished( QString ) ), SLOT( infoSystemFinished( QString ) ) );
+
+    ui->breadCrumbLeft->setVisible( false );
+    m_spinner = new AnimatedSpinner( ui->albumsView );
+    m_spinner->fadeIn();
 }
 
 
@@ -92,6 +95,7 @@ NewReleasesWidget::~NewReleasesWidget()
     m_workers.clear();
     m_workerThread->exit(0);
     m_playlistInterface.clear();
+    delete m_spinner;
     delete ui;
 }
 
@@ -153,7 +157,7 @@ NewReleasesWidget::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData request
         case InfoSystem::InfoNewReleaseCapabilities:
         {
             tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Got InfoNewReleaseCapabilities";
-            QStandardItem *rootItem= m_crumbModelLeft->invisibleRootItem();
+            QStandardItem *rootItem = m_crumbModelLeft->invisibleRootItem();
 
             foreach ( const QString label, returnedData.keys() )
             {
@@ -161,10 +165,6 @@ NewReleasesWidget::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData request
                 rootItem->appendRow(childItem);
                 tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "NewReleases:" << label;
             }
-
-            m_sortedProxy->setSourceModel( m_crumbModelLeft );
-            m_sortedProxy->sort( 0, Qt::AscendingOrder );
-            ui->breadCrumbLeft->setModel( m_sortedProxy );
             break;
         }
 
@@ -175,7 +175,7 @@ NewReleasesWidget::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData request
             const QString type = returnedData["type"].toString();
             if( !returnedData.contains(type) )
                 break;
-            const QString side = requestData.customData["whatshot_side"].toString();
+
             const QString releaseId = requestData.input.value< Tomahawk::InfoSystem::InfoStringHash >().value( "nr_id" );
 
             m_queuedFetches.remove( releaseId );
@@ -217,7 +217,21 @@ NewReleasesWidget::infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData request
 void
 NewReleasesWidget::infoSystemFinished( QString target )
 {
-    Q_UNUSED( target );
+    if( m_loading )
+    {
+        if ( target != s_newReleasesIdentifier )
+        {
+            return;
+        }
+
+        m_sortedProxy->setSourceModel( m_crumbModelLeft );
+        m_sortedProxy->sort( 0, Qt::AscendingOrder );
+        ui->breadCrumbLeft->setModel( m_sortedProxy );
+
+        m_spinner->fadeOut();
+        ui->breadCrumbLeft->setVisible( true );
+        m_loading = false;
+    }
 }
 
 
@@ -241,6 +255,7 @@ NewReleasesWidget::leftCrumbIndexChanged( QModelIndex index )
 
 
     const QString nrId = item->data( Breadcrumb::ChartIdRole ).toString();
+    const qlonglong nrExpires = item->data( Breadcrumb::ChartExpireRole ).toLongLong();
 
     if ( m_albumModels.contains( nrId ) )
     {
@@ -255,6 +270,7 @@ NewReleasesWidget::leftCrumbIndexChanged( QModelIndex index )
 
     Tomahawk::InfoSystem::InfoStringHash criteria;
     criteria.insert( "nr_id", nrId );
+    criteria.insert( "nr_expires", QString::number(nrExpires) );
     /// Remember to lower the source!
     criteria.insert( "nr_source",  index.data().toString().toLower() );
 
@@ -307,6 +323,7 @@ NewReleasesWidget::parseNode( QStandardItem* parentItem, const QString &label, c
         {
             QStandardItem *childItem= new QStandardItem( chart[ "label" ] );
             childItem->setData( chart[ "id" ], Breadcrumb::ChartIdRole );
+            childItem->setData( chart[ "expires" ], Breadcrumb::ChartExpireRole );
             if ( chart.value( "default", "" ) == "true")
             {
                 childItem->setData( true, Breadcrumb::DefaultRole );

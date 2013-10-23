@@ -16,10 +16,12 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 #include "DelegateConfigWrapper.h"
+#include "AccountConfigWidget.h"
+
 #include <QMessageBox>
 
 
-DelegateConfigWrapper::DelegateConfigWrapper( QWidget* conf, QWidget* aboutWidget, const QString& title, QWidget* parent, Qt::WindowFlags flags )
+DelegateConfigWrapper::DelegateConfigWrapper( AccountConfigWidget* conf, QWidget* aboutWidget, const QString& title, QWidget* parent, Qt::WindowFlags flags )
     : QDialog( parent, flags )
     , m_widget( conf )
     , m_aboutW( aboutWidget )
@@ -101,21 +103,42 @@ DelegateConfigWrapper::closed( QAbstractButton* b )
     if ( buttons->standardButton( b ) == QDialogButtonBox::Help )
         return;
 
-    // let the config widget live to see another day
-    layout()->removeWidget( m_widget );
-    m_widget->setParent( 0 );
-    m_widget->setVisible( false );
+    int doneCode = 0;
 
     if ( buttons->standardButton( b ) == QDialogButtonBox::Ok )
-        done( QDialog::Accepted );
+    {
+        m_widget->resetErrors();
+        m_widget->checkForErrors();
+        if( !m_widget->settingsValid() )
+        {
+            foreach( const QString& error, m_widget->errors() )
+            {
+                QMessageBox::warning( this, tr( "Config Error" ) , error );
+            }
+
+            return;
+        }
+
+        doneCode = QDialog::Accepted;
+    }
     else if ( b == m_deleteButton )
     {
         m_deleted = true;
         emit closedWithDelete();
         reject();
+        return;
     }
     else
-        done( QDialog::Rejected );
+    {
+        doneCode = QDialog::Rejected;
+    }
+
+    // let the config widget live to see another day
+    layout()->removeWidget( m_widget );
+    m_widget->setParent( 0 );
+    m_widget->setVisible( false );
+
+    done( doneCode );
 }
 
 

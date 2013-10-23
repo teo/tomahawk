@@ -21,8 +21,12 @@
 
 #include "Typedefs.h"
 
-#include "network/ControlConnection.h"
 #include "database/DatabaseCollection.h"
+
+class ControlConnection;
+
+namespace Tomahawk
+{
 
 class RemoteCollection : public DatabaseCollection
 {
@@ -37,9 +41,13 @@ public:
         qDebug() << Q_FUNC_INFO;
     }
 
+    virtual QString prettyName() const;
+
 public slots:
     virtual void addTracks( const QList<QVariant>& newitems );
     virtual void removeTracks( const QDir& dir );
 };
+
+}
 
 #endif // REMOTECOLLECTION_H

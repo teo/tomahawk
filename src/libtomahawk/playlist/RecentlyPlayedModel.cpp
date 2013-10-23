@@ -34,9 +34,9 @@
 using namespace Tomahawk;
 
 
-RecentlyPlayedModel::RecentlyPlayedModel( QObject* parent )
+RecentlyPlayedModel::RecentlyPlayedModel( QObject* parent, unsigned int maxItems )
     : PlaylistModel( parent )
-    , m_limit( HISTORY_TRACK_ITEMS )
+    , m_limit( maxItems > 0 ? maxItems : HISTORY_TRACK_ITEMS )
 {
 }
 
@@ -56,12 +56,14 @@ RecentlyPlayedModel::loadHistory()
     startLoading();
 
     DatabaseCommand_PlaybackHistory* cmd = new DatabaseCommand_PlaybackHistory( m_source );
+    cmd->setDateFrom( m_dateFrom );
+    cmd->setDateTo( m_dateTo );
     cmd->setLimit( m_limit );
 
-    connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr> ) ),
-                    SLOT( appendQueries( QList<Tomahawk::query_ptr> ) ), Qt::QueuedConnection );
+    connect( cmd, SIGNAL( tracks( QList<Tomahawk::track_ptr>, QList<Tomahawk::PlaybackLog> ) ),
+                    SLOT( appendTracks( QList<Tomahawk::track_ptr>, QList<Tomahawk::PlaybackLog> ) ), Qt::QueuedConnection );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -101,25 +103,25 @@ RecentlyPlayedModel::setSource( const Tomahawk::source_ptr& source )
 void
 RecentlyPlayedModel::onSourceAdded( const Tomahawk::source_ptr& source )
 {
-    connect( source.data(), SIGNAL( playbackFinished( Tomahawk::query_ptr ) ), SLOT( onPlaybackFinished( Tomahawk::query_ptr ) ), Qt::UniqueConnection );
+    connect( source.data(), SIGNAL( playbackFinished( Tomahawk::track_ptr, Tomahawk::PlaybackLog ) ),
+                              SLOT( onPlaybackFinished( Tomahawk::track_ptr, Tomahawk::PlaybackLog ) ), Qt::UniqueConnection );
 }
 
 
 void
-RecentlyPlayedModel::onPlaybackFinished( const Tomahawk::query_ptr& query )
+RecentlyPlayedModel::onPlaybackFinished( const Tomahawk::track_ptr& track, const Tomahawk::PlaybackLog& log )
 {
     int count = trackCount();
-    unsigned int playtime = query->playedBy().second;
 
     if ( count )
     {
         PlayableItem* oldestItem = itemFromIndex( index( count - 1, 0, QModelIndex() ) );
-        if ( oldestItem->query()->playedBy().second >= playtime )
+        if ( oldestItem->playbackLog().timestamp >= log.timestamp )
             return;
 
         PlayableItem* youngestItem = itemFromIndex( index( 0, 0, QModelIndex() ) );
-        if ( youngestItem->query()->playedBy().second <= playtime )
-            insertQuery( query, 0 );
+        if ( youngestItem->playbackLog().timestamp <= log.timestamp )
+            insertQuery( track->toQuery(), 0, log );
         else
         {
             for ( int i = 0; i < count - 1; i++ )
@@ -127,16 +129,16 @@ RecentlyPlayedModel::onPlaybackFinished( const Tomahawk::query_ptr& query )
                 PlayableItem* item1 = itemFromIndex( index( i, 0, QModelIndex() ) );
                 PlayableItem* item2 = itemFromIndex( index( i + 1, 0, QModelIndex() ) );
 
-                if ( item1->query()->playedBy().second >= playtime && item2->query()->playedBy().second <= playtime )
+                if ( item1->playbackLog().timestamp >= log.timestamp && item2->playbackLog().timestamp <= log.timestamp )
                 {
-                    insertQuery( query, i + 1 );
+                    insertQuery( track->toQuery(), i + 1, log );
                     break;
                 }
             }
         }
     }
     else
-        insertQuery( query, 0 );
+        insertQuery( track->toQuery(), 0, log );
 
     if ( trackCount() > (int)m_limit )
         remove( m_limit );
@@ -149,4 +151,19 @@ bool
 RecentlyPlayedModel::isTemporary() const
 {
     return true;
+}
+
+
+void
+RecentlyPlayedModel::setDateFrom( const QDate& date )
+{
+    m_dateFrom = date;
+}
+
+
+void
+RecentlyPlayedModel::setDateTo( const QDate& date )
+{
+    m_dateTo = date;
+    loadHistory();
 }

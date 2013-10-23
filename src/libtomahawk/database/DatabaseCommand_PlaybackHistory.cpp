@@ -26,16 +26,24 @@
 #include "utils/Logger.h"
 
 
+namespace Tomahawk
+{
+
 void
 DatabaseCommand_PlaybackHistory::exec( DatabaseImpl* dbi )
 {
     TomahawkSqlQuery query = dbi->newquery();
-    QList<Tomahawk::query_ptr> ql;
+    QString whereToken( "WHERE 1" );
 
-    QString whereToken;
     if ( !source().isNull() )
     {
-        whereToken = QString( "WHERE source %1" ).arg( source()->isLocal() ? "IS NULL" : QString( "= %1" ).arg( source()->id() ) );
+        whereToken += QString( " AND source %1" ).arg( source()->isLocal() ? "IS NULL" : QString( "= %1" ).arg( source()->id() ) );
+    }
+    if ( m_dateFrom.year() > 1900 && m_dateTo.year() > 1900 )
+    {
+        whereToken += QString( " AND playtime >= %1 AND playtime <= %2" )
+                         .arg( QDateTime( m_dateFrom ).toUTC().toTime_t() )
+                         .arg( QDateTime( m_dateTo.addDays( 1 ) ).toUTC().toTime_t() );
     }
 
     QString sql = QString(
@@ -49,6 +57,8 @@ DatabaseCommand_PlaybackHistory::exec( DatabaseImpl* dbi )
     query.prepare( sql );
     query.exec();
 
+    QList<Tomahawk::track_ptr> tl;
+    QList<Tomahawk::PlaybackLog> logs;
     while ( query.next() )
     {
         TomahawkSqlQuery query_track = dbi->newquery();
@@ -65,22 +75,21 @@ DatabaseCommand_PlaybackHistory::exec( DatabaseImpl* dbi )
 
         if ( query_track.next() )
         {
-            Tomahawk::query_ptr q = Tomahawk::Query::get( query_track.value( 1 ).toString(), query_track.value( 0 ).toString(), QString() );
-            if ( q.isNull() )
+            Tomahawk::track_ptr track = Tomahawk::Track::get( query_track.value( 1 ).toString(), query_track.value( 0 ).toString(), QString() );
+            if ( !track )
                 continue;
 
-            if ( query.value( 3 ).toUInt() == 0 )
-            {
-                q->setPlayedBy( SourceList::instance()->getLocal(), query.value( 1 ).toUInt() );
-            }
-            else
-            {
-                q->setPlayedBy( SourceList::instance()->get( query.value( 3 ).toUInt() ), query.value( 1 ).toUInt() );
-            }
+            Tomahawk::PlaybackLog log;
+            log.timestamp = query.value( 1 ).toUInt();
+            log.secsPlayed = query.value( 2 ).toUInt();
+            log.source = SourceList::instance()->get( query.value( 3 ).toUInt() );
 
-            ql << q;
+            logs << log;
+            tl << track;
         }
     }
 
-    emit tracks( ql );
+    emit tracks( tl, logs );
+}
+
 }

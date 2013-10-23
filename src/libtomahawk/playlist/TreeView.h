@@ -20,9 +20,9 @@
 #ifndef TREEVIEW_H
 #define TREEVIEW_H
 
-#include <QtGui/QSortFilterProxyModel>
-#include <QtGui/QTreeView>
-#include <QtCore/QTimer>
+#include <QSortFilterProxyModel>
+#include <QTreeView>
+#include <QTimer>
 
 #include "TreeProxyModel.h"
 #include "ViewPage.h"
@@ -40,8 +40,9 @@ class ViewHeader;
 class AnimatedSpinner;
 class OverlayWidget;
 class TreeModel;
+class TreeItemDelegate;
 
-class DLLEXPORT TreeView : public QTreeView, public Tomahawk::ViewPage
+class DLLEXPORT TreeView : public QTreeView
 {
 Q_OBJECT
 
@@ -63,18 +64,7 @@ public:
 
     void setEmptyTip( const QString& tip );
 
-    virtual QWidget* widget() { return this; }
-    virtual Tomahawk::playlistinterface_ptr playlistInterface() const { return proxyModel()->playlistInterface(); }
-
-    virtual QString title() const { return m_model->title(); }
-    virtual QString description() const { return m_model->description(); }
-    virtual QPixmap pixmap() const { return m_model->icon(); }
-
-    virtual bool showFilter() const { return true; }
-    virtual bool setFilter( const QString& filter );
     virtual bool jumpToCurrentTrack();
-
-    QModelIndex hoveredIndex() const { return m_hoveredIndex; }
 
     bool updatesContextView() const { return m_updateContextView; }
     void setUpdatesContextView( bool b ) { m_updateContextView = b; }
@@ -90,10 +80,7 @@ protected:
     virtual void resizeEvent( QResizeEvent* event );
 
     virtual void keyPressEvent( QKeyEvent* event );
-    void wheelEvent( QWheelEvent* event );
-    void mouseMoveEvent( QMouseEvent* event );
-    void mousePressEvent( QMouseEvent* event );
-    void leaveEvent( QEvent* event );
+    virtual void wheelEvent( QWheelEvent* event );
 
 protected slots:
     virtual void currentChanged( const QModelIndex& current, const QModelIndex& previous );
@@ -108,17 +95,15 @@ private slots:
     void onMenuTriggered( int action );
 
 private:
-    void updateHoverIndex( const QPoint& pos );
-
     ViewHeader* m_header;
     OverlayWidget* m_overlay;
     TreeModel* m_model;
     TreeProxyModel* m_proxyModel;
+    TreeItemDelegate* m_delegate;
     AnimatedSpinner* m_loadingSpinner;
 
     bool m_updateContextView;
 
-    QModelIndex m_hoveredIndex;
     QModelIndex m_contextMenuIndex;
     Tomahawk::ContextMenu* m_contextMenu;
 

@@ -19,14 +19,17 @@
 
 #include "XspfGenerator.h"
 
+#include "utils/Logger.h"
+
+#include "Playlist.h"
+#include "PlaylistEntry.h"
+#include "Query.h"
+#include "Source.h"
+#include "Track.h"
+
 #include <QXmlStreamWriter>
 #include <QDateTime>
 #include <QTimer>
-
-#include "Playlist.h"
-#include "Query.h"
-#include "utils/Logger.h"
-#include "Source.h"
 
 using namespace Tomahawk;
 
@@ -66,9 +69,9 @@ XSPFGenerator::generate()
     foreach ( const plentry_ptr& q, m_playlist->entries() )
     {
         w.writeStartElement( "track" );
-        w.writeTextElement( "title", q->query()->track() );
-        w.writeTextElement( "creator", q->query()->artist() );
-        w.writeTextElement( "album", q->query()->album() );
+        w.writeTextElement( "title", q->query()->queryTrack()->track() );
+        w.writeTextElement( "creator", q->query()->queryTrack()->artist() );
+        w.writeTextElement( "album", q->query()->queryTrack()->album() );
         w.writeEndElement();
     }
     w.writeEndDocument(); // will close all open elements

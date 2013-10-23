@@ -18,10 +18,13 @@
 
 #include "XspfUpdater.h"
 
-#include "Playlist.h"
 #include "utils/XspfLoader.h"
-#include "Pipeline.h"
 #include "utils/TomahawkUtils.h"
+#include "utils/Logger.h"
+
+#include "Pipeline.h"
+#include "Playlist.h"
+#include "PlaylistEntry.h"
 #include "Source.h"
 
 #include <QTimer>
@@ -98,6 +101,11 @@ XspfUpdater::updateNow()
     if ( m_url.isEmpty() )
     {
         qWarning() << "XspfUpdater not updating because we have an empty url...";
+        return;
+    }
+    if ( !playlist()->loaded() )
+    {
+        tDebug() << "XspfUpdater not updating because playlist wasn't loaded yet...";
         return;
     }
 

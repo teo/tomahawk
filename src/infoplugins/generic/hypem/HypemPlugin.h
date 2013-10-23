@@ -20,7 +20,8 @@
 #ifndef HYPEMPLUGIN_H
 #define HYPEMPLUGIN_H
 
-#include "infoplugins/InfoPluginDllMacro.h"
+#include "../../InfoPluginDllMacro.h"
+
 #include "infosystem/InfoSystem.h"
 #include "infosystem/InfoSystemWorker.h"
 #include <QNetworkReply>
@@ -36,6 +37,7 @@ namespace InfoSystem
 
 class INFOPLUGINDLLEXPORT HypemPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 

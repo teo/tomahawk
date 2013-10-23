@@ -2,29 +2,38 @@
    Copyright 2011, David Sansome <me@davidsansome.com>
    Copyright 2012, Leo Franchi <lfranchi@kde.org>
 
-   Clementine is free software: you can redistribute it and/or modify
+   Tomahawk is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
 
-   Clementine is distributed in the hope that it will be useful,
+   Tomahawk is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with Clementine.  If not, see <http://www.gnu.org/licenses/>.
+   along with Tomahawk.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+// Originally from Clementine
 
 #ifndef CLOSURE_H
 #define CLOSURE_H
 
 #include "DllMacro.h"
 
+#ifdef _WEBSOCKETPP_CPP11_STL_
+#include <functional>
+using std::function;
+#else
 #include <tr1/functional>
+using std::tr1::function;
+#endif
 
 #include <QMetaMethod>
 #include <QObject>
+#include <QPointer>
 #include <QSharedPointer>
 
 #include <boost/noncopyable.hpp>
@@ -64,7 +73,7 @@ class DLLEXPORT Closure : public QObject, boost::noncopyable {
           const ClosureArgumentWrapper* val3 = 0);
 
   Closure(QObject* sender, const char* signal,
-          std::tr1::function<void()> callback);
+          function<void()> callback);
 
   void setAutoDelete( bool autoDelete ) { autoDelete_ = autoDelete; }
 
@@ -74,7 +83,7 @@ class DLLEXPORT Closure : public QObject, boost::noncopyable {
    * If you don't this Closure to act on a signal, but just act like
    *  a closure in that it saves some args and delivers them on demand later
    *
-   * Only call this is you passed a null QObject* as a sender! Otherwise you
+   * Only call this if you passed a null QObject* as a sender! Otherwise you
    *  might delete your object twice :)
    */
   void forceInvoke();
@@ -87,9 +96,9 @@ class DLLEXPORT Closure : public QObject, boost::noncopyable {
   void Connect(QObject* sender, const char* signal);
 
   QMetaMethod slot_;
-  std::tr1::function<void()> callback_;
+  function<void()> callback_;
   bool autoDelete_;
-  QObject* outOfThreadReceiver_;
+  QPointer<QObject> outOfThreadReceiver_;
 
   boost::scoped_ptr<const ClosureArgumentWrapper> val0_;
   boost::scoped_ptr<const ClosureArgumentWrapper> val1_;

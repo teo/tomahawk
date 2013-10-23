@@ -20,6 +20,9 @@
 #ifndef TOMAHAWKUTILSGUI_H
 #define TOMAHAWKUTILSGUI_H
 
+#include "TomahawkUtils.h"
+#include "DllMacro.h"
+
 #include <QSize>
 #include <QModelIndex>
 #include <QColor>
@@ -27,21 +30,19 @@
 #include <QTextOption>
 #include <QImage>
 
-#include "TomahawkUtils.h"
-#include "DllMacro.h"
+// include contains typedefs for Qt4/Qt5 compatibility
+#include <QStyleOption>
 
 class PlayableItem;
-class QStyleOptionViewItemV4;
 class QPainter;
 class QPixmap;
 class QLayout;
 class QPalette;
 class QRect;
-class QScrollBar;
 
 namespace TomahawkUtils
 {
-    DLLEXPORT void drawQueryBackground( QPainter* p, const QPalette& palette, const QRect& r, qreal lightnessFactor = 1 );
+    DLLEXPORT void drawQueryBackground( QPainter* p, const QRect& r );
     DLLEXPORT QWidget* tomahawkWindow();
     /// Platform-specific bringing tomahawk mainwindow to front, b/c qt's activate() and such don't seem to work well enough for us
     DLLEXPORT void bringToFront();
@@ -58,31 +59,21 @@ namespace TomahawkUtils
 
     DLLEXPORT void unmarginLayout( QLayout* layout );
 
+    DLLEXPORT void setDefaultFontSize( int points );
     DLLEXPORT int defaultFontSize();
     DLLEXPORT int defaultFontHeight();
-    DLLEXPORT void setDefaultFontSize( int points );
-
-    DLLEXPORT QPixmap defaultPixmap( ImageType type, ImageMode mode = TomahawkUtils::Original, const QSize& size = QSize( 0, 0 ) );
+    DLLEXPORT QSize defaultIconSize();
 
     DLLEXPORT void prepareStyleOption( QStyleOptionViewItemV4* option, const QModelIndex& index, PlayableItem* item );
 
     DLLEXPORT void drawRoundedButton( QPainter* painter, const QRect& btnRect, const QColor& color, const QColor &gradient1bottom = QColor(), const QColor& gradient2top = QColor(), const QColor& gradient2bottom = QColor() );
 
-    DLLEXPORT void styleScrollBar( QScrollBar* scrollBar );
-
+    DLLEXPORT QPixmap defaultPixmap( ImageType type, ImageMode mode = TomahawkUtils::Original, const QSize& size = QSize( 0, 0 ) );
     DLLEXPORT QPixmap createTiledPixmap( int width, int height, const QImage& src );
-
     DLLEXPORT QPixmap addDropShadow( const QPixmap& sourceImage, const QSize& targetSize );
+    DLLEXPORT QPixmap squareCenterPixmap( const QPixmap& sourceImage );
 
-    namespace Colors
-    {
-        static const QColor BORDER_LINE = QColor( "#8c8c8c" );
-        static const QColor POPUP_BACKGROUND = QColor( "#ffffff" );
-        static const QColor GROUP_HEADER = QColor( "#637180" );
-    }
-
-    static const int POPUP_ROUNDING_RADIUS = 6;
-    static const float POPUP_OPACITY = 0.96;
+    DLLEXPORT void drawCompositedPopup( QWidget* widget, const QPainterPath& outline, const QColor& lineColor, const QBrush& backgroundBrush, qreal opacity );
 }
 
 #endif // TOMAHAWKUTILSGUI_H

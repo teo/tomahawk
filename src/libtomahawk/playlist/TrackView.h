@@ -20,15 +20,15 @@
 #ifndef TRACKVIEW_H
 #define TRACKVIEW_H
 
-#include <QtGui/QTreeView>
-#include <QtGui/QSortFilterProxyModel>
-#include <QtCore/QTimer>
-
 #include "ContextMenu.h"
 #include "PlaylistItemDelegate.h"
 #include "ViewPage.h"
 
 #include "DllMacro.h"
+
+#include <QTreeView>
+#include <QSortFilterProxyModel>
+#include <QTimer>
 
 class QAction;
 class AnimatedSpinner;
@@ -45,9 +45,10 @@ public:
     explicit TrackView( QWidget* parent = 0 );
     ~TrackView();
 
-    virtual QString guid() const { return m_guid; }
-    virtual void setGuid( const QString& guid );
+    virtual QString guid() const;
+    virtual void setGuid( const QString& newguid );
 
+    virtual void setPlaylistItemDelegate( PlaylistItemDelegate* delegate );
     virtual void setPlayableModel( PlayableModel* model );
     virtual void setModel( QAbstractItemModel* model );
     void setProxyModel( PlayableProxyModel* model );
@@ -74,12 +75,16 @@ public:
     virtual bool setFilter( const QString& filter );
     virtual bool jumpToCurrentTrack();
 
-    QModelIndex hoveredIndex() const { return m_hoveredIndex; }
     QModelIndex contextMenuIndex() const { return m_contextMenuIndex; }
     void setContextMenuIndex( const QModelIndex& idx ) { m_contextMenuIndex = idx; }
 
     bool updatesContextView() const { return m_updateContextView; }
     void setUpdatesContextView( bool b ) { m_updateContextView = b; }
+
+    bool autoResize() const { return m_autoResize; }
+    void setAutoResize( bool b );
+
+    void setAlternatingRowColors( bool enable );
 
     // Starts playing from the beginning if resolved, or waits until a track is playable
     void startPlayingFromStart();
@@ -93,10 +98,10 @@ public:
 public slots:
     virtual void onItemActivated( const QModelIndex& index );
 
-    void deleteSelectedItems();
+    virtual void deleteSelectedItems();
 
     void playItem();
-    void onMenuTriggered( int action );
+    virtual void onMenuTriggered( int action );
 
     void onViewChanged();
     void onScrollTimeout();
@@ -110,16 +115,14 @@ protected:
 
     virtual void startDrag( Qt::DropActions supportedActions );
     virtual void dragEnterEvent( QDragEnterEvent* event );
-    virtual void dragLeaveEvent( QDragLeaveEvent* /*event*/ ) { m_dragging = false; setDirtyRegion( m_dropRect ); }
+    virtual void dragLeaveEvent( QDragLeaveEvent* event );
     virtual void dragMoveEvent( QDragMoveEvent* event );
     virtual void dropEvent( QDropEvent* event );
 
-    void wheelEvent( QWheelEvent* event );
-    void mouseMoveEvent( QMouseEvent* event );
-    void mousePressEvent( QMouseEvent* event );
-    void leaveEvent( QEvent* event );
-    void paintEvent( QPaintEvent* event );
-    void keyPressEvent( QKeyEvent* event );
+    virtual void leaveEvent( QEvent* event );
+    virtual void paintEvent( QPaintEvent* event );
+    virtual void keyPressEvent( QKeyEvent* event );
+    virtual void wheelEvent( QWheelEvent* event );
 
 protected slots:
     virtual void currentChanged( const QModelIndex& current, const QModelIndex& previous );
@@ -127,10 +130,14 @@ protected slots:
 private slots:
     void onItemResized( const QModelIndex& index );
     void onFilterChanged( const QString& filter );
+    void onModelFilling();
+    void onModelEmptyCheck();
 
     void onCustomContextMenu( const QPoint& pos );
 
     void autoPlayResolveFinished( const Tomahawk::query_ptr& query, int row );
+
+    void verifySize();
 
 private:
     void startAutoPlay( const QModelIndex& index );
@@ -153,9 +160,9 @@ private:
     bool m_manualProgression;
 
     bool m_updateContextView;
+    bool m_autoResize;
+    bool m_alternatingRowColors;
 
-    Tomahawk::playlistinterface_ptr m_playlistInterface;
-    QModelIndex m_hoveredIndex;
     QModelIndex m_contextMenuIndex;
 
     Tomahawk::query_ptr m_autoPlaying;

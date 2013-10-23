@@ -20,8 +20,6 @@
 #ifndef TOMAHAWKARTIST_H
 #define TOMAHAWKARTIST_H
 
-#include "config.h"
-
 #include <QtCore/QObject>
 #ifndef ENABLE_HEADLESS
     #include <QtGui/QPixmap>
@@ -29,15 +27,15 @@
 
 #include <QFuture>
 
+#include "TrackData.h"
 #include "Typedefs.h"
 #include "DllMacro.h"
 #include "Query.h"
 
-
-class IdThreadWorker;
-
 namespace Tomahawk
 {
+
+class IdThreadWorker;
 
 class DLLEXPORT Artist : public QObject
 {
@@ -55,8 +53,8 @@ public:
     QString name() const { return m_name; }
     QString sortname() const { return m_sortname; }
 
-    QList<Tomahawk::album_ptr> albums( ModelMode mode = Mixed, const Tomahawk::collection_ptr& collection = Tomahawk::collection_ptr() ) const;
-    QList<Tomahawk::artist_ptr> similarArtists() const;
+    QList<album_ptr> albums( ModelMode mode = Mixed, const Tomahawk::collection_ptr& collection = Tomahawk::collection_ptr() ) const;
+    QList<artist_ptr> similarArtists() const;
 
     QList<Tomahawk::query_ptr> tracks( ModelMode mode = Mixed, const Tomahawk::collection_ptr& collection = Tomahawk::collection_ptr() );
     Tomahawk::playlistinterface_ptr playlistInterface( ModelMode mode, const Tomahawk::collection_ptr& collection = Tomahawk::collection_ptr() );
@@ -64,8 +62,11 @@ public:
     void loadStats();
     QList< Tomahawk::PlaybackLog > playbackHistory( const Tomahawk::source_ptr& source = Tomahawk::source_ptr() ) const;
     void setPlaybackHistory( const QList< Tomahawk::PlaybackLog >& playbackData );
-    unsigned int playbackCount( const Tomahawk::source_ptr& source = Tomahawk::source_ptr() );
-    
+    unsigned int playbackCount( const Tomahawk::source_ptr& source = Tomahawk::source_ptr() ) const;
+
+    unsigned int chartPosition() const;
+    unsigned int chartCount() const;
+
     QString biography() const;
 
 #ifndef ENABLE_HEADLESS
@@ -79,6 +80,10 @@ public:
     void setWeakRef( QWeakPointer< Tomahawk::Artist > weakRef ) { m_ownRef = weakRef; }
 
     void loadId( bool autoCreate );
+
+public slots:
+    void deleteLater();
+
 signals:
     void tracksAdded( const QList<Tomahawk::query_ptr>& tracks, Tomahawk::ModelMode mode, const Tomahawk::collection_ptr& collection );
     void albumsAdded( const QList<Tomahawk::album_ptr>& albums, Tomahawk::ModelMode mode );
@@ -90,8 +95,9 @@ signals:
     void statsLoaded();
 
 private slots:
-    void onTracksLoaded(Tomahawk::ModelMode mode, const Tomahawk::collection_ptr& collection );
-    void onAlbumsFound( const QList<Tomahawk::album_ptr>& albums, const QVariant& data );
+    void onArtistStatsLoaded( unsigned int plays, unsigned int chartPos, unsigned int chartCount );
+    void onTracksLoaded( Tomahawk::ModelMode mode, const Tomahawk::collection_ptr& collection );
+    void onAlbumsFound( const QList<Tomahawk::album_ptr>& albums, const QVariant& collectionIsNull = QVariant( false ) );
 
     void infoSystemInfo( Tomahawk::InfoSystem::InfoRequestData requestData, QVariant output );
     void infoSystemFinished( QString target );
@@ -123,23 +129,23 @@ private:
     QList<Tomahawk::artist_ptr> m_similarArtists;
     QString m_biography;
 
-    bool m_playbackHistoryLoaded;
     QList< PlaybackLog > m_playbackHistory;
+    unsigned int m_chartPosition;
+    unsigned int m_chartCount;
 
     mutable QByteArray m_coverBuffer;
 #ifndef ENABLE_HEADLESS
     mutable QPixmap* m_cover;
-    mutable QHash< int, QPixmap > m_coverCache;
 #endif
 
     QHash< Tomahawk::ModelMode, QHash< Tomahawk::collection_ptr, Tomahawk::playlistinterface_ptr > > m_playlistInterface;
-    
+
     QWeakPointer< Tomahawk::Artist > m_ownRef;
 
-    static QHash< QString, artist_ptr > s_artistsByName;
-    static QHash< unsigned int, artist_ptr > s_artistsById;
+    static QHash< QString, artist_wptr > s_artistsByName;
+    static QHash< unsigned int, artist_wptr > s_artistsById;
 
-    friend class ::IdThreadWorker;
+    friend class IdThreadWorker;
 };
 
 } // ns

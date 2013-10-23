@@ -21,8 +21,8 @@
 
 #include "infosystem/InfoSystem.h"
 #include "LastFmInfoPlugin.h"
-#include "utils/TomahawkUtils.h"
-#include "resolvers/QtScriptResolver.h"
+#include "resolvers/ExternalResolverGui.h"
+#include "utils/TomahawkUtilsGui.h"
 #include "AtticaManager.h"
 #include "Pipeline.h"
 #include "accounts/AccountManager.h"
@@ -34,7 +34,6 @@ using namespace Accounts;
 
 LastFmAccountFactory::LastFmAccountFactory()
 {
-    m_icon.load( RESPATH "images/lastfm-icon.png" );
 }
 
 
@@ -48,7 +47,7 @@ LastFmAccountFactory::createAccount( const QString& accountId )
 QPixmap
 LastFmAccountFactory::icon() const
 {
-    return m_icon;
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::LastfmIcon );
 }
 
 
@@ -56,7 +55,6 @@ LastFmAccount::LastFmAccount( const QString& accountId )
     : CustomAtticaAccount( accountId )
 {
     setAccountFriendlyName( "Last.Fm" );
-    m_icon.load( RESPATH "images/lastfm-icon.png" );
 
     AtticaManager::instance()->registerCustomAccount( "lastfm", this );
 
@@ -139,11 +137,11 @@ LastFmAccount::deauthenticate()
 }
 
 
-QWidget*
+AccountConfigWidget*
 LastFmAccount::configurationWidget()
 {
     if ( m_configWidget.isNull() )
-        m_configWidget = QWeakPointer<LastFmConfig>( new LastFmConfig( this ) );
+        m_configWidget = QPointer<LastFmConfig>( new LastFmConfig( this ) );
 
     return m_configWidget.data();
 }
@@ -152,14 +150,14 @@ LastFmAccount::configurationWidget()
 Account::ConnectionState
 LastFmAccount::connectionState() const
 {
-    return (!m_resolver.isNull() && m_resolver.data()->running()) ? Account::Connected : Account::Disconnected;
+    return ( !m_resolver.isNull() && m_resolver.data()->running() ) ? Account::Connected : Account::Disconnected;
 }
 
 
 QPixmap
 LastFmAccount::icon() const
 {
-    return m_icon;
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::LastfmIcon );
 }
 
 
@@ -167,7 +165,7 @@ InfoPluginPtr
 LastFmAccount::infoPlugin()
 {
     if ( m_infoPlugin.isNull() )
-        m_infoPlugin = QWeakPointer< LastFmInfoPlugin >( new LastFmInfoPlugin( this ) );
+        m_infoPlugin = QPointer< LastFmInfoPlugin >( new LastFmInfoPlugin( this ) );
 
     return InfoPluginPtr( m_infoPlugin.data() );
 }
@@ -288,7 +286,8 @@ LastFmAccount::hookupResolver()
 
     const AtticaManager::Resolver data = AtticaManager::instance()->resolverData( res.id() );
 
-    m_resolver = QWeakPointer< ExternalResolverGui >( qobject_cast< ExternalResolverGui* >( Pipeline::instance()->addScriptResolver( data.scriptPath ) ) );
+    m_resolver = QPointer< ExternalResolverGui >( qobject_cast< ExternalResolverGui* >( Pipeline::instance()->addScriptResolver( data.scriptPath ) ) );
+    m_resolver.data()->setIcon( icon() );
     connect( m_resolver.data(), SIGNAL( changed() ), this, SLOT( resolverChanged() ) );
 }
 

@@ -26,7 +26,10 @@
 #include <QWaitCondition>
 #include <QMutex>
 
-class QueueItem;
+namespace Tomahawk
+{
+
+struct QueueItem;
 class Database;
 class DatabaseImpl;
 
@@ -40,8 +43,9 @@ public:
     void run();
     void stop();
 
-    static void getArtistId( const Tomahawk::artist_ptr& artist, bool autoCreate = false );
-    static void getAlbumId( const Tomahawk::album_ptr& album, bool autoCreate = false );
+    static void getArtistId( const artist_ptr& artist, bool autoCreate = false );
+    static void getAlbumId( const album_ptr& album, bool autoCreate = false );
+    static void getTrackId( const trackdata_ptr& trackData, bool autoCreate = false );
 
 private:
     Database* m_db;
@@ -50,5 +54,7 @@ private:
 
     static QQueue< QueueItem* > s_workQueue;
 };
+
+}
 
 #endif // IDTHREADWORKER_H

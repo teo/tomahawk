@@ -1,5 +1,6 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
+ *   Copyright 2012, Hugo Lindström <hugolm84@gmail.com>
  *   Copyright 2012, Casey Link <unnamedrambler@gmail.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
@@ -21,8 +22,10 @@
 
 #include "infosystem/InfoSystem.h"
 #include "infosystem/InfoSystemWorker.h"
-#include "infoplugins/InfoPluginDllMacro.h"
 
+#include "../../InfoPluginDllMacro.h"
+
+#include <QVariantMap>
 #include <QtNetwork/QNetworkReply>
 #include <QtCore/QObject>
 
@@ -36,6 +39,7 @@ namespace InfoSystem
 
 class INFOPLUGINDLLEXPORT NewReleasesPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 
@@ -70,11 +74,6 @@ protected slots:
 
 private:
     /**
-     * Fetch list of newlreeases sources (e.g., rovi)
-     * Populates the m_nrSources member.
-     */
-    void fetchNRSourcesList( bool fetchOnlySourcesList );
-    /**
      * Requests newrelease list for each source in m_chartSources
      */
     void fetchAllNRSources();
@@ -87,15 +86,17 @@ private:
     void fetchNRCapabilitiesFromCache( Tomahawk::InfoSystem::InfoRequestData requestData );
     void dataError( Tomahawk::InfoSystem::InfoRequestData requestData );
 
-    QStringList m_nrSources;
+    qlonglong getMaxAge( const QByteArray &rawHeader ) const;
+    qlonglong getMaxAge( const qlonglong expires ) const;
+
+    QList< Tomahawk::InfoSystem::InfoStringHash > m_nrSources;
+    QStringList m_refetchSource;
     QString m_nrVersion;
-    QList< InfoStringHash > m_newreleases;
-    //ChartType m_chartType;
     QVariantMap m_allNRsMap;
     uint m_nrFetchJobs;
     QList< InfoRequestData > m_cachedRequests;
     QHash< QString, QString > m_cachedCountries;
-    QWeakPointer< QNetworkAccessManager > m_nam;
+    QPointer< QNetworkAccessManager > m_nam;
 };
 
 }

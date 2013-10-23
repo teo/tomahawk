@@ -1,19 +1,19 @@
-/* This file is part of Clementine.
+/* This file is part of Tomahawk.
    Copyright 2011, David Sansome <me@davidsansome.com>
    Copyright 2012, Leo Franchi <lfranchi@kde.org>
 
-   Clementine is free software: you can redistribute it and/or modify
+   Tomahawk is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
 
-   Clementine is distributed in the hope that it will be useful,
+   Tomahawk is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with Clementine.  If not, see <http://www.gnu.org/licenses/>.
+   along with Tomahawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "Closure.h"
@@ -54,7 +54,7 @@ Closure::Closure(QObject* sender,
 
 Closure::Closure(QObject* sender,
                  const char* signal,
-                 std::tr1::function<void()> callback)
+                 function<void()> callback)
     : callback_(callback) {
   Connect(sender, signal);
 }
@@ -80,20 +80,31 @@ void Closure::Connect(QObject* sender, const char* signal) {
   Q_UNUSED(success);
 }
 
-void Closure::Invoked() {
-  if (callback_) {
-    callback_();
-  } else {
-    slot_.invoke(
-        parent() ? parent() : outOfThreadReceiver_,
-        val0_ ? val0_->arg() : QGenericArgument(),
-        val1_ ? val1_->arg() : QGenericArgument(),
-        val2_ ? val2_->arg() : QGenericArgument(),
-        val3_ ? val3_->arg() : QGenericArgument());
-  }
+void
+Closure::Invoked() {
+    if ( callback_ )
+    {
+        callback_();
+    }
+    else
+    {
+        // Only invoke the closure if the receiver still exists
+        // Hint: If parent was destroyed, this closure would also be destroyed
+        if ( parent() || !outOfThreadReceiver_.isNull() )
+        {
+            slot_.invoke(
+                parent() ? parent() : outOfThreadReceiver_.data(),
+                val0_ ? val0_->arg() : QGenericArgument(),
+                val1_ ? val1_->arg() : QGenericArgument(),
+                val2_ ? val2_->arg() : QGenericArgument(),
+                val3_ ? val3_->arg() : QGenericArgument());
+        }
+    }
 
-  if ( autoDelete_ )
-    deleteLater();
+    if ( autoDelete_ )
+    {
+        deleteLater();
+    }
 }
 
 void Closure::Cleanup() {

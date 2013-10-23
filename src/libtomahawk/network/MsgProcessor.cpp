@@ -18,9 +18,18 @@
 
 #include "MsgProcessor.h"
 
+#include "network/Msg_p.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
 
+#include <qjson/parser.h>
+#include <qjson/serializer.h>
+#include <qjson/qobjecthelper.h>
+
+#include <QThread>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <qtconcurrentrun.h>
 
 MsgProcessor::MsgProcessor( quint32 mode, quint32 t ) :
     QObject(), m_mode( mode ), m_threshold( t ), m_totmsgsize( 0 )
@@ -106,21 +115,21 @@ MsgProcessor::process( msg_ptr msg, quint32 mode, quint32 threshold )
     if( (mode & UNCOMPRESS_ALL) && msg->is( Msg::COMPRESSED ) )
     {
 //        qDebug() << "MsgProcessor::UNCOMPRESSING";
-        msg->m_payload = qUncompress( msg->payload() );
-        msg->m_length  = msg->m_payload.length();
-        msg->m_flags ^= Msg::COMPRESSED;
+        msg->d_func()->payload = qUncompress( msg->payload() );
+        msg->d_func()->length  = msg->d_func()->payload.length();
+        msg->d_func()->flags ^= Msg::COMPRESSED;
     }
 
     // parse json payload into qvariant if needed
     if( (mode & PARSE_JSON) &&
         msg->is( Msg::JSON ) &&
-        msg->m_json_parsed == false )
+        msg->d_func()->json_parsed == false )
     {
 //        qDebug() << "MsgProcessor::PARSING JSON";
         bool ok;
         QJson::Parser parser;
-        msg->m_json = parser.parse( msg->payload(), &ok );
-        msg->m_json_parsed = true;
+        msg->d_func()->json = parser.parse( msg->payload(), &ok );
+        msg->d_func()->json_parsed = true;
     }
 
     // compress if needed
@@ -129,9 +138,9 @@ MsgProcessor::process( msg_ptr msg, quint32 mode, quint32 threshold )
         && msg->length() > threshold )
     {
 //        qDebug() << "MsgProcessor::COMPRESSING";
-        msg->m_payload = qCompress( msg->payload(), 9 );
-        msg->m_length  = msg->m_payload.length();
-        msg->m_flags |= Msg::COMPRESSED;
+        msg->d_func()->payload = qCompress( msg->payload(), 9 );
+        msg->d_func()->length  = msg->d_func()->payload.length();
+        msg->d_func()->flags |= Msg::COMPRESSED;
     }
     return msg;
 }

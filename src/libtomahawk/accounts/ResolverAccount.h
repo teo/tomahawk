@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,6 +22,10 @@
 
 #include "accounts/Account.h"
 #include "DllMacro.h"
+
+#include <QPointer>
+
+class QDir;
 
 namespace Tomahawk {
 
@@ -49,6 +54,10 @@ public:
 
     // Internal use
     static Account* createFromPath( const QString& path, const QString& factoryId, bool isAttica );
+
+private:
+    static QVariantHash metadataFromJsonFile( const QString& path );
+    static void expandPaths( const QDir& contentDir, QVariantHash& configuration );
 };
 
 /**
@@ -69,7 +78,7 @@ public:
     virtual bool isAuthenticated() const;
     virtual Tomahawk::Accounts::Account::ConnectionState connectionState() const;
 
-    virtual QWidget* configurationWidget();
+    virtual AccountConfigWidget* configurationWidget();
     virtual QString errorMessage() const;
 
     virtual void saveConfig();
@@ -77,22 +86,27 @@ public:
 
     QString path() const;
 
+    virtual QPixmap icon() const;
+    virtual QString description() const;
+    virtual QString author() const;
+    virtual QString version() const;
+
     // Not relevant
-    virtual QPixmap icon() const { return QPixmap(); }
-    virtual SipPlugin* sipPlugin() { return 0; }
+    virtual SipPlugin* sipPlugin( bool ) { return 0; }
     virtual Tomahawk::InfoSystem::InfoPluginPtr infoPlugin() { return Tomahawk::InfoSystem::InfoPluginPtr(); }
     virtual QWidget* aclWidget() { return 0; }
+
+    virtual void removeBundle();
 
 private slots:
     void resolverChanged();
 
 protected:
     // Created by factory, when user installs a new resolver
-    ResolverAccount( const QString& accountId, const QString& path );
-
+    ResolverAccount( const QString& accountId, const QString& path, const QVariantHash& initialConfiguration = QVariantHash() );
     void hookupResolver();
 
-    QWeakPointer<ExternalResolverGui> m_resolver;
+    QPointer<ExternalResolverGui> m_resolver;
 
 private:
     void init( const QString& path );
@@ -123,9 +137,10 @@ private slots:
     void resolverIconUpdated( const QString& );
 
     void loadIcon();
+
 private:
     // Created by factory, when user installs a new resolver
-    AtticaResolverAccount( const QString& accountId, const QString& path, const QString& atticaId );
+    AtticaResolverAccount( const QString& accountId, const QString& path, const QString& atticaId, const QVariantHash& initialConfiguration = QVariantHash() );
 
     void init();
 

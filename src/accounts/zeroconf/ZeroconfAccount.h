@@ -19,9 +19,10 @@
 #ifndef ZEROCONF_ACCOUNTS_H
 #define ZEROCONF_ACCOUNTS_H
 
+#include "TomahawkPlugin.h"
 #include "Zeroconf.h"
 #include "accounts/Account.h"
-#include "../AccountDllMacro.h"
+#include "accounts/AccountDllMacro.h"
 
 class SipPlugin;
 
@@ -32,14 +33,16 @@ namespace Accounts
 
 class ACCOUNTDLLEXPORT ZeroconfFactory : public AccountFactory
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.AccountFactory" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::Accounts::AccountFactory )
+
 public:
     ZeroconfFactory();
     virtual ~ZeroconfFactory();
 
     virtual QString factoryId() const { return "zeroconfaccount"; }
-    virtual QString prettyName() const { return "Local Network"; }
+    virtual QString prettyName() const { return tr( "Local Network" ); }
     QString description() const { return tr( "Automatically connect to Tomahawks on the local network" ); }
     virtual bool isUnique() const { return true; }
     AccountTypes types() const { return AccountTypes( SipType ); };
@@ -66,13 +69,13 @@ public:
     ConnectionState connectionState() const;
 
     virtual Tomahawk::InfoSystem::InfoPluginPtr infoPlugin() { return Tomahawk::InfoSystem::InfoPluginPtr(); }
-    SipPlugin* sipPlugin();
+    SipPlugin* sipPlugin( bool create = true );
 
-    QWidget* configurationWidget() { return 0; }
+    AccountConfigWidget* configurationWidget() { return 0; }
     QWidget* aclWidget() { return 0; }
 
 private:
-    QWeakPointer< ZeroconfPlugin > m_sipPlugin;
+    QPointer< ZeroconfPlugin > m_sipPlugin;
 };
 
 }

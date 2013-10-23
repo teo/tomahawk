@@ -18,16 +18,20 @@
 
 #include "DatabaseCommand_AllArtists.h"
 
-#include <QSqlQuery>
-
-#include "Artist.h"
-#include "DatabaseImpl.h"
-#include "Source.h"
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
 
+#include "Artist.h"
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
 
-DatabaseCommand_AllArtists::DatabaseCommand_AllArtists( const Tomahawk::collection_ptr &collection, QObject *parent )
+#include <QSqlQuery>
+
+namespace Tomahawk
+{
+
+DatabaseCommand_AllArtists::DatabaseCommand_AllArtists( const Tomahawk::collection_ptr& collection, QObject* parent )
     : DatabaseCommand( parent )
     , m_collection( collection )
     , m_amount( 0 )
@@ -46,7 +50,6 @@ void
 DatabaseCommand_AllArtists::exec( DatabaseImpl* dbi )
 {
     TomahawkSqlQuery query = dbi->newquery();
-    QList<Tomahawk::artist_ptr> al;
     QString orderToken, sourceToken, filterToken, tables, joins;
 
     switch ( m_sortOrder )
@@ -95,13 +98,15 @@ DatabaseCommand_AllArtists::exec( DatabaseImpl* dbi )
     query.prepare( sql );
     query.exec();
 
-    while( query.next() )
+    QList<Tomahawk::artist_ptr> al;
+    while ( query.next() )
     {
         Tomahawk::artist_ptr artist = Tomahawk::Artist::get( query.value( 0 ).toUInt(), query.value( 1 ).toString() );
-
         al << artist;
     }
 
     emit artists( al );
     emit done();
+}
+
 }

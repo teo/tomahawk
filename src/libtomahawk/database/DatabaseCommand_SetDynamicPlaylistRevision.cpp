@@ -18,15 +18,22 @@
 
 #include "DatabaseCommand_SetDynamicPlaylistRevision.h"
 
-#include "Source.h"
-#include "DatabaseImpl.h"
-#include "TomahawkSqlQuery.h"
+#include "collection/Collection.h"
 #include "playlist/dynamic/DynamicPlaylist.h"
 #include "playlist/dynamic/DynamicControl.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
 
+#include "DatabaseImpl.h"
+#include "Source.h"
+#include "TomahawkSqlQuery.h"
+
+#include <qjson/serializer.h>
+
 #include <QSqlQuery>
+
+namespace Tomahawk
+{
 
 DatabaseCommand_SetDynamicPlaylistRevision::DatabaseCommand_SetDynamicPlaylistRevision( const Tomahawk::source_ptr& s,
                                                                                 const QString& playlistguid,
@@ -86,7 +93,8 @@ DatabaseCommand_SetDynamicPlaylistRevision::controlsV()
 void
 DatabaseCommand_SetDynamicPlaylistRevision::postCommitHook()
 {
-    if ( source().isNull() || source()->collection().isNull() )
+    tDebug() << Q_FUNC_INFO;
+    if ( source().isNull() || source()->dbCollection().isNull() )
     {
         tDebug() << "Source has gone offline, not emitting to GUI.";
         return;
@@ -97,39 +105,31 @@ DatabaseCommand_SetDynamicPlaylistRevision::postCommitHook()
         orderedentriesguids << v.toString();
 
     Q_ASSERT( !source().isNull() );
-    Q_ASSERT( !source()->collection().isNull() );
+    Q_ASSERT( !source()->dbCollection().isNull() );
     tLog() << "Postcommitting this playlist:" << playlistguid() << source().isNull();
 
     // private, but we are a friend. will recall itself in its own thread:
-    dynplaylist_ptr playlist = source()->collection()->autoPlaylist( playlistguid() );
-    if ( playlist.isNull() )
-        playlist = source()->collection()->station( playlistguid() );
-    // UGH we don't have a sharedptr from DynamicPlaylist+
+    DynamicPlaylist* rawPl = 0;
+    dynplaylist_ptr playlist = source()->dbCollection()->autoPlaylist( playlistguid() );
+    if ( !playlist )
+        playlist = source()->dbCollection()->station( playlistguid() );
 
-    DynamicPlaylist* rawPl = playlist.data();
-    if( playlist.isNull() ) // if it's neither an auto or station, it must not be auto-loaded, so we MUST have been told about it directly
-        rawPl = m_playlist;
-
-    if ( rawPl == 0 )
+    if ( playlist )
+        rawPl = playlist.data();
+    else
     {
-        tLog() <<"Got null playlist with guid:" << playlistguid() << "from source and collection:" << source()->friendlyName() << source()->collection()->name() << "and mode is static?:" << (m_mode == Static);
-        Q_ASSERT( false );
+        // if it's neither an auto or station, it must not be auto-loaded, so we MUST have been told about it directly
+        rawPl = m_playlist;
+    }
+
+    if ( !rawPl )
+    {
+        tLog() << "Got null playlist with guid:" << playlistguid() << "from source and collection:" << source()->friendlyName() << source()->dbCollection()->name() << "and mode is static?:" << (m_mode == Static);
+//        Q_ASSERT( false );
         return;
     }
-    
-    // workaround a bug in pre-0.1.0 tomahawks. they created dynamic playlists in OnDemand mode *always*, and then set the mode to the real one.
-    // now that we separate them, if we get them as one and then get a changed mode, the playlist ends up in the wrong bucket in Collection.
-    // so here we fix it if we have to.
-    // HACK
-    tDebug() << "Does this need the 0.3->0.1 playlist category hack fix?" << ( rawPl->mode() == Static && source()->collection()->autoPlaylist( playlistguid() ).isNull() )
-        <<  ( rawPl->mode() == OnDemand && source()->collection()->station( playlistguid() ).isNull() )
-                    << rawPl->mode() << source()->collection()->autoPlaylist( playlistguid() ).isNull() << source()->collection()->station( playlistguid() ).isNull();
-    if( rawPl->mode() == Static && source()->collection()->autoPlaylist( playlistguid() ).isNull() ) // should be here
-        source()->collection()->moveStationToAuto( playlistguid() );
-    else if ( rawPl->mode() == OnDemand && source()->collection()->station( playlistguid() ).isNull() ) // should be here
-        source()->collection()->moveAutoToStation( playlistguid() );
 
-  if ( !m_controlsV.isEmpty() && m_controls.isEmpty() )
+    if ( !m_controlsV.isEmpty() && m_controls.isEmpty() )
     {
         QList<QVariantMap> controlMap;
         foreach( const QVariant& v, m_controlsV )
@@ -179,6 +179,8 @@ void
 DatabaseCommand_SetDynamicPlaylistRevision::exec( DatabaseImpl* lib )
 {
     DatabaseCommand_SetPlaylistRevision::exec( lib );
+    if ( m_failed )
+        return;
 
     QVariantList newcontrols;
     if ( m_controlsV.isEmpty() && !m_controls.isEmpty() )
@@ -268,4 +270,6 @@ void
 DatabaseCommand_SetDynamicPlaylistRevision::setPlaylist( DynamicPlaylist* pl )
 {
     m_playlist = pl;
+}
+
 }

@@ -20,11 +20,14 @@
 #ifndef DYNAMIC_PLAYLIST_CONTROL
 #define DYNAMIC_PLAYLIST_CONTROL
 
-#include <QtCore/QObject>
-#include <QtCore/QSharedPointer>
-#include <QStringList>
-#include <QtGui/QWidget>
+#include "DllMacro.h"
 #include "Typedefs.h"
+
+
+#include <QObject>
+#include <QSharedPointer>
+#include <QStringList>
+#include <QWidget>
 
 namespace Tomahawk
 {
@@ -39,7 +42,7 @@ namespace Tomahawk
  *  Each control also has a list of TypeSelectors that comes from the generator, and only one is selected at once.
  *
  */
-class DynamicControl : public QObject
+class DLLEXPORT DynamicControl : public QObject
 {
     Q_OBJECT
     Q_PROPERTY( QString type READ type WRITE setType ) // the generator type associated with this control
@@ -116,6 +119,8 @@ private:
     QString m_id;
 };
 
-};
+}
+
+Q_DECLARE_METATYPE( Tomahawk::dyncontrol_ptr )
 
 #endif

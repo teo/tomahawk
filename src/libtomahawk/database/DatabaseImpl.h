@@ -22,6 +22,7 @@
 
 #include <QObject>
 #include <QList>
+#include <QMutex>
 #include <QPair>
 #include <QVariant>
 #include <QVariantMap>
@@ -31,13 +32,18 @@
 #include <QHash>
 #include <QThread>
 
+#include "DllMacro.h"
 #include "TomahawkSqlQuery.h"
-#include "FuzzyIndex.h"
 #include "Typedefs.h"
+
+class FuzzyIndex;
+
+namespace Tomahawk
+{
 
 class Database;
 
-class DatabaseImpl : public QObject
+class DLLEXPORT DatabaseImpl : public QObject
 {
 Q_OBJECT
 
@@ -102,5 +108,7 @@ private:
     FuzzyIndex* m_fuzzyIndex;
     mutable QMutex m_mutex;
 };
+
+}
 
 #endif // DATABASEIMPL_H

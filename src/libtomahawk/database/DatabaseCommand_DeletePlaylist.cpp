@@ -20,8 +20,11 @@
 
 #include <QSqlQuery>
 
+#include "collection/Collection.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
+
+#include "Playlist.h"
 
 using namespace Tomahawk;
 
@@ -53,16 +56,16 @@ void
 DatabaseCommand_DeletePlaylist::postCommitHook()
 {
     qDebug() << Q_FUNC_INFO << "..reporting..";
-    if ( source().isNull() || source()->collection().isNull() )
+    if ( source().isNull() || source()->dbCollection().isNull() )
     {
         qDebug() << "Source has gone offline, not emitting to GUI.";
         return;
     }
 
-    playlist_ptr playlist = source()->collection()->playlist( m_playlistguid );
+    playlist_ptr playlist = source()->dbCollection()->playlist( m_playlistguid );
     Q_ASSERT( !playlist.isNull() );
-
-    playlist->reportDeleted( playlist );
+    if ( playlist )
+        playlist->reportDeleted( playlist );
 
     if( source()->isLocal() )
         Servent::instance()->triggerDBSync();

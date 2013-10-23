@@ -21,7 +21,7 @@
 #define TOMAHAWKSOURCEPLAYLISTINTERFACE_H
 
 #include <QObject>
-#include <QSharedPointer>
+#include <QPointer>
 
 #include "Typedefs.h"
 #include "PlaylistInterface.h"
@@ -36,21 +36,23 @@ class DLLEXPORT SourcePlaylistInterface : public Tomahawk::PlaylistInterface
 Q_OBJECT
 
 public:
-    SourcePlaylistInterface( Tomahawk::Source *source, Tomahawk::PlaylistModes::LatchMode latchMode = PlaylistModes::StayOnSong );
+    SourcePlaylistInterface( Tomahawk::Source* source, Tomahawk::PlaylistModes::LatchMode latchMode = PlaylistModes::StayOnSong );
     virtual ~SourcePlaylistInterface();
 
-    QList<Tomahawk::query_ptr> tracks();
+    QList<Tomahawk::query_ptr> tracks() const;
 
     virtual int trackCount() const { return 1; }
 
-    virtual Tomahawk::query_ptr itemAt( unsigned int position ) const { Q_UNUSED( position ); Q_ASSERT( false ); return Tomahawk::query_ptr(); }
-    virtual int indexOfResult( const Tomahawk::result_ptr& result ) const { Q_UNUSED( result ); Q_ASSERT( false ); return -1; }
-    virtual int indexOfQuery( const Tomahawk::query_ptr& query ) const { Q_UNUSED( query ); Q_ASSERT( false ); return -1; }
+    virtual void setCurrentIndex( qint64 index );
+    virtual Tomahawk::result_ptr resultAt( qint64 index ) const;
+    virtual Tomahawk::query_ptr queryAt( qint64 index ) const;
+    virtual qint64 indexOfResult( const Tomahawk::result_ptr& result ) const;
+    virtual qint64 indexOfQuery( const Tomahawk::query_ptr& query ) const { Q_UNUSED( query ); Q_ASSERT( false ); return -1; }
 
-    virtual Tomahawk::result_ptr siblingItem( int itemsAway, bool readOnly = false );
-    virtual bool sourceValid();
-    virtual bool hasNextItem();
-    virtual Tomahawk::result_ptr nextItem();
+    virtual qint64 siblingIndex( int itemsAway, qint64 rootIndex = -1 ) const;
+    virtual bool sourceValid() const;
+    virtual bool hasNextResult() const;
+    virtual Tomahawk::result_ptr nextResult() const;
     virtual Tomahawk::result_ptr currentItem() const;
 
     virtual PlaylistModes::RepeatMode repeatMode() const { return PlaylistModes::NoRepeat; }
@@ -63,7 +65,7 @@ public:
 
     virtual bool shuffled() const { return false; }
 
-    virtual QWeakPointer< Tomahawk::Source > source() const;
+    virtual QPointer< Tomahawk::Source > source() const;
 
     virtual void reset();
 
@@ -73,13 +75,13 @@ public slots:
     virtual void audioPaused() { setLatchMode( PlaylistModes::StayOnSong ); }
 
 private slots:
-    void onSourcePlaybackStarted( const Tomahawk::query_ptr& query );
+    void onSourcePlaybackStarted( const Tomahawk::track_ptr& track );
     void resolvingFinished( bool hasResults );
 
 private:
-    QWeakPointer< Tomahawk::Source > m_source;
-    Tomahawk::result_ptr m_currentItem;
-    bool m_gotNextItem;
+    QPointer< Tomahawk::Source > m_source;
+    mutable Tomahawk::result_ptr m_currentItem;
+    mutable bool m_gotNextItem;
 };
 
 }; // ns

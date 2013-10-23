@@ -21,6 +21,7 @@
 
 #include <QObject>
 #include <QNetworkReply>
+#include <QStringList>
 
 #include "Typedefs.h"
 
@@ -34,23 +35,41 @@ public:
     explicit NetworkReply( QNetworkReply* parent = 0 );
     virtual ~NetworkReply();
 
+    void blacklistHostFromRedirection( const QString& host );
     QNetworkReply* reply() const { return m_reply; }
+
+    static const int maxRedirects = 100;
+    static const int maxSameRedirects = 5;
 
 signals:
     void redirected();
 
+    void finalUrlReached();
+    void finalUrlReached( const QUrl& finalUrlReached );
+
     void finished();
+    void finished( const QUrl& finalUrl );
     void error( QNetworkReply::NetworkError error );
 
 private slots:
     void deletedByParent();
+    void metaDataChanged();
     void networkLoadFinished();
 
 private:
+    void connectReplySignals();
+    void disconnectReplySignals();
+    void emitFinished( const QUrl& url );
     void load( const QUrl& url );
 
+    QStringList m_blacklistedHosts;
+    QStringList m_formerUrls;
     QNetworkReply* m_reply;
     QUrl m_url;
 };
+
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    Q_DECLARE_METATYPE( NetworkReply* )
+#endif
 
 #endif // NETWORKREPLY_H

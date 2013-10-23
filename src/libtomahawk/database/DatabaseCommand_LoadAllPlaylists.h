@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2011, Leo Franchi <lfranchi@kde.org>
+ *   Copyright 2013, Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,16 +18,16 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef DATABASECOMMAND_LOADALLPLAYLIST_H
 #define DATABASECOMMAND_LOADALLPLAYLIST_H
 
-#include <QObject>
-#include <QVariantMap>
-
-#include "Typedefs.h"
 #include "DatabaseCommand.h"
 
-#include "DllMacro.h"
+namespace Tomahawk
+{
+
+class DatabaseCommand_LoadAllPlaylistsPrivate;
 
 class DLLEXPORT DatabaseCommand_LoadAllPlaylists : public DatabaseCommand
 {
@@ -43,28 +44,38 @@ public:
         Descending = 2
     };
 
-    explicit DatabaseCommand_LoadAllPlaylists( const Tomahawk::source_ptr& s, QObject* parent = 0 )
-        : DatabaseCommand( s, parent )
-        , m_limitAmount( 0 )
-        , m_sortOrder( None )
-        , m_sortDescending( false )
-    {}
+    explicit DatabaseCommand_LoadAllPlaylists( const Tomahawk::source_ptr& s, QObject* parent = 0 );
 
     virtual void exec( DatabaseImpl* );
     virtual bool doesMutates() const { return false; }
     virtual QString commandname() const { return "loadallplaylists"; }
 
-    void setLimit( unsigned int limit ) { m_limitAmount = limit; }
-    void setSortOrder( SortOrder order ) { m_sortOrder = order; }
-    void setSortDescending( bool descending ) { m_sortDescending = descending; }
+    void setLimit( unsigned int limit );
+    void setSortOrder( SortOrder order );
+    void setSortDescending( bool descending );
+
+    /**
+     * By default, only playlists with no revision will be loaded as fully
+     * loading a revision is a lot of work which cannot be integrated into
+     * one query.
+     *
+     * Often one only needs to know the trackIds of a playlist, not the
+     * whole revision information.
+     */
+    void setReturnPlEntryIds( bool returnPlEntryIds );
 
 signals:
     void done( const QList<Tomahawk::playlist_ptr>& playlists );
 
+    /**
+     * This signal is only emitted if returnTrackIds == true.
+     */
+    void done( const QHash< Tomahawk::playlist_ptr, QStringList >& playlists );
+
 private:
-    unsigned int m_limitAmount;
-    SortOrder m_sortOrder;
-    bool m_sortDescending;
+    Q_DECLARE_PRIVATE( DatabaseCommand_LoadAllPlaylists )
 };
+
+} // namespace Tomahawk
 
 #endif // DATABASECOMMAND_LOADALLPLAYLIST_H

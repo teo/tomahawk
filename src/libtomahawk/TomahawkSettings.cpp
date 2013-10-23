@@ -20,18 +20,22 @@
 
 #include "TomahawkSettings.h"
 
-#include <QDir>
-
-#include "Source.h"
-#include "sip/SipHandler.h"
-#include "PlaylistInterface.h"
-
+#include "collection/Collection.h"
+#include "database/DatabaseCommand_UpdateSearchIndex.h"
+#include "database/Database.h"
+#include "infosystem/InfoSystemCache.h"
+#include "playlist/PlaylistUpdaterInterface.h"
 #include "utils/Logger.h"
 #include "utils/TomahawkUtils.h"
 
-#include "database/DatabaseCommand_UpdateSearchIndex.h"
-#include "database/Database.h"
-#include "playlist/PlaylistUpdaterInterface.h"
+#include "PlaylistEntry.h"
+#include "PlaylistInterface.h"
+#include "Source.h"
+
+#include <qjson/serializer.h>
+
+#include <qtkeychain/keychain.h>
+#include <QDir>
 
 using namespace Tomahawk;
 
@@ -189,7 +193,6 @@ TomahawkSettings::createSpotifyAccount()
     beginGroup( "accounts/" + accountKey );
     setValue( "enabled", false );
     setValue( "types", QStringList() << "ResolverType" );
-    setValue( "credentials", QVariantHash() );
     setValue( "configuration", QVariantHash() );
     setValue( "accountfriendlyname", "Spotify" );
     endGroup();
@@ -207,7 +210,7 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
 
     if ( oldVersion == 1 )
     {
-        qDebug() << "Migrating config from verson 1 to 2: script resolver config name";
+        qDebug() << "Migrating config from version 1 to 2: script resolver config name";
         if( contains( "script/resolvers" ) ) {
             setValue( "script/loadedresolvers", value( "script/resolvers" ) );
             remove( "script/resolvers" );
@@ -372,7 +375,7 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
             }
             else if ( pluginName == "sipzeroconf" )
             {
-                setValue( QString( "accounts/%1/accountfriendlyname" ).arg( accountKey ), "Local Network" );
+                setValue( QString( "accounts/%1/accountfriendlyname" ).arg( accountKey ), tr( "Local Network" ) );
             }
 
             beginGroup( "accounts/" + accountKey );
@@ -605,6 +608,95 @@ TomahawkSettings::doUpgrade( int oldVersion, int newVersion )
             }
         }
     }
+    else if ( oldVersion == 13 )
+    {
+        //Delete old echonest_stylesandmoods.dat file
+        QFile dataFile( TomahawkUtils::appDataDir().absoluteFilePath( "echonest_stylesandmoods.dat" ) );
+        const bool removed = dataFile.remove();
+        tDebug() << "Tried to remove echonest_stylesandmoods.dat, succeeded?" << removed;
+    }
+    else if ( oldVersion == 14 )
+    {
+        const QStringList accounts = value( "accounts/allaccounts" ).toStringList();
+        tDebug() << "About to move these accounts to QtKeychain:" << accounts;
+
+        //On OSX we store everything under a single Keychain key, so we first need
+        //to gather all the entries in a QVariantMap and then write them all in a
+        //single shot.
+        //NOTE: The following OSX-specific #ifdefs do not affect the config file
+        //      format, which stays the same on all platforms. --Teo 9/2013
+#ifdef Q_OS_MAC
+        QVariantMap everythingMap;
+#endif
+        //Move storage of Credentials from QSettings to QtKeychain
+        foreach ( const QString& account, accounts )
+        {
+            tDebug() << "beginGroup" << QString( "accounts/%1" ).arg( account );
+            beginGroup( QString( "accounts/%1" ).arg( account ) );
+            const QVariantHash creds = value( "credentials" ).toHash();
+            tDebug() << creds[ "username" ]
+                     << ( creds[ "password" ].isNull() ? ", no password" : ", has password" );
+
+            if ( !creds.isEmpty() )
+            {
+#ifdef Q_OS_MAC
+                everythingMap.insert( account, creds );
+                tDebug() << "Preparing upgrade for account" << account;
+#else
+                QKeychain::WritePasswordJob* j = new QKeychain::WritePasswordJob( QLatin1String( "Tomahawk" ), this );
+                j->setKey( account );
+                j->setAutoDelete( true );
+#if defined( Q_OS_UNIX ) && !defined( Q_OS_MAC )
+                j->setInsecureFallback( true );
+#endif
+                QJson::Serializer serializer;
+                bool ok;
+                QByteArray data = serializer.serialize( creds, &ok );
+
+                if ( ok )
+                {
+                    tDebug() << "Performing upgrade for account" << account;
+                }
+                else
+                {
+                    tDebug() << "Upgrade error: cannot serialize credentials to JSON for account" << account;
+                }
+
+                j->setTextData( data );
+                j->start();
+#endif //Q_OS_MAC
+            }
+
+            remove( "credentials" );
+
+            endGroup();
+        }
+
+#ifdef Q_OS_MAC
+        QJson::Serializer serializer;
+        bool ok;
+        QByteArray data = serializer.serialize( everythingMap, &ok );
+
+        if ( ok )
+        {
+            QKeychain::WritePasswordJob* j = new QKeychain::WritePasswordJob( QLatin1String( "Tomahawk" ), this );
+            j->setKey( "tomahawksecrets" ); //Tomahawk::Accounts::OSX_SINGLE_KEY in CredentialsManager.cpp
+            j->setAutoDelete( true );
+
+            j->setTextData( data );
+
+            tDebug() << "Performing OSX-specific upgrade for all accounts.";
+
+            j->start();
+        }
+        else
+        {
+            tDebug() << "Cannot serialize credentials for OSX-specific upgrade"
+                     << "in map:" << everythingMap.keys();
+        }
+#endif
+
+    }
 }
 
 
@@ -648,7 +740,7 @@ TomahawkSettings::scannerPaths() const
 {
     QString musicLocation;
 
-#if defined(Q_WS_X11)
+#if defined(Q_OS_LINUX)
     musicLocation = QDir::homePath() + QLatin1String("/Music");
 #endif
 
@@ -724,6 +816,34 @@ void
 TomahawkSettings::setCrashReporterEnabled( bool enable )
 {
     setValue( "ui/crashReporter", enable );
+}
+
+
+bool
+TomahawkSettings::songChangeNotificationEnabled() const
+{
+    return value( "ui/songChangeNotification", true ).toBool();
+}
+
+
+void
+TomahawkSettings::setSongChangeNotificationEnabled(bool enable)
+{
+    setValue( "ui/songChangeNotification", enable );
+}
+
+
+bool
+TomahawkSettings::autoDetectExternalIp() const
+{
+    return value( "network/auto-detect-external-ip" ).toBool();
+}
+
+
+void
+TomahawkSettings::setAutoDetectExternalIp( bool autoDetect )
+{
+    setValue( "network/auto-detect-external-ip", autoDetect );
 }
 
 
@@ -860,6 +980,30 @@ TomahawkSettings::setAclEntries( const QVariantList &entries )
 }
 
 
+bool
+TomahawkSettings::isSslCertKnown( const QByteArray& sslDigest ) const
+{
+    return value( "network/ssl/certs" ).toMap().contains( sslDigest );
+}
+
+
+bool
+TomahawkSettings::isSslCertTrusted( const QByteArray& sslDigest ) const
+{
+    return value( "network/ssl/certs" ).toMap().value( sslDigest, false ).toBool();
+}
+
+
+void
+TomahawkSettings::setSslCertTrusted( const QByteArray& sslDigest, bool trusted )
+{
+    QVariantMap map = value( "network/ssl/certs" ).toMap();
+    map[ sslDigest ] = trusted;
+
+    setValue( "network/ssl/certs", map );
+}
+
+
 QByteArray
 TomahawkSettings::mainWindowGeometry() const
 {
@@ -915,6 +1059,7 @@ TomahawkSettings::setVerboseNotifications( bool notifications )
     setValue( "ui/notifications/verbose", notifications );
 }
 
+
 bool
 TomahawkSettings::menuBarVisible() const
 {
@@ -925,12 +1070,27 @@ TomahawkSettings::menuBarVisible() const
 #endif
 }
 
+
 void
 TomahawkSettings::setMenuBarVisible( bool visible )
 {
 #ifndef Q_OS_MAC
     setValue( "ui/mainwindow/menuBarVisible", visible );
 #endif
+}
+
+
+bool
+TomahawkSettings::fullscreenEnabled() const
+{
+    return value( "ui/mainwindow/fullscreenEnabled", false ).toBool();
+}
+
+
+void
+TomahawkSettings::setFullscreenEnabled( bool enabled )
+{
+    setValue( "ui/mainwindow/fullscreenEnabled", enabled );
 }
 
 
@@ -998,6 +1158,20 @@ TomahawkSettings::removePlaylistSettings( const QString& playlistid )
 {
     remove( QString( "ui/playlist/%1/shuffleState" ).arg( playlistid ) );
     remove( QString( "ui/playlist/%1/repeatMode" ).arg( playlistid ) );
+}
+
+
+QVariant
+TomahawkSettings::queueState() const
+{
+    return value( QString( "playlists/queue/state" ) );
+}
+
+
+void
+TomahawkSettings::setQueueState( const QVariant& state )
+{
+    setValue( QString( "playlists/queue/state" ), state );
 }
 
 
@@ -1163,20 +1337,20 @@ TomahawkSettings::removeAccount( const QString& accountId )
 }
 
 
-TomahawkSettings::ExternalAddressMode
+Tomahawk::Network::ExternalAddress::Mode
 TomahawkSettings::externalAddressMode()
 {
     if ( value( "network/prefer-static-host-and-port", false ).toBool() )
     {
         remove( "network/prefer-static-host-and-port" );
-        setValue( "network/external-address-mode", TomahawkSettings::Static );
+        setValue( "network/external-address-mode", Tomahawk::Network::ExternalAddress::Static );
     }
-    return (TomahawkSettings::ExternalAddressMode) value( "network/external-address-mode", TomahawkSettings::Upnp ).toInt();
+    return (Tomahawk::Network::ExternalAddress::Mode) value( "network/external-address-mode", Tomahawk::Network::ExternalAddress::Upnp ).toInt();
 }
 
 
 void
-TomahawkSettings::setExternalAddressMode( ExternalAddressMode externalAddressMode )
+TomahawkSettings::setExternalAddressMode( Tomahawk::Network::ExternalAddress::Mode externalAddressMode )
 {
     setValue( "network/external-address-mode", externalAddressMode );
 }
@@ -1335,8 +1509,8 @@ TomahawkSettings::setPrivateListeningMode( TomahawkSettings::PrivateListeningMod
 void
 TomahawkSettings::updateIndex()
 {
-    DatabaseCommand* cmd = new DatabaseCommand_UpdateSearchIndex();
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Tomahawk::DatabaseCommand* cmd = new Tomahawk::DatabaseCommand_UpdateSearchIndex();
+    Database::instance()->enqueue( QSharedPointer<Tomahawk::DatabaseCommand>( cmd ) );
 }
 
 

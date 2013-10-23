@@ -19,10 +19,11 @@
 
 #include "PlaylistPlaylistInterface.h"
 
-#include "Playlist.h"
-#include "SourceList.h"
-
 #include "utils/Logger.h"
+
+#include "Playlist.h"
+#include "PlaylistEntry.h"
+#include "SourceList.h"
 
 using namespace Tomahawk;
 
@@ -36,7 +37,7 @@ PlaylistPlaylistInterface::PlaylistPlaylistInterface( Tomahawk::Playlist* playli
 
 PlaylistPlaylistInterface::~PlaylistPlaylistInterface()
 {
-    m_playlist.clear();
+    m_playlist = 0;
 }
 
 
@@ -48,7 +49,7 @@ PlaylistPlaylistInterface::trackCount() const
 
 
 QList< Tomahawk::query_ptr >
-PlaylistPlaylistInterface::tracks()
+PlaylistPlaylistInterface::tracks() const
 {
     QList<Tomahawk::query_ptr> queries;
     foreach( const plentry_ptr& p, ( m_playlist.isNull() ? QList< Tomahawk::plentry_ptr >() : m_playlist.data()->entries() ) )

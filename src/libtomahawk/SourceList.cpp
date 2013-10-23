@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -23,8 +24,14 @@
 #include "database/DatabaseCommand_LoadAllSources.h"
 #include "network/RemoteCollection.h"
 #include "network/ControlConnection.h"
+#include "infosystem/InfoSystemCache.h"
+#include "resolvers/ExternalResolver.h"
+#include "resolvers/ScriptCollection.h"
+#include "ListeningRoom.h"
 
 #include "utils/Logger.h"
+
+#include <qjson/qobjecthelper.h>
 
 using namespace Tomahawk;
 
@@ -64,8 +71,8 @@ SourceList::setWebSource( const source_ptr& websrc )
 }
 
 
-const
-source_ptr SourceList::webSource() const
+const source_ptr
+SourceList::webSource() const
 {
     return m_dummy;
 }
@@ -74,12 +81,12 @@ source_ptr SourceList::webSource() const
 void
 SourceList::loadSources()
 {
-    DatabaseCommand_LoadAllSources* cmd = new DatabaseCommand_LoadAllSources();
+    Tomahawk::DatabaseCommand_LoadAllSources* cmd = new Tomahawk::DatabaseCommand_LoadAllSources();
 
     connect( cmd, SIGNAL( done( QList<Tomahawk::source_ptr> ) ),
                     SLOT( setSources( QList<Tomahawk::source_ptr> ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -110,7 +117,7 @@ SourceList::setLocal( const Tomahawk::source_ptr& localSrc )
 
     {
         QMutexLocker lock( &m_mut );
-        m_sources.insert( localSrc->userName(), localSrc );
+        m_sources.insert( localSrc->nodeId(), localSrc );
         m_local = localSrc;
     }
 
@@ -126,11 +133,11 @@ SourceList::add( const source_ptr& source )
 {
     Q_ASSERT( m_isReady );
 
-//    qDebug() << "Adding to sources:" << source->userName() << source->id();
-    m_sources.insert( source->userName(), source );
+//    qDebug() << "Adding to sources:" << source->nodeId() << source->id();
+    m_sources.insert( source->nodeId(), source );
 
     if ( source->id() > 0 )
-        m_sources_id2name.insert( source->id(), source->userName() );
+        m_sources_id2name.insert( source->id(), source->nodeId() );
     connect( source.data(), SIGNAL( syncedWithDatabase() ), SLOT( sourceSynced() ) );
 
     collection_ptr coll( new RemoteCollection( source ) );
@@ -201,14 +208,14 @@ SourceList::get( const QString& username, const QString& friendlyName, bool auto
         {
             Q_ASSERT( !friendlyName.isEmpty() );
             source = source_ptr( new Source( -1, username ) );
-            source->setFriendlyName( friendlyName );
+            source->setDbFriendlyName( friendlyName );
             add( source );
         }
     }
     else
     {
         source = m_sources.value( username );
-        source->setFriendlyName( friendlyName );
+        source->setDbFriendlyName( friendlyName );
     }
 
     return source;
@@ -216,11 +223,38 @@ SourceList::get( const QString& username, const QString& friendlyName, bool auto
 
 
 void
+SourceList::createPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents )
+{
+    Tomahawk::playlist_ptr p = Tomahawk::playlist_ptr( new Tomahawk::Playlist( src ) );
+    QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
+    p->reportCreated( p );
+}
+
+
+void
+SourceList::createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents )
+{
+    Tomahawk::dynplaylist_ptr p = Tomahawk::dynplaylist_ptr( new Tomahawk::DynamicPlaylist( src, contents.toMap().value( "type", QString() ).toString()  ) );
+    QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
+    p->reportCreated( p );
+}
+
+
+void
+SourceList::createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents )
+{
+    Tomahawk::listeningroom_ptr p = Tomahawk::listeningroom_ptr( new Tomahawk::ListeningRoom( src ) );
+    QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
+    p->reportCreated( p );
+    tDebug() << Q_FUNC_INFO << "room created";
+}
+
+void
 SourceList::sourceSynced()
 {
     Source* src = qobject_cast< Source* >( sender() );
 
-    m_sources_id2name.insert( src->id(), src->userName() );
+    m_sources_id2name.insert( src->id(), src->nodeId() );
 }
 
 
@@ -231,21 +265,85 @@ SourceList::count() const
     return m_sources.size();
 }
 
+
+QList<collection_ptr>
+SourceList::scriptCollections() const
+{
+    return m_scriptCollections;
+}
+
+
 void
 SourceList::latchedOff( const source_ptr& to )
 {
     Source* s = qobject_cast< Source* >( sender() );
-    const source_ptr source = m_sources[ s->userName() ];
+    const source_ptr source = m_sources[ s->nodeId() ];
 
     emit sourceLatchedOff( source, to );
 }
+
+
+void
+SourceList::onResolverAdded( Resolver* resolver )
+{
+    ExternalResolver* r = qobject_cast< ExternalResolver* >( resolver );
+    if ( r == 0 )
+        return;
+
+    foreach ( const Tomahawk::collection_ptr& collection, r->collections() )
+    {
+        addScriptCollection( collection );
+    }
+
+    connect( r, SIGNAL( collectionAdded( Tomahawk::collection_ptr ) ),
+             this, SLOT( addScriptCollection( Tomahawk::collection_ptr ) ) );
+    connect( r, SIGNAL( collectionRemoved(Tomahawk::collection_ptr) ),
+             this, SLOT( removeScriptCollection( Tomahawk::collection_ptr ) ) );
+}
+
+
+void
+SourceList::onResolverRemoved( Resolver* resolver )
+{
+    ExternalResolver* r = qobject_cast< ExternalResolver* >( resolver );
+    if ( r == 0 )
+        return;
+
+    foreach ( const Tomahawk::collection_ptr& collection, m_scriptCollections )
+        if ( qobject_cast< ScriptCollection* >( collection.data() )->resolver() == r )
+            removeScriptCollection( collection );
+
+    disconnect( r, SIGNAL( collectionAdded( Tomahawk::collection_ptr ) ),
+                this, SLOT( addScriptCollection( Tomahawk::collection_ptr ) ) );
+    disconnect( r, SIGNAL( collectionRemoved(Tomahawk::collection_ptr) ),
+                this, SLOT( removeScriptCollection( Tomahawk::collection_ptr ) ) );
+}
+
+
+void
+SourceList::addScriptCollection( const collection_ptr& collection )
+{
+    m_scriptCollections.append( collection );
+
+    emit scriptCollectionAdded( collection );
+}
+
+
+void
+SourceList::removeScriptCollection( const collection_ptr& collection )
+{
+    emit scriptCollectionRemoved( collection );
+
+    m_scriptCollections.removeAll( collection );
+}
+
 
 void
 SourceList::latchedOn( const source_ptr& to )
 {
 
     Source* s = qobject_cast< Source* >( sender() );
-    const source_ptr source = m_sources[ s->userName() ];
+    const source_ptr source = m_sources[ s->nodeId() ];
 
     emit sourceLatchedOn( source, to );
 }

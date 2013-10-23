@@ -25,6 +25,9 @@
 
 #include "DllMacro.h"
 
+namespace Tomahawk
+{
+
 class DatabaseImpl;
 
 class DLLEXPORT DatabaseCommand_RenameListeningRoom : public DatabaseCommandLoggable
@@ -59,5 +62,7 @@ private:
     QString m_listeningRoomGuid;
     QString m_listeningRoomTitle;
 };
+
+} //ns
 
 #endif // DATABASECOMMAND_RENAMELISTENINGROOM_H

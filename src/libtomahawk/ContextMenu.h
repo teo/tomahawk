@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,8 +21,8 @@
 #ifndef CONTEXTMENU_H
 #define CONTEXTMENU_H
 
-#include <QtCore/QSignalMapper>
-#include <QtGui/QMenu>
+#include <QSignalMapper>
+#include <QMenu>
 
 #include "Typedefs.h"
 #include "DllMacro.h"
@@ -36,14 +37,20 @@ Q_OBJECT
 public:
     enum MenuActions
     {
-       ActionPlay =         1,
-       ActionQueue =        2,
-       ActionDelete =       4,
-       ActionCopyLink =     8,
-       ActionLove =         16,
-       ActionStopAfter =    32,
-       ActionPage =         64,
-       ActionEditMetadata = 128
+        ActionPlay =         1,
+        ActionQueue =        2,
+        ActionDelete =       4,
+        ActionCopyLink =     8,
+        ActionLove =         16,
+        ActionStopAfter =    32,
+        ActionPage =         64,
+        ActionTrackPage =    65,
+        ActionArtistPage =   66,
+        ActionAlbumPage =    67,
+        ActionEditMetadata = 128,
+        ActionPlaylist =     256,
+        ActionSend =         512,
+        ActionMarkListened = 1024
     };
 
     explicit ContextMenu( QWidget* parent = 0 );
@@ -73,20 +80,26 @@ signals:
 private slots:
     void onTriggered( int action );
     void copyLink();
-    void openPage();
+    void openPage( MenuActions action );
     void addToQueue();
+    void addToPlaylist( int playlistIdx );
+    void sendToSource( int sourceIdx );
 
     void onSocialActionsLoaded();
 
 private:
     QSignalMapper* m_sigmap;
+    QSignalMapper* m_playlists_sigmap;
+    QSignalMapper* m_sources_sigmap;
     int m_supportedActions;
 
     QAction* m_loveAction;
 
+    QList< Tomahawk::playlist_ptr > m_playlists;
     QList< Tomahawk::query_ptr > m_queries;
     QList< Tomahawk::artist_ptr > m_artists;
     QList< Tomahawk::album_ptr > m_albums;
+    QList< Tomahawk::source_ptr > m_sources;
 
     Tomahawk::playlistinterface_ptr m_interface;
 };

@@ -54,7 +54,7 @@ RecentlyAddedModel::loadHistory()
     }
     startLoading();
 
-    DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_source->collection() );
+    DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( m_source->dbCollection() );
     cmd->setLimit( m_limit );
     cmd->setSortOrder( DatabaseCommand_AllTracks::ModificationTime );
     cmd->setSortDescending( true );
@@ -62,7 +62,7 @@ RecentlyAddedModel::loadHistory()
     connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr>, QVariant ) ),
                     SLOT( appendQueries( QList<Tomahawk::query_ptr> ) ), Qt::QueuedConnection );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -103,7 +103,7 @@ RecentlyAddedModel::setSource( const Tomahawk::source_ptr& source )
 void
 RecentlyAddedModel::onSourceAdded( const Tomahawk::source_ptr& source )
 {
-    connect( source->collection().data(), SIGNAL( changed() ), SLOT( loadHistory() ) );
+    connect( source->dbCollection().data(), SIGNAL( changed() ), SLOT( loadHistory() ) );
 }
 
 

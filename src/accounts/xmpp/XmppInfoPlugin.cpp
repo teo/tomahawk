@@ -25,6 +25,11 @@
 #include "utils/Logger.h"
 #include "TomahawkSettings.h"
 
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "Source.h"
+#endif
+
 
 // remove now playing status after PAUSE_TIMEOUT seconds
 static const int PAUSE_TIMEOUT = 10;
@@ -122,10 +127,12 @@ Tomahawk::InfoSystem::XmppInfoPlugin::audioStarted( const Tomahawk::InfoSystem::
     emit publishTune( url, info );
 }
 
+
 void
 Tomahawk::InfoSystem::XmppInfoPlugin::audioPaused()
 {
 }
+
 
 void
 Tomahawk::InfoSystem::XmppInfoPlugin::audioStopped()

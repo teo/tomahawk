@@ -20,13 +20,21 @@
  */
 
 #include "ActionCollection.h"
+
 #include "TomahawkSettings.h"
+#include "Source.h"
 #include "audio/AudioEngine.h"
+#include "utils/ImageRegistry.h"
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
-#include "Source.h"
 
 #include <QCoreApplication>
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "Query.h"
+#endif
+
 
 ActionCollection* ActionCollection::s_instance = 0;
 ActionCollection* ActionCollection::instance()
@@ -55,10 +63,10 @@ void
 ActionCollection::initActions()
 {
     QAction *latchOn = new QAction( tr( "&Listen Along" ), this );
-    latchOn->setIcon( QIcon( RESPATH "images/headphones-sidebar.png" ) );
+    latchOn->setIcon( ImageRegistry::instance()->icon( RESPATH "images/headphones.svg" ) );
     m_actionCollection[ "latchOn" ] = latchOn;
     QAction *latchOff = new QAction( tr( "Stop &Listening Along" ), this );
-    latchOff->setIcon( QIcon( RESPATH "images/headphones-off.png" ) );
+    latchOff->setIcon( ImageRegistry::instance()->icon( RESPATH "images/headphones-off.svg" ) );
     m_actionCollection[ "latchOff" ] = latchOff;
 
     QAction *realtimeFollowingAlong = new QAction( tr( "&Follow in real-time" ), this );
@@ -67,23 +75,27 @@ ActionCollection::initActions()
 
     bool isPublic = TomahawkSettings::instance()->privateListeningMode() == TomahawkSettings::PublicListening;
     QAction *privacyToggle = new QAction( ( isPublic ? tr( "&Listen Privately" ) : tr( "&Listen Publicly" ) ), this );
-    privacyToggle->setIcon( QIcon( RESPATH "images/private-listening.png" ) );
+    privacyToggle->setIcon( ImageRegistry::instance()->icon( RESPATH "images/private-listening.svg" ) );
     privacyToggle->setIconVisibleInMenu( isPublic );
     m_actionCollection[ "togglePrivacy" ] = privacyToggle;
     connect( m_actionCollection[ "togglePrivacy" ], SIGNAL( triggered() ), SLOT( togglePrivateListeningMode() ), Qt::UniqueConnection );
 
     m_actionCollection[ "loadPlaylist" ] =   new QAction( tr( "&Load Playlist" ), this );
+    m_actionCollection[ "loadStation" ] =    new QAction( tr( "&Load Station" ), this );
     m_actionCollection[ "renamePlaylist" ] = new QAction( tr( "&Rename Playlist" ), this );
+    m_actionCollection[ "renameStation" ] = new QAction( tr( "&Rename Station" ), this );
     m_actionCollection[ "copyPlaylist" ] =   new QAction( tr( "&Copy Playlist Link" ), this );
     m_actionCollection[ "playPause" ] =      new QAction( tr( "&Play" ), this );
-    m_actionCollection[ "playPause" ]->setIcon( QIcon( RESPATH "images/play-rest.png" ) );
+    m_actionCollection[ "playPause" ]->setIcon( ImageRegistry::instance()->icon( RESPATH "images/play-rest.svg" ) );
     m_actionCollection[ "playPause" ]->setShortcut( Qt::Key_Space );
     m_actionCollection[ "playPause" ]->setShortcutContext( Qt::ApplicationShortcut );
     m_actionCollection[ "stop" ] =           new QAction( tr( "&Stop" ), this );
     m_actionCollection[ "previousTrack" ] =  new QAction( tr( "&Previous Track" ), this );
-    m_actionCollection[ "previousTrack" ]->setIcon( QIcon( RESPATH "images/back-rest.png" ) );
+    m_actionCollection[ "previousTrack" ]->setIcon( ImageRegistry::instance()->icon( RESPATH "images/back-rest.svg" ) );
+    m_actionCollection[ "previousTrack" ]->setShortcut( QKeySequence( "Left" ) );
     m_actionCollection[ "nextTrack" ] =      new QAction( tr( "&Next Track" ), this );
-    m_actionCollection[ "nextTrack" ]->setIcon( QIcon( RESPATH "images/skip-rest.png" ) );
+    m_actionCollection[ "nextTrack" ]->setIcon( ImageRegistry::instance()->icon( RESPATH "images/skip-rest.svg" ) );
+    m_actionCollection[ "nextTrack" ]->setShortcut( QKeySequence( "Right" ) );
     m_actionCollection[ "quit" ] =           new QAction( tr( "&Quit" ), this );
     m_actionCollection[ "quit" ]->setShortcut( QKeySequence::Quit );
     m_actionCollection[ "quit" ]->setShortcutContext( Qt::ApplicationShortcut );
@@ -101,44 +113,49 @@ ActionCollection::initActions()
     connect( m_actionCollection[ "nextTrack" ],     SIGNAL( triggered() ), ae,   SLOT( next() ),      Qt::UniqueConnection );
 
     // main menu actions
-    m_actionCollection[ "loadXSPF" ] =           new QAction( tr( "Load &XSPF..." ), this );
-    m_actionCollection[ "updateCollection" ] =   new QAction( tr( "U&pdate Collection" ), this );
-    m_actionCollection[ "rescanCollection" ] =   new QAction( tr( "Fully &Rescan Collection" ), this );
+    m_actionCollection[ "loadXSPF" ] = new QAction( tr( "Load &XSPF..." ), this );
+    m_actionCollection[ "updateCollection" ] = new QAction( tr( "U&pdate Collection" ), this );
+    m_actionCollection[ "rescanCollection" ] = new QAction( tr( "Fully &Rescan Collection" ), this );
     m_actionCollection[ "showOfflineSources" ] = new QAction( tr( "Show Offline Sources" ), this );
     m_actionCollection[ "showOfflineSources" ]->setCheckable( true );
-    m_actionCollection[ "preferences" ] =        new QAction( tr( "&Configure Tomahawk..." ), this );
-    m_actionCollection[ "preferences" ]->setIcon( QIcon( RESPATH "images/configure.png" ) );
+    m_actionCollection[ "preferences" ] = new QAction( tr( "&Configure Tomahawk..." ), this );
+    m_actionCollection[ "preferences" ]->setIcon( ImageRegistry::instance()->icon( RESPATH "images/configure.svg" ) );
     m_actionCollection[ "preferences" ]->setMenuRole( QAction::PreferencesRole );
 #ifdef Q_OS_MAC
-    m_actionCollection[ "minimize" ] =           new QAction( tr( "Minimize" ), this );
+    m_actionCollection[ "minimize" ] = new QAction( tr( "Minimize" ), this );
     m_actionCollection[ "minimize" ]->setShortcut( QKeySequence( "Ctrl+M" ) );
-    m_actionCollection[ "zoom" ] =               new QAction( tr( "Zoom" ), this );
+    m_actionCollection[ "zoom" ] = new QAction( tr( "Zoom" ), this );
     m_actionCollection[ "zoom" ]->setShortcut( QKeySequence( "Meta+Ctrl+Z" ) );
+    m_actionCollection[ "fullscreen" ] = new QAction( tr( "Enter Full Screen" ), this );
+    m_actionCollection[ "fullscreen" ]->setShortcut( QKeySequence( "Meta+Ctrl+F" ) );
 #else
-    m_actionCollection[ "toggleMenuBar" ] =      new QAction( tr( "Hide Menu Bar" ), this );
+    m_actionCollection[ "toggleMenuBar" ] = new QAction( tr( "Hide Menu Bar" ), this );
     m_actionCollection[ "toggleMenuBar" ]->setShortcut( QKeySequence( "Ctrl+M" ) );
     m_actionCollection[ "toggleMenuBar" ]->setShortcutContext( Qt::ApplicationShortcut );
 #endif
-    m_actionCollection[ "diagnostics" ] =        new QAction( tr( "Diagnostics..." ), this );
+    m_actionCollection[ "diagnostics" ] = new QAction( tr( "Diagnostics..." ), this );
     m_actionCollection[ "diagnostics" ]->setMenuRole( QAction::ApplicationSpecificRole );
-    m_actionCollection[ "aboutTomahawk" ] =      new QAction( tr( "About &Tomahawk..." ), this );
-    m_actionCollection[ "aboutTomahawk" ]->setIcon( QIcon( RESPATH "images/info.png" ) );
+    m_actionCollection[ "aboutTomahawk" ] = new QAction( tr( "About &Tomahawk..." ), this );
+    m_actionCollection[ "aboutTomahawk" ]->setIcon( ImageRegistry::instance()->icon( RESPATH "images/info.svg" ) );
     m_actionCollection[ "aboutTomahawk" ]->setMenuRole( QAction::AboutRole );
-    m_actionCollection[ "legalInfo" ] =          new QAction( tr( "&Legal Information..." ), this );
+    m_actionCollection[ "legalInfo" ] = new QAction( tr( "&Legal Information..." ), this );
     m_actionCollection[ "legalInfo" ]->setMenuRole( QAction::ApplicationSpecificRole );
-#if defined( Q_OS_MAC ) && defined( HAVE_SPARKLE ) || defined( Q_WS_WIN )
-    m_actionCollection[ "checkForUpdates" ] =    new QAction( tr( "Check For Updates..." ), this );
+    m_actionCollection[ "openLogfile" ] = new QAction( tr( "&View Logfile" ), this );
+    m_actionCollection[ "openLogfile" ]->setMenuRole( QAction::ApplicationSpecificRole );
+    #if defined( Q_OS_MAC ) && defined( HAVE_SPARKLE ) || defined( Q_WS_WIN )
+    m_actionCollection[ "checkForUpdates" ] = new QAction( tr( "Check For Updates..." ), this );
     m_actionCollection[ "checkForUpdates" ]->setMenuRole( QAction::ApplicationSpecificRole );
 #endif
-    m_actionCollection[ "crashNow" ] =           new QAction( "Crash now...", this );
+    m_actionCollection[ "crashNow" ] = new QAction( "Crash now...", this );
 }
 
-QMenuBar *
+
+QMenuBar*
 ActionCollection::createMenuBar( QWidget *parent )
 {
-    QMenuBar *menuBar = new QMenuBar( parent );
+    QMenuBar* menuBar = new QMenuBar( parent );
 
-    QMenu *controlsMenu = new QMenu( tr( "&Controls" ), menuBar );
+    QMenu* controlsMenu = new QMenu( tr( "&Controls" ), menuBar );
     controlsMenu->addAction( m_actionCollection[ "playPause" ] );
     controlsMenu->addAction( m_actionCollection[ "previousTrack" ] );
     controlsMenu->addAction( m_actionCollection[ "nextTrack" ] );
@@ -152,20 +169,21 @@ ActionCollection::createMenuBar( QWidget *parent )
     controlsMenu->addSeparator();
     controlsMenu->addAction( m_actionCollection[ "quit" ] );
 
-    QMenu *settingsMenu = new QMenu( tr( "&Settings" ), menuBar );
+    QMenu* settingsMenu = new QMenu( tr( "&Settings" ), menuBar );
 #ifndef Q_OS_MAC
     settingsMenu->addAction( m_actionCollection[ "toggleMenuBar" ] );
 #endif
     settingsMenu->addAction( m_actionCollection[ "preferences" ] );
 
-    QMenu *helpMenu = new QMenu( tr( "&Help" ), menuBar );
+    QMenu* helpMenu = new QMenu( tr( "&Help" ), menuBar );
     helpMenu->addAction( m_actionCollection[ "diagnostics" ] );
-    helpMenu->addAction( m_actionCollection[ "aboutTomahawk" ] );
+    helpMenu->addAction( m_actionCollection[ "openLogfile" ] );
     helpMenu->addAction( m_actionCollection[ "legalInfo" ] );
+    helpMenu->addAction( m_actionCollection[ "aboutTomahawk" ] );
 
     // Setup update check
 #ifndef Q_OS_MAC
-    helpMenu->insertSeparator( m_actionCollection[ "aboutTomahawk" ] );
+    helpMenu->insertSeparator( m_actionCollection[ "legalInfo" ] );
 #endif
 
 #if defined( Q_OS_MAC ) && defined( HAVE_SPARKLE )
@@ -182,21 +200,25 @@ ActionCollection::createMenuBar( QWidget *parent )
 
     menuBar->addMenu( controlsMenu );
     menuBar->addMenu( settingsMenu );
+
 #if defined( Q_OS_MAC )
-    QMenu *windowMenu = new QMenu( tr( "&Window" ), menuBar );
+    QMenu* windowMenu = new QMenu( tr( "&Window" ), menuBar );
     windowMenu->addAction( m_actionCollection[ "minimize" ] );
     windowMenu->addAction( m_actionCollection[ "zoom" ] );
+    windowMenu->addAction( m_actionCollection[ "fullscreen" ] );
 
     menuBar->addMenu( windowMenu );
 #endif
+
     menuBar->addMenu( helpMenu );
     return menuBar;
 }
 
-QMenu *
+
+QMenu*
 ActionCollection::createCompactMenu( QWidget *parent )
 {
-    QMenu *compactMenu = new QMenu( tr( "Main Menu" ), parent );
+    QMenu* compactMenu = new QMenu( tr( "Main Menu" ), parent );
 
     compactMenu->addAction( m_actionCollection[ "playPause" ] );
     compactMenu->addAction( m_actionCollection[ "previousTrack" ] );
@@ -220,12 +242,13 @@ ActionCollection::createCompactMenu( QWidget *parent )
     compactMenu->addSeparator();
 
     compactMenu->addAction( m_actionCollection[ "diagnostics" ] );
-    compactMenu->addAction( m_actionCollection[ "aboutTomahawk" ] );
+    compactMenu->addAction( m_actionCollection[ "openLogfile" ] );
     compactMenu->addAction( m_actionCollection[ "legalInfo" ] );
+    compactMenu->addAction( m_actionCollection[ "aboutTomahawk" ] );
 
     // Setup update check
 #ifndef Q_OS_MAC
-    compactMenu->insertSeparator( m_actionCollection[ "aboutTomahawk" ] );
+    compactMenu->insertSeparator( m_actionCollection[ "legalInfo" ] );
 #endif
 
 #if defined( Q_OS_MAC ) && defined( HAVE_SPARKLE )

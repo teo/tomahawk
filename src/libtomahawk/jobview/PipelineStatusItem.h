@@ -23,6 +23,7 @@
 #include "Query.h"
 
 #include <QPixmap>
+#include <QPointer>
 
 class PipelineStatusItem : public JobStatusItem
 {
@@ -45,8 +46,6 @@ private slots:
 
 private:
     QString m_latestQuery;
-
-    static QPixmap* s_pixmap;
 };
 
 class PipelineStatusManager : public QObject
@@ -60,7 +59,7 @@ private slots:
     void resolving( const Tomahawk::query_ptr& p );
 
 private:
-    QWeakPointer<PipelineStatusItem> m_curItem;
+    QPointer<PipelineStatusItem> m_curItem;
 };
 
 

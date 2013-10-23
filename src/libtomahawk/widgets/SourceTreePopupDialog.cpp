@@ -19,8 +19,6 @@
 
 #include "SourceTreePopupDialog.h"
 
-#include "utils/TomahawkUtilsGui.h"
-
 #include <QApplication>
 #include <QPaintEvent>
 #include <QPainter>
@@ -33,8 +31,12 @@
 #include <QTimer>
 
 #ifdef QT_MAC_USE_COCOA
-#include "SourceTreePopupDialog_mac.h"
+    #include "SourceTreePopupDialog_mac.h"
 #endif
+
+#include "utils/TomahawkStyle.h"
+#include "utils/TomahawkUtilsGui.h"
+#include "utils/ImageRegistry.h"
 
 using namespace Tomahawk;
 
@@ -45,23 +47,19 @@ SourceTreePopupDialog::SourceTreePopupDialog()
     , m_label( 0 )
     , m_buttons( 0 )
 {
-#ifndef ENABLE_HEADLESS
     setParent( QApplication::activeWindow() );
-#endif
-#ifndef Q_OS_WIN
-    setWindowFlags( Qt::FramelessWindowHint );
-    setWindowFlags( Qt::Popup );
-#endif
+    setWindowFlags( Qt::Popup | Qt::FramelessWindowHint );
 
     setAutoFillBackground( false );
     setAttribute( Qt::WA_TranslucentBackground, true );
+    setAttribute( Qt::WA_NoSystemBackground, true );
 
     //setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
 
     m_title = new QLabel( this );
     QFont titleFont = m_title->font();
     titleFont.setBold( true );
-    m_title->setStyleSheet( "color: " + TomahawkUtils::Colors::GROUP_HEADER.name() );
+    m_title->setStyleSheet( "color: " + TomahawkStyle::GROUP_HEADER.name() );
     titleFont.setPointSize( TomahawkUtils::defaultFontSize() + 1 );
     m_title->setFont( titleFont );
     m_title->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
@@ -69,8 +67,8 @@ SourceTreePopupDialog::SourceTreePopupDialog()
     m_label = new QLabel( this );
     m_buttons = new QDialogButtonBox( QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, this );
 
-    m_buttons->button( QDialogButtonBox::Ok )->setIcon( QIcon( RESPATH "images/delete.png" ) );
-    m_buttons->button( QDialogButtonBox::Cancel )->setIcon( QIcon( RESPATH "images/cancel.png" ) );
+    m_buttons->button( QDialogButtonBox::Ok )->setIcon( ImageRegistry::instance()->icon( RESPATH "images/delete.svg" ) );
+    m_buttons->button( QDialogButtonBox::Cancel )->setIcon( ImageRegistry::instance()->icon( RESPATH "images/cancel.svg" ) );
 
     connect( m_buttons, SIGNAL( accepted() ), this, SLOT( onAccepted() ) );
     connect( m_buttons, SIGNAL( rejected() ), this, SLOT( onRejected() ) );
@@ -87,7 +85,7 @@ SourceTreePopupDialog::SourceTreePopupDialog()
     m_separatorLine->setFixedHeight( 1 );
     m_separatorLine->setContentsMargins( 0, 0, 0, 0 );
     m_separatorLine->setStyleSheet( "QWidget { border-top: 1px solid " +
-                                    TomahawkUtils::Colors::BORDER_LINE.name() + "; }" );
+                                    TomahawkStyle::BORDER_LINE.name() + "; }" );
     m_layout->addWidget( m_separatorLine );
     m_layout->addWidget( m_label );
     m_layout->addWidget( m_buttons );
@@ -188,7 +186,7 @@ SourceTreePopupDialog::paintEvent( QPaintEvent* event )
 
     // Constants for painting
     const int leftTriangleWidth = 12;
-    const int cornerRounding = TomahawkUtils::POPUP_ROUNDING_RADIUS;
+    const int cornerRounding = TomahawkStyle::POPUP_ROUNDING_RADIUS;
     const int leftEdgeOffset = 2 /*margin*/ + leftTriangleWidth / 2;
     const QRect brect = rect().adjusted( 2, 3, -2, -3 );
 
@@ -205,28 +203,18 @@ SourceTreePopupDialog::paintEvent( QPaintEvent* event )
     outline.lineTo( leftEdgeOffset, brect.top() + brect.height() / 2 + leftTriangleWidth / 2 );
     outline.lineTo( brect.left(), brect.top() + brect.height() / 2 );
 
-    QPainter p( this );
-
-    p.setRenderHint( QPainter::Antialiasing );
-
-    QPen pen( TomahawkUtils::Colors::BORDER_LINE );
-    pen.setWidth( 2 );
-    p.setPen( pen );
-    p.drawPath( outline );
-
-#ifdef Q_OS_MAC
-    p.setOpacity( 0.93 );
-    p.fillPath( outline, QColor( "#D6E3F1" ) );
+#ifndef Q_OS_MAC
+    TomahawkUtils::drawCompositedPopup( this,
+                                        outline,
+                                        TomahawkStyle::BORDER_LINE,
+                                        TomahawkStyle::POPUP_BACKGROUND,
+                                        TomahawkStyle::POPUP_OPACITY );
 #else
-    p.setOpacity( TomahawkUtils::POPUP_OPACITY );
-    p.fillPath( outline, TomahawkUtils::Colors::POPUP_BACKGROUND );
-#endif
-
-#ifdef QT_MAC_USE_COCOA
-    // Work around bug in Qt/Mac Cocoa where opening subsequent popups
-    // would incorrectly calculate the background due to it not being
-    // invalidated.
-    SourceTreePopupHelper::clearBackground( this );
+    TomahawkUtils::drawCompositedPopup( this,
+                                        outline,
+                                        TomahawkStyle::BORDER_LINE,
+                                        TomahawkStyle::POPUP_OSX_BACKGROUND,
+                                        TomahawkStyle::POPUP_OPACITY );
 #endif
 }
 

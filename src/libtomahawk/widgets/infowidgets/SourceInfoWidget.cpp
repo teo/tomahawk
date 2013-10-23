@@ -65,7 +65,7 @@ SourceInfoWidget::SourceInfoWidget( const Tomahawk::source_ptr& source, QWidget*
     ui->recentAlbumView->proxyModel()->sort( -1 );
 
     onCollectionChanged();
-    connect( source->collection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ) );
+    connect( source->dbCollection().data(), SIGNAL( changed() ), SLOT( onCollectionChanged() ) );
 
     m_title = tr( "New Additions" );
     if ( source->isLocal() )
@@ -76,8 +76,6 @@ SourceInfoWidget::SourceInfoWidget( const Tomahawk::source_ptr& source, QWidget*
     {
         m_description = tr( "Recent activity from %1" ).arg( source->friendlyName() );
     }
-
-    m_pixmap.load( RESPATH "images/new-additions.png" );
 }
 
 
@@ -97,7 +95,7 @@ SourceInfoWidget::onCollectionChanged()
 void
 SourceInfoWidget::loadRecentAdditions()
 {
-    m_recentAlbumModel->addFilteredCollection( m_source->collection(), 20, DatabaseCommand_AllAlbums::ModificationTime, true );
+    m_recentAlbumModel->addFilteredCollection( m_source->dbCollection(), 20, Tomahawk::DatabaseCommand_AllAlbums::ModificationTime, true );
 }
 
 
@@ -114,4 +112,12 @@ SourceInfoWidget::changeEvent( QEvent* e )
         default:
             break;
     }
+}
+
+
+QPixmap
+SourceInfoWidget::pixmap() const
+{
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::NewAdditions, TomahawkUtils::Original );
+
 }

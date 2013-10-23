@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -16,22 +17,25 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef PLAYLISTMODEL_H
 #define PLAYLISTMODEL_H
 
 #include <QList>
 #include <QHash>
 
-#include "Typedefs.h"
-#include "PlayableModel.h"
 #include "Playlist.h"
 #include "Query.h"
 #include "PlaylistInterface.h"
 
 #include "DllMacro.h"
+#include "PlayableModel.h"
+#include "Typedefs.h"
 
 class QMimeData;
 class QMetaData;
+
+class PlaylistModelPrivate;
 
 class DLLEXPORT PlaylistModel : public PlayableModel
 {
@@ -45,17 +49,20 @@ typedef struct {
 
 public:
     explicit PlaylistModel( QObject* parent = 0 );
-    ~PlaylistModel();
+    virtual ~PlaylistModel();
 
     virtual QString guid() const;
 
     virtual QMimeData* mimeData( const QModelIndexList& indexes ) const;
     virtual bool dropMimeData( const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent );
 
-    Tomahawk::playlist_ptr playlist() const { return m_playlist; }
+    Tomahawk::playlist_ptr playlist() const;
 
     virtual void loadPlaylist( const Tomahawk::playlist_ptr& playlist, bool loadEntries = true );
     bool isTemporary() const;
+
+    bool acceptPlayableQueriesOnly() const;
+    void setAcceptPlayableQueriesOnly( bool b );
 
 public slots:
     virtual void clear();
@@ -64,8 +71,8 @@ public slots:
 
     virtual void insertAlbums( const QList< Tomahawk::album_ptr >& album, int row = 0 );
     virtual void insertArtists( const QList< Tomahawk::artist_ptr >& artist, int row = 0 );
-    virtual void insertQueries( const QList< Tomahawk::query_ptr >& queries, int row = 0 );
-    virtual void insertEntries( const QList< Tomahawk::plentry_ptr >& entries, int row = 0 );
+    virtual void insertQueries( const QList< Tomahawk::query_ptr >& queries, int row = 0, const QList< Tomahawk::PlaybackLog >& logs = QList< Tomahawk::PlaybackLog >() );
+    virtual void insertEntries( const QList< Tomahawk::plentry_ptr >& entries, int row = 0, const QList< Tomahawk::PlaybackLog >& logs = QList< Tomahawk::PlaybackLog >() );
 
     virtual void removeIndex( const QModelIndex& index, bool moreToCome = false );
 
@@ -76,8 +83,9 @@ signals:
     void playlistChanged();
 
 protected:
-    bool waitForRevision( const QString& revisionguid ) const { return m_waitForRevision.contains( revisionguid ); }
-    void removeFromWaitList( const QString& revisionguid ) { m_waitForRevision.removeAll( revisionguid ); }
+    PlaylistModel( QObject* parent, PlaylistModelPrivate* d );
+    bool waitForRevision( const QString& revisionguid ) const;
+    void removeFromWaitList( const QString& revisionguid );
 
     QList<Tomahawk::plentry_ptr> playlistEntries() const;
 
@@ -90,19 +98,9 @@ private slots:
 private:
     void beginPlaylistChanges();
     void endPlaylistChanges();
+    void init();
 
-    Tomahawk::playlist_ptr m_playlist;
-    bool m_isTemporary;
-    bool m_changesOngoing;
-    bool m_isLoading;
-    QList< Tomahawk::Query* > m_waitingForResolved;
-    QStringList m_waitForRevision;
-
-    int m_savedInsertPos;
-    QList< Tomahawk::plentry_ptr > m_savedInsertTracks;
-    QList< Tomahawk::query_ptr > m_savedRemoveTracks;
-
-    DropStorageData m_dropStorage;
+    Q_DECLARE_PRIVATE( PlaylistModel )
 };
 
 #endif // PLAYLISTMODEL_H

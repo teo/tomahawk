@@ -1,7 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
- *   Copyright 2012,      Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2012-2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include "FlexibleHeader.h"
 
 #include <QBoxLayout>
+#include <QFile>
 #include <QLabel>
 #include <QPixmap>
 #include <QCheckBox>
@@ -29,7 +30,6 @@
 
 #include "playlist/FlexibleView.h"
 #include "ViewManager.h"
-#include "thirdparty/Qocoa/qsearchfield.h"
 #include "utils/Closure.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "utils/Logger.h"
@@ -40,12 +40,14 @@ using namespace Tomahawk;
 
 
 FlexibleHeader::FlexibleHeader( FlexibleView* parent )
-    : BasicHeader( parent )
+    : FilterHeader( parent )
     , m_parent( parent )
 {
+    setFixedHeight( 80 );
+
     QFile f( RESPATH "stylesheets/topbar-radiobuttons.css" );
     f.open( QFile::ReadOnly );
-    QString css = QString::fromAscii( f.readAll() );
+    QString css = QString::fromLatin1( f.readAll() );
     f.close();
 
     QHBoxLayout* outerModeLayout = new QHBoxLayout;
@@ -62,7 +64,7 @@ FlexibleHeader::FlexibleHeader( FlexibleView* parent )
     m_radioDetailed = new QRadioButton( modeWidget );
     m_radioCloud = new QRadioButton( modeWidget );
     //for the CSS:
-    m_radioNormal->setObjectName( "radioNormal");
+    m_radioNormal->setObjectName( "radioNormal" );
     m_radioCloud->setObjectName( "radioCloud" );
 
     m_radioNormal->setFocusPolicy( Qt::NoFocus );
@@ -80,51 +82,20 @@ FlexibleHeader::FlexibleHeader( FlexibleView* parent )
     outerModeLayout->addWidget( modeWidget );
     outerModeLayout->addStretch();
 
-    m_filterField = new QSearchField( this );
-    m_filterField->setPlaceholderText( tr( "Filter..." ) );
-    m_filterField->setFixedWidth( 220 );
-    m_mainLayout->addWidget( m_filterField );
-
     TomahawkUtils::unmarginLayout( outerModeLayout );
     TomahawkUtils::unmarginLayout( modeLayout );
 
-    connect( &m_filterTimer, SIGNAL( timeout() ), SLOT( applyFilter() ) );
-    connect( m_filterField, SIGNAL( textChanged( QString ) ), SLOT( onFilterEdited() ) );
-
-    NewClosure( m_radioNormal,   SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Flat )->setAutoDelete( false );
-    NewClosure( m_radioDetailed, SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Detailed )->setAutoDelete( false );
-    NewClosure( m_radioCloud,    SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Grid )->setAutoDelete( false );
+    if ( parent )
+    {
+        NewClosure( m_radioNormal,   SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Flat )->setAutoDelete( false );
+        NewClosure( m_radioDetailed, SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Detailed )->setAutoDelete( false );
+        NewClosure( m_radioCloud,    SIGNAL( clicked() ), const_cast< FlexibleView* >( parent ), SLOT( setCurrentMode( FlexibleViewMode ) ), FlexibleView::Grid )->setAutoDelete( false );
+    }
 }
 
 
 FlexibleHeader::~FlexibleHeader()
 {
-}
-
-
-void
-FlexibleHeader::setFilter( const QString& filter )
-{
-    m_filterField->setText( filter );
-}
-
-
-void
-FlexibleHeader::onFilterEdited()
-{
-    m_filter = m_filterField->text();
-
-    m_filterTimer.stop();
-    m_filterTimer.setInterval( 280 );
-    m_filterTimer.setSingleShot( true );
-    m_filterTimer.start();
-}
-
-
-void
-FlexibleHeader::applyFilter()
-{
-    emit filterTextChanged( m_filterField->text() );
 }
 
 

@@ -18,6 +18,13 @@
 
 #include "WikipediaContext.h"
 #include "Source.h"
+#include "Track.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "PlaylistInterface.h"
+#endif
+
 
 using namespace Tomahawk;
 
@@ -53,7 +60,7 @@ WikipediaContext::setQuery( const Tomahawk::query_ptr& query )
     if ( query.isNull() )
         return;
 
-    setArtist( Artist::get( query->artist(), false ) );
+    setArtist( query->track()->artistPtr() );
 }
 
 
@@ -87,5 +94,5 @@ LastfmContext::setQuery( const Tomahawk::query_ptr& query )
     if ( query.isNull() )
         return;
 
-    setArtist( Artist::get( query->artist(), false ) );
+    setArtist( query->track()->artistPtr() );
 }

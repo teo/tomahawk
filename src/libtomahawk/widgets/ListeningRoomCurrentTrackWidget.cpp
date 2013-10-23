@@ -97,21 +97,21 @@ ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
 
     PlayableItem* item = model->itemFromIndex( idx );
 
-    const Tomahawk::query_ptr q = item->query()->displayQuery();
+    const Tomahawk::track_ptr q = item->query()->track();
 
     m_trackLabel->setText( q->track() );
     m_artistLabel->setText( q->artist() );
 
     QPixmap albumArtPixmap;
     QSize aaSize = QSize( 80, 80 );
-    if ( item->query()->coverLoaded() )
+    if ( item->query()->track()->coverLoaded() )
         albumArtPixmap = TomahawkUtils::createRoundedImage( q->cover( aaSize ), aaSize );
     else
         albumArtPixmap = TomahawkUtils::createRoundedImage( m_albumArtPlaceholder, aaSize );
 
     m_albumArtLabel->setPixmap( albumArtPixmap );
 
-    QString lovesString = item->query()->socialActionDescription( "Love", Tomahawk::Query::Detailed );
+    QString lovesString = item->query()->queryTrack()->socialActionDescription( "Love", Tomahawk::Track::Detailed );
     m_lovesLabel->setText( lovesString );
 
     unsigned int duration = q->duration();
@@ -120,10 +120,10 @@ ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
     // and queries resolved again and again which doesn't leave enough time before the next track is
     // popped up to this widget
     // TODO: investigate
-    if ( !q->results().isEmpty() &&
-         !q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) ).isNull() )
+    if ( !item->query()->results().isEmpty() &&
+         !item->query()->results().first()->sourceIcon( TomahawkUtils::DropShadow, QSize( 32, 32 ) ).isNull() )
     {
-        const QPixmap sourceIcon = q->results().first()->sourceIcon( Tomahawk::Result::DropShadow, QSize( 32, 32 ) );
+        const QPixmap sourceIcon = item->query()->results().first()->sourceIcon( TomahawkUtils::DropShadow, QSize( 32, 32 ) );
         m_avatarLabel->setPixmap( sourceIcon );
     }
 

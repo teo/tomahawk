@@ -22,6 +22,8 @@
 #include "JobStatusItem.h"
 
 #include <QPixmap>
+#include <QPointer>
+
 
 class StreamConnection;
 
@@ -32,14 +34,11 @@ public:
     explicit TransferStatusManager( QObject* parent = 0 );
     virtual ~TransferStatusManager() {}
 
-    QPixmap rxPixmap() const { return m_rxPixmap; }
-    QPixmap txPixmap() const { return m_txPixmap; }
+    QPixmap rxPixmap() const;
+    QPixmap txPixmap() const;
 
 private slots:
     void streamRegistered( StreamConnection* sc );
-
-private:
-    QPixmap m_rxPixmap, m_txPixmap;
 };
 
 class TransferStatusItem : public JobStatusItem
@@ -61,7 +60,7 @@ private slots:
 private:
     TransferStatusManager* m_parent;
     QString m_type, m_main, m_right;
-    QWeakPointer< StreamConnection > m_stream;
+    QPointer< StreamConnection > m_stream;
 };
 
 #endif // TRANSFERSTATUSITEM_H

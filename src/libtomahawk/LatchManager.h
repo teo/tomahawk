@@ -48,7 +48,8 @@ public slots:
 
 private slots:
     void playlistChanged( Tomahawk::playlistinterface_ptr );
-    
+    void audioPaused();
+
 private:
     explicit LatchManager( QObject* parent = 0 );
 

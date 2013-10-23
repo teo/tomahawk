@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi            <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,20 +21,23 @@
 #include "DatabaseCollection.h"
 
 #include "database/Database.h"
-#include "DatabaseCommand_AllTracks.h"
-#include "DatabaseCommand_AddFiles.h"
-#include "DatabaseCommand_DeleteFiles.h"
-#include "DatabaseCommand_LoadAllPlaylists.h"
-#include "DatabaseCommand_LoadAllAutoPlaylists.h"
-#include "DatabaseCommand_LoadAllStations.h"
-
+#include "database/DatabaseCommand_AllArtists.h"
+#include "database/DatabaseCommand_AllAlbums.h"
+#include "database/DatabaseCommand_AllTracks.h"
+#include "database/DatabaseCommand_AddFiles.h"
+#include "database/DatabaseCommand_DeleteFiles.h"
+#include "database/DatabaseCommand_LoadAllPlaylists.h"
+#include "database/DatabaseCommand_LoadAllAutoPlaylists.h"
+#include "database/DatabaseCommand_LoadAllStations.h"
 #include "utils/Logger.h"
+
+#include "PlaylistEntry.h"
 
 using namespace Tomahawk;
 
 
 DatabaseCollection::DatabaseCollection( const source_ptr& src, QObject* parent )
-    : Collection( src, QString( "dbcollection:%1" ).arg( src->userName() ), parent )
+    : Collection( src, QString( "dbcollection:%1" ).arg( src->nodeId() ), parent )
 {
 }
 
@@ -46,7 +50,7 @@ DatabaseCollection::loadPlaylists()
     connect( cmd,  SIGNAL( done( const QList<Tomahawk::playlist_ptr>& ) ),
                      SLOT( setPlaylists( const QList<Tomahawk::playlist_ptr>& ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -58,7 +62,7 @@ DatabaseCollection::loadAutoPlaylists()
     connect( cmd, SIGNAL( autoPlaylistLoaded( Tomahawk::source_ptr, QVariantList ) ),
                     SLOT( autoPlaylistCreated( const Tomahawk::source_ptr&, const QVariantList& ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -70,7 +74,7 @@ DatabaseCollection::loadStations()
     connect( cmd, SIGNAL( stationLoaded( Tomahawk::source_ptr, QVariantList ) ),
              SLOT( stationCreated( const Tomahawk::source_ptr&, const QVariantList& ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -80,7 +84,7 @@ DatabaseCollection::addTracks( const QList<QVariant>& newitems )
     qDebug() << Q_FUNC_INFO << newitems.length();
     DatabaseCommand_AddFiles* cmd = new DatabaseCommand_AddFiles( newitems, source() );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -90,7 +94,7 @@ DatabaseCollection::removeTracks( const QDir& dir )
     qDebug() << Q_FUNC_INFO << dir;
     DatabaseCommand_DeleteFiles* cmd = new DatabaseCommand_DeleteFiles( dir, source() );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 }
 
 
@@ -127,6 +131,57 @@ DatabaseCollection::stations()
     }
 
     return Collection::stations();
+}
+
+
+Tomahawk::ArtistsRequest*
+DatabaseCollection::requestArtists()
+{
+    //FIXME: assuming there's only one dbcollection per source, and that this is the one
+    Tomahawk::collection_ptr thisCollection = source()->dbCollection();
+    if ( thisCollection->name() != this->name() )
+        return 0;
+
+    Tomahawk::ArtistsRequest* cmd = new DatabaseCommand_AllArtists( thisCollection );
+
+    return cmd;
+}
+
+
+Tomahawk::AlbumsRequest*
+DatabaseCollection::requestAlbums( const Tomahawk::artist_ptr& artist )
+{
+    //FIXME: assuming there's only one dbcollection per source, and that this is the one
+    Tomahawk::collection_ptr thisCollection = source()->dbCollection();
+    if ( thisCollection->name() != this->name() )
+        return 0;
+
+    Tomahawk::AlbumsRequest* cmd = new DatabaseCommand_AllAlbums( thisCollection, artist );
+
+    return cmd;
+}
+
+
+Tomahawk::TracksRequest*
+DatabaseCollection::requestTracks( const Tomahawk::album_ptr& album )
+{
+    //FIXME: assuming there's only one dbcollection per source, and that this is the one
+    Tomahawk::collection_ptr thisCollection = source()->dbCollection();
+    if ( thisCollection->name() != this->name() )
+        return 0;
+
+    DatabaseCommand_AllTracks* cmd = new DatabaseCommand_AllTracks( thisCollection );
+    cmd->setAlbum( album->weakRef() );
+    cmd->setSortOrder( DatabaseCommand_AllTracks::AlbumPosition );
+
+    return cmd;
+}
+
+
+int
+DatabaseCollection::trackCount() const
+{
+    return source()->trackCount();
 }
 
 

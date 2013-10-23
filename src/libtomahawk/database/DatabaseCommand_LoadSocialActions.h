@@ -27,8 +27,12 @@
 #include "SourceList.h"
 #include "Typedefs.h"
 #include "Artist.h"
+#include "Track.h"
 
 #include "DllMacro.h"
+
+namespace Tomahawk
+{
 
 /**
  * \class DatabaseCommand_LoadSocialActions
@@ -46,7 +50,7 @@ class DLLEXPORT DatabaseCommand_LoadSocialActions : public DatabaseCommand
 Q_OBJECT
 
 public:
-    typedef QMap<Tomahawk::query_ptr,Tomahawk::SocialAction> TrackActions;
+    typedef QMap<Tomahawk::track_ptr, Tomahawk::SocialAction> TrackActions;
     /**
      * \brief Default constructor for DatabaseCommand_LoadSocialActions.
      *
@@ -63,12 +67,10 @@ public:
      *
      * Constructor which creates a new database command for loading all social actions.
      */
-    explicit DatabaseCommand_LoadSocialActions( const Tomahawk::query_ptr& query, QObject* parent = 0 )
-        : DatabaseCommand( parent ), m_query( query )
+    explicit DatabaseCommand_LoadSocialActions( const Tomahawk::trackdata_ptr& track, QObject* parent = 0 )
+        : DatabaseCommand( parent ), m_track( track )
     {
         setSource( SourceList::instance()->getLocal() );
-        setArtist( query->artist() );
-        setTrack( query->track() );
     }
 
     /**
@@ -78,7 +80,7 @@ public:
         : DatabaseCommand( parent ), m_actionOnly( action )
     {
         setSource( source );
-        qRegisterMetaType<TrackActions>( "DatabaseCommand_LoadSocialAction::TrackActions" );
+        qRegisterMetaType<TrackActions>( "DatabaseCommand_LoadSocialActions::TrackActions" );
     }
 
     /**
@@ -98,35 +100,8 @@ public:
      */
     virtual void exec( DatabaseImpl* );
 
-    /**
-     * \brief Returns the artist associated with this database command.
-     * \return Name of the artist.
-     * \see setArtist()
-     */
-    QString artist() const { return m_artist; }
-
-    /**
-     * \brief Sets the artist name for this database command.
-     * \param s QString containing the artist name.
-     * \see artist()
-     */
-    void setArtist( const QString& s ) { m_artist = s; }
-
-    /**
-     * \brief Returns the track name associated with this social action.
-     * \return QString containing the track name.
-     * \see setTrack()
-     */
-    QString track() const { return m_track; }
-
-    /**
-     * \brief Sets the track name associated with this database command.
-     * \param track QString containing the track name.
-     * \see track()
-     */
-    void setTrack( const QString& s ) { m_track = s; }
-
     virtual bool doesMutates() const { return false; }
+
 signals:
     /**
      * All loaded social actions for each track found, for queries that generate all tracks
@@ -135,13 +110,14 @@ signals:
     void done( DatabaseCommand_LoadSocialActions::TrackActions actionsForTracks );
 
 private:
-    Tomahawk::query_ptr m_query;
-    QString m_artist;
-    QString m_track;
+    Tomahawk::trackdata_ptr m_track;
     QString m_actionOnly;
 
 };
 
-Q_DECLARE_METATYPE( DatabaseCommand_LoadSocialActions::TrackActions )
+}
+
+//FIXME: Qt5: this fails with Qt5, is it needed at all? It compiles fine without in Qt4 as well
+// Q_DECLARE_METATYPE( DatabaseCommand_LoadSocialActions::TrackActions )
 
 #endif // DATABASECOMMAND_LOADSOCIALACTIONS_H

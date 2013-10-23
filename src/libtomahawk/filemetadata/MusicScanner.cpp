@@ -19,11 +19,6 @@
 
 #include "MusicScanner.h"
 
-#include <QtCore/QCoreApplication>
-
-#include "utils/TomahawkUtils.h"
-#include "TomahawkSettings.h"
-#include "SourceList.h"
 #include "database/Database.h"
 #include "database/DatabaseCommand_DirMtimes.h"
 #include "database/DatabaseCommand_FileMTimes.h"
@@ -31,11 +26,17 @@
 #include "database/DatabaseCommand_AddFiles.h"
 #include "database/DatabaseCommand_DeleteFiles.h"
 #include "taghandlers/tag.h"
-
 #include "utils/Logger.h"
+#include "utils/TomahawkUtils.h"
+
+#include "PlaylistEntry.h"
+#include "SourceList.h"
+#include "TomahawkSettings.h"
+
+#include <QCoreApplication>
+
 
 using namespace Tomahawk;
-
 
 void
 DirLister::go()
@@ -100,7 +101,39 @@ DirLister::scanDir( QDir dir, int depth )
 }
 
 
-MusicScanner::MusicScanner( ScanManager::ScanMode scanMode, const QStringList& paths, quint32 bs )
+DirListerThreadController::DirListerThreadController( QObject *parent )
+    : QThread( parent )
+{
+    tDebug() << Q_FUNC_INFO;
+}
+
+
+DirListerThreadController::~DirListerThreadController()
+{
+    tDebug() << Q_FUNC_INFO;
+}
+
+
+void
+DirListerThreadController::run()
+{
+    m_dirLister = QPointer< DirLister >( new DirLister( m_paths ) );
+    connect( m_dirLister.data(), SIGNAL( fileToScan( QFileInfo ) ),
+             parent(), SLOT( scanFile( QFileInfo ) ), Qt::QueuedConnection );
+
+    // queued, so will only fire after all dirs have been scanned:
+    connect( m_dirLister.data(), SIGNAL( finished() ),
+             parent(), SLOT( postOps() ), Qt::QueuedConnection );
+
+    QMetaObject::invokeMethod( m_dirLister.data(), "go", Qt::QueuedConnection );
+
+    exec();
+    if ( !m_dirLister.isNull() )
+        delete m_dirLister.data();
+}
+
+
+MusicScanner::MusicScanner( MusicScanner::ScanMode scanMode, const QStringList& paths, quint32 bs )
     : QObject()
     , m_scanMode( scanMode )
     , m_paths( paths )
@@ -118,6 +151,7 @@ MusicScanner::MusicScanner( ScanManager::ScanMode scanMode, const QStringList& p
     m_ext2mime.insert( "flac", TomahawkUtils::extensionToMimetype( "flac" ) );
     m_ext2mime.insert( "aiff", TomahawkUtils::extensionToMimetype( "aiff" ) );
     m_ext2mime.insert( "aif",  TomahawkUtils::extensionToMimetype( "aif" ) );
+    m_ext2mime.insert( "wv",   TomahawkUtils::extensionToMimetype( "wv" ) );
 }
 
 
@@ -125,12 +159,11 @@ MusicScanner::~MusicScanner()
 {
     tDebug() << Q_FUNC_INFO;
 
-    if ( !m_dirLister.isNull() )
+    if ( m_dirListerThreadController )
     {
-        m_dirListerThreadController->quit();;
+        m_dirListerThreadController->quit();
         m_dirListerThreadController->wait( 60000 );
 
-        delete m_dirLister.data();
         delete m_dirListerThreadController;
         m_dirListerThreadController = 0;
     }
@@ -154,7 +187,7 @@ MusicScanner::startScan()
     connect( cmd, SIGNAL( done( QMap< QString, QMap< unsigned int, unsigned int > > ) ),
                     SLOT( setFileMtimes( QMap< QString, QMap< unsigned int, unsigned int > > ) ) );
 
-    Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+    Database::instance()->enqueue( dbcmd_ptr( cmd ) );
     return;
 }
 
@@ -176,26 +209,15 @@ MusicScanner::scan()
     connect( this, SIGNAL( batchReady( QVariantList, QVariantList ) ),
                      SLOT( commitBatch( QVariantList, QVariantList ) ), Qt::DirectConnection );
 
-    if ( m_scanMode == ScanManager::FileScan )
+    if ( m_scanMode == MusicScanner::FileScan )
     {
         scanFilePaths();
         return;
     }
 
-    m_dirListerThreadController = new QThread( this );
-
-    m_dirLister = QWeakPointer< DirLister >( new DirLister( m_paths ) );
-    m_dirLister.data()->moveToThread( m_dirListerThreadController );
-
-    connect( m_dirLister.data(), SIGNAL( fileToScan( QFileInfo ) ),
-                                   SLOT( scanFile( QFileInfo ) ), Qt::QueuedConnection );
-
-    // queued, so will only fire after all dirs have been scanned:
-    connect( m_dirLister.data(), SIGNAL( finished() ),
-                                   SLOT( postOps() ), Qt::QueuedConnection );
-
+    m_dirListerThreadController = new DirListerThreadController( this );
+    m_dirListerThreadController->setPaths( m_paths );
     m_dirListerThreadController->start( QThread::IdlePriority );
-    QMetaObject::invokeMethod( m_dirLister.data(), "go" );
 }
 
 
@@ -219,7 +241,7 @@ MusicScanner::postOps()
 {
     tDebug( LOGVERBOSE ) << Q_FUNC_INFO;
 
-    if ( m_scanMode == ScanManager::DirScan )
+    if ( m_scanMode == MusicScanner::DirScan )
     {
         // any remaining stuff that wasnt emitted as a batch:
         foreach( const QString& key, m_filemtimes.keys() )
@@ -250,12 +272,11 @@ MusicScanner::postOps()
 void
 MusicScanner::cleanup()
 {
-    if ( !m_dirLister.isNull() )
+    if ( m_dirListerThreadController )
     {
-        m_dirListerThreadController->quit();;
+        m_dirListerThreadController->quit();
         m_dirListerThreadController->wait( 60000 );
 
-        delete m_dirLister.data();
         delete m_dirListerThreadController;
         m_dirListerThreadController = 0;
     }
@@ -271,19 +292,19 @@ MusicScanner::commitBatch( const QVariantList& tracks, const QVariantList& delet
     if ( deletethese.length() )
     {
         tDebug( LOGINFO ) << Q_FUNC_INFO << "deleting" << deletethese.length() << "tracks";
-        executeCommand( QSharedPointer<DatabaseCommand>( new DatabaseCommand_DeleteFiles( deletethese, SourceList::instance()->getLocal() ) ) );
+        executeCommand( dbcmd_ptr( new DatabaseCommand_DeleteFiles( deletethese, SourceList::instance()->getLocal() ) ) );
     }
 
     if ( tracks.length() )
     {
         tDebug( LOGINFO ) << Q_FUNC_INFO << "adding" << tracks.length() << "tracks";
-        executeCommand( QSharedPointer<DatabaseCommand>( new DatabaseCommand_AddFiles( tracks, SourceList::instance()->getLocal() ) ) );
+        executeCommand( dbcmd_ptr( new DatabaseCommand_AddFiles( tracks, SourceList::instance()->getLocal() ) ) );
     }
 }
 
 
 void
-MusicScanner::executeCommand( QSharedPointer< DatabaseCommand > cmd )
+MusicScanner::executeCommand( dbcmd_ptr cmd )
 {
     tDebug() << Q_FUNC_INFO << m_cmdQueue;
     m_cmdQueue++;
@@ -368,7 +389,7 @@ MusicScanner::readFile( const QFileInfo& fi )
     int bitrate = 0;
     int duration = 0;
 
-    Tag *tag = Tag::fromFile( f );
+    Tag* tag = Tag::fromFile( f );
     if ( f.audioProperties() )
     {
         TagLib::AudioProperties *properties = f.audioProperties();
@@ -414,3 +435,4 @@ MusicScanner::readFile( const QFileInfo& fi )
     m_scanned++;
     return m;
 }
+

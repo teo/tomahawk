@@ -17,18 +17,24 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef TYPEDEFS_H
 #define TYPEDEFS_H
 
 #include <QSharedPointer>
+#include <QPointer>
 #include <QUuid>
 #include <QPair>
 #include <QPersistentModelIndex>
-#include <boost/function.hpp>
 
 //template <typename T> class QSharedPointer;
 
-class QNetworkReply;
+#include <QNetworkReply>
+
+// TODO: Move into Tomahawk namespace
+class Msg;
+
+typedef QSharedPointer<Msg> msg_ptr;
 
 namespace Tomahawk
 {
@@ -40,12 +46,17 @@ namespace Tomahawk
     class Playlist;
     class PlaylistEntry;
     class PlaylistInterface;
+    class PlaylistTemplate;
     class DynamicPlaylist;
     class Query;
     class Result;
+    class Track;
+    class TrackData;
     class Source;
     class DynamicControl;
     class GeneratorInterface;
+    class PeerInfo;
+    class DatabaseCommand;
 
     typedef QSharedPointer<Collection> collection_ptr;
     typedef QSharedPointer<ListeningRoom> listeningroom_ptr;
@@ -53,12 +64,24 @@ namespace Tomahawk
     typedef QSharedPointer<Playlist> playlist_ptr;
     typedef QSharedPointer<PlaylistEntry> plentry_ptr;
     typedef QSharedPointer<PlaylistInterface> playlistinterface_ptr;
+    typedef QSharedPointer<PlaylistTemplate> playlisttemplate_ptr;
     typedef QSharedPointer<DynamicPlaylist> dynplaylist_ptr;
     typedef QSharedPointer<Query> query_ptr;
+    typedef QWeakPointer<Query> query_wptr;
     typedef QSharedPointer<Result> result_ptr;
+    typedef QWeakPointer<Result> result_wptr;
+    typedef QSharedPointer<Track> track_ptr;
+    typedef QWeakPointer<Track> track_wptr;
+    typedef QSharedPointer<TrackData> trackdata_ptr;
+    typedef QWeakPointer<TrackData> trackdata_wptr;
     typedef QSharedPointer<Source> source_ptr;
     typedef QSharedPointer<Artist> artist_ptr;
+    typedef QWeakPointer<Artist> artist_wptr;
     typedef QSharedPointer<Album> album_ptr;
+    typedef QWeakPointer<Album> album_wptr;
+    typedef QSharedPointer<PeerInfo> peerinfo_ptr;
+    typedef QWeakPointer<PeerInfo> peerinfo_wptr;
+    typedef QSharedPointer< DatabaseCommand> dbcmd_ptr;
 
     typedef QSharedPointer<DynamicControl> dyncontrol_ptr;
     typedef QSharedPointer<GeneratorInterface> geninterface_ptr;
@@ -66,6 +89,15 @@ namespace Tomahawk
     // let's keep these typesafe, they are different kinds of GUID:
     typedef QString QID; //query id
     typedef QString RID; //result id
+
+    namespace ACLStatus {
+        enum Type {
+            NotFound = 0,
+            Deny = 1,
+            Read = 2,
+            Stream = 3
+        };
+    }
 
     enum GeneratorMode
     {
@@ -77,11 +109,18 @@ namespace Tomahawk
     {
         Mixed = 0,
         DatabaseMode,
-        InfoSystemMode,
+        InfoSystemMode
+    };
+
+    enum ModelTypes
+    {
+        TypeArtist = 0,
+        TypeAlbum,
+        TypeQuery,
+        TypeResult
     };
 
     class ExternalResolver;
-    typedef boost::function<Tomahawk::ExternalResolver*(QString)> ResolverFactoryFunc;
 
     namespace PlaylistModes {
         enum RepeatMode { NoRepeat, RepeatOne, RepeatAll };
@@ -197,19 +236,32 @@ namespace Tomahawk
 
             InfoNotifyUser = 100,
 
-            InfoLastInfo = 101 //WARNING: *ALWAYS* keep this last!
+            InfoInboxReceived = 101,
+
+            InfoLastInfo = 102 //WARNING: *ALWAYS* keep this last!
         };
 
         class InfoPlugin;
 
+        typedef QSet< InfoType > InfoTypeSet;
         typedef QMap< InfoType, QVariant > InfoTypeMap;
         typedef QMap< InfoType, uint > InfoTimeoutMap;
         typedef QHash< QString, QString > InfoStringHash;
         typedef QPair< QVariantMap, QVariant > PushInfoPair;
 
-        typedef QWeakPointer< InfoPlugin > InfoPluginPtr;
+        typedef QPointer< InfoPlugin > InfoPluginPtr;
     }
-}; // ns
+
+    namespace Network
+    {
+        namespace ACL
+        {
+            class AclRequest;
+            typedef QSharedPointer<AclRequest> aclrequest_ptr;
+            typedef QWeakPointer<AclRequest> aclrequest_wptr;
+        }
+    }
+} // ns
 
 typedef int AudioErrorCode;
 typedef int AudioState;
@@ -219,7 +271,7 @@ typedef QList< QPair< QString, QString > > PairList;
 inline static QString uuid()
 {
     // kinda lame, but
-    QString q = QUuid::createUuid();
+    QString q = QUuid::createUuid().toString();
     q.remove( 0, 1 );
     q.chop( 1 );
     return q;
@@ -227,7 +279,8 @@ inline static QString uuid()
 
 Q_DECLARE_METATYPE( QModelIndex )
 Q_DECLARE_METATYPE( QPersistentModelIndex )
-Q_DECLARE_METATYPE( QNetworkReply* );
-Q_DECLARE_METATYPE( Tomahawk::source_ptr );
+Q_DECLARE_METATYPE( QNetworkReply* )
+Q_DECLARE_METATYPE( Tomahawk::source_ptr )
+Q_DECLARE_METATYPE( Tomahawk::ACLStatus::Type )
 
 #endif // TYPEDEFS_H

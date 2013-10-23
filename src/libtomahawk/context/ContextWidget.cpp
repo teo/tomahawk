@@ -28,11 +28,18 @@
 #include "context/pages/RelatedArtistsContext.h"
 #include "context/pages/TopTracksContext.h"
 #include "context/pages/WikipediaContext.h"
+#include "utils/TomahawkStyle.h"
+#include "utils/TomahawkUtilsGui.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "PlaylistInterface.h"
+#endif
+
 
 #include "Source.h"
+#include "Track.h"
 
-#include "utils/StyleHelper.h"
-#include "utils/TomahawkUtilsGui.h"
 
 #define ANIMATION_TIME 450
 #define SLIDE_TIME 350
@@ -93,7 +100,7 @@ ContextWidget::ContextWidget( QWidget* parent )
 
     ensurePolished();
     QPalette pal = palette();
-    pal.setBrush( QPalette::Window, QColor( "#454e59" ) );
+    pal.setBrush( QPalette::Window, TomahawkStyle::FOOTNOTES_BACKGROUND );
     setPalette( pal );
 
     connect( ui->toggleButton, SIGNAL( clicked() ), SLOT( toggleSize() ) );
@@ -270,7 +277,7 @@ ContextWidget::setQuery( const Tomahawk::query_ptr& query, bool force )
 {
     if ( query.isNull() )
         return;
-    if ( !force && !m_query.isNull() && query->artist() == m_query->artist() )
+    if ( !force && !m_query.isNull() && query->track()->artist() == m_query->track()->artist() )
         return;
 
     m_query = query;

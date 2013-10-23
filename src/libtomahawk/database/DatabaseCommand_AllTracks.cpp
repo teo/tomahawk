@@ -21,12 +21,17 @@
 
 #include <QSqlQuery>
 
-#include "DatabaseImpl.h"
-#include "Artist.h"
-#include "Album.h"
-#include "SourceList.h"
 #include "utils/Logger.h"
 
+#include "Album.h"
+#include "Artist.h"
+#include "DatabaseImpl.h"
+#include "Result.h"
+#include "SourceList.h"
+#include "Track.h"
+
+namespace Tomahawk
+{
 
 void
 DatabaseCommand_AllTracks::exec( DatabaseImpl* dbi )
@@ -96,24 +101,15 @@ DatabaseCommand_AllTracks::exec( DatabaseImpl* dbi )
 
     while( query.next() )
     {
-        Tomahawk::source_ptr s;
         QString url = query.value( 8 ).toString();
-
-        if ( query.value( 9 ).toUInt() == 0 )
+        Tomahawk::source_ptr s = SourceList::instance()->get( query.value( 9 ).toUInt() );
+        if ( !s )
         {
-            s = SourceList::instance()->getLocal();
+            Q_ASSERT( false );
+            continue;
         }
-        else
-        {
-            s = SourceList::instance()->get( query.value( 9 ).toUInt() );
-            if ( s.isNull() )
-            {
-                Q_ASSERT( false );
-                continue;
-            }
-
-            url = QString( "servent://%1\t%2" ).arg( s->userName() ).arg( url );
-        }
+        if ( !s->isLocal() )
+            url = QString( "servent://%1\t%2" ).arg( s->nodeId() ).arg( url );
 
         QString artist, track, album, composer;
         artist = query.value( 1 ).toString();
@@ -123,37 +119,17 @@ DatabaseCommand_AllTracks::exec( DatabaseImpl* dbi )
 
         Tomahawk::result_ptr result = Tomahawk::Result::get( url );
         Tomahawk::query_ptr qry = Tomahawk::Query::get( artist, track, album );
-        Tomahawk::artist_ptr artistptr = Tomahawk::Artist::get( query.value( 14 ).toUInt(), artist );
-        Tomahawk::artist_ptr composerptr = Tomahawk::Artist::get( query.value( 17 ).toUInt(), composer );
-        Tomahawk::album_ptr albumptr = Tomahawk::Album::get( query.value( 15 ).toUInt(), album, artistptr );
 
-        result->setTrackId( query.value( 16 ).toUInt() );
-        result->setArtist( artistptr );
-        result->setAlbum( albumptr );
-        result->setTrack( query.value( 3 ).toString() );
-        result->setComposer( composerptr );
+        Tomahawk::track_ptr t = Tomahawk::Track::get( query.value( 16 ).toUInt(), artist, track, album, query.value( 6 ).toUInt(), composer, query.value( 13 ).toUInt(), query.value( 12 ).toUInt() );
+        t->loadAttributes();
+        result->setTrack( t );
+
         result->setSize( query.value( 5 ).toUInt() );
-        result->setDuration( query.value( 6 ).toUInt() );
         result->setBitrate( query.value( 7 ).toUInt() );
         result->setModificationTime( query.value( 10 ).toUInt() );
         result->setMimetype( query.value( 11 ).toString() );
-        result->setDiscNumber( query.value( 12 ).toUInt() );
-        result->setAlbumPos( query.value( 13 ).toUInt() );
         result->setScore( 1.0 );
-        result->setCollection( s->collection() );
-
-        TomahawkSqlQuery attrQuery = dbi->newquery();
-        QVariantMap attr;
-
-        attrQuery.prepare( "SELECT k, v FROM track_attributes WHERE id = ?" );
-        attrQuery.bindValue( 0, result->trackId() );
-        attrQuery.exec();
-        while ( attrQuery.next() )
-        {
-            attr[ attrQuery.value( 0 ).toString() ] = attrQuery.value( 1 ).toString();
-        }
-
-        result->setAttributes( attr );
+        result->setCollection( s->dbCollection() );
 
         QList<Tomahawk::result_ptr> results;
         results << result;
@@ -164,5 +140,8 @@ DatabaseCommand_AllTracks::exec( DatabaseImpl* dbi )
     }
 
     emit tracks( ql, data() );
+    emit tracks( ql );
     emit done( m_collection );
+}
+
 }

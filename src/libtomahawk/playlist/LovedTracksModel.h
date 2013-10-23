@@ -1,6 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
+ *   Copyright 2013,      Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -16,45 +17,48 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef LOVEDTRACKSMODEL_H
 #define LOVEDTRACKSMODEL_H
 
-#include <QList>
-#include <QHash>
-
-#include "Typedefs.h"
 #include "PlaylistModel.h"
 
-#include "DllMacro.h"
+class LovedTracksModelPrivate;
 
 class DLLEXPORT LovedTracksModel : public PlaylistModel
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-    explicit LovedTracksModel( QObject* parent = 0 );
-    ~LovedTracksModel();
+    virtual ~LovedTracksModel();
 
-    unsigned int limit() const { return m_limit; }
-    void setLimit( unsigned int limit ) { m_limit = limit; }
+    unsigned int limit() const;
+    void setLimit( unsigned int limit );
 
     bool isTemporary() const;
 
 public slots:
     void setSource( const Tomahawk::source_ptr& source );
 
+protected slots:
+    virtual void loadTracks();
+
+protected:
+    explicit LovedTracksModel( QObject* parent = 0 );
+    explicit LovedTracksModel( QObject* parent, LovedTracksModelPrivate* d );
+
 private slots:
     void onSourcesReady();
     void onSourceAdded( const Tomahawk::source_ptr& source );
-
     void onTrackLoved();
-    void loadTracks();
 
     void tracksLoaded( QList<Tomahawk::query_ptr> );
+
 private:
-    Tomahawk::source_ptr m_source;
-    QTimer* m_smoothingTimer;
-    unsigned int m_limit;
+    Q_DECLARE_PRIVATE( LovedTracksModel )
+
+    void init();
+
 };
 
 #endif // LOVEDTRACKSMODEL_H

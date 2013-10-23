@@ -18,14 +18,16 @@
 
 #include "DiscogsPlugin.h"
 
-#include <QNetworkReply>
-#include <QDomDocument>
-#include <QtPlugin>
 
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
 #include "utils/Closure.h"
-#include <parser.h>
+#include "utils/NetworkAccessManager.h"
+
+#include <qjson/parser.h>
+
+#include <QNetworkReply>
+#include <QDomDocument>
 
 using namespace Tomahawk::InfoSystem;
 
@@ -66,7 +68,7 @@ DiscogsPlugin::getInfo( Tomahawk::InfoSystem::InfoRequestData requestData )
             criteria["artist"] = hash["artist"];
             criteria["album"] = hash["album"];
 
-            emit getCachedInfo( criteria, 2419200000, requestData );
+            emit getCachedInfo( criteria, Q_INT64_C(2419200000), requestData );
 
             break;
         }
@@ -89,12 +91,14 @@ DiscogsPlugin::notInCacheSlot( InfoStringHash criteria, InfoRequestData requestD
         {
             QString requestString( "http://api.discogs.com/database/search" );
             QUrl url( requestString );
-            url.addQueryItem( "type", "release" );
-            url.addQueryItem( "release_title", criteria[ "album" ] );
-            url.addQueryItem( "artist", criteria[ "artist" ] );
+
+            TomahawkUtils::urlAddQueryItem( url, "type", "release" );
+            TomahawkUtils::urlAddQueryItem( url, "release_title", criteria[ "album" ] );
+            TomahawkUtils::urlAddQueryItem( url, "artist", criteria[ "artist" ] );
+
             QNetworkRequest req( url );
             req.setRawHeader( "User-Agent", "TomahawkPlayer/1.0 +http://tomahawk-player.org" );
-            QNetworkReply* reply = TomahawkUtils::nam()->get( req );
+            QNetworkReply* reply = Tomahawk::Utils::nam()->get( req );
 
             NewClosure( reply, SIGNAL( finished() ),  this, SLOT( albumSearchSlot( Tomahawk::InfoSystem::InfoRequestData, QNetworkReply* ) ), requestData, reply );
             break;
@@ -133,7 +137,7 @@ DiscogsPlugin::albumSearchSlot( const InfoRequestData &requestData, QNetworkRepl
     QNetworkRequest req( url );
     req.setRawHeader( "User-Agent", "TomahawkPlayer/1.0 +http://tomahawk-player.org" );
 
-    QNetworkReply* reply2 = TomahawkUtils::nam()->get( req );
+    QNetworkReply* reply2 = Tomahawk::Utils::nam()->get( req );
     NewClosure( reply2, SIGNAL( finished() ),  this, SLOT( albumInfoSlot( Tomahawk::InfoSystem::InfoRequestData, QNetworkReply* ) ), requestData, reply2 );
 }
 
@@ -181,7 +185,7 @@ DiscogsPlugin::albumInfoSlot( const InfoRequestData& requestData, QNetworkReply*
     criteria["artist"] = requestData.input.value< Tomahawk::InfoSystem::InfoStringHash>()["artist"];
     criteria["album"] = requestData.input.value< Tomahawk::InfoSystem::InfoStringHash>()["album"];
 
-    emit updateCache( criteria, 0, requestData.type, returnedData );
+    emit updateCache( criteria, Q_INT64_C(0), requestData.type, returnedData );
 }
 
 

@@ -28,14 +28,17 @@
 #include <QObject>
 #include <QSet>
 
-namespace Tomahawk {
-class ExternalResolverGui;
+namespace Tomahawk
+{
+    class ExternalResolverGui;
 
-namespace InfoSystem {
+namespace InfoSystem
+{
     class LastFmInfoPlugin;
 }
 
-namespace Accounts {
+namespace Accounts
+{
 
 class LastFmConfig;
 
@@ -53,9 +56,6 @@ public:
     virtual bool allowUserCreation() const { return false; }
     virtual QPixmap icon() const;
     virtual bool isUnique() const { return true; }
-
-private:
-    QPixmap m_icon;
 };
 
 /**
@@ -73,7 +73,7 @@ public:
     virtual void deauthenticate();
     virtual void authenticate();
 
-    virtual SipPlugin* sipPlugin() { return 0; }
+    virtual SipPlugin* sipPlugin( bool ) { return 0; }
     virtual Tomahawk::InfoSystem::InfoPluginPtr infoPlugin();
 
     virtual bool isAuthenticated() const;
@@ -81,7 +81,7 @@ public:
     virtual ConnectionState connectionState() const;
     virtual QPixmap icon() const;
     virtual QWidget* aclWidget() { return 0; }
-    virtual QWidget* configurationWidget();
+    virtual AccountConfigWidget* configurationWidget();
     virtual void saveConfig();
 
     QString username() const;
@@ -104,14 +104,13 @@ private slots:
 private:
     void hookupResolver();
 
-    QWeakPointer<Tomahawk::ExternalResolverGui> m_resolver;
-    QWeakPointer<Tomahawk::InfoSystem::LastFmInfoPlugin> m_infoPlugin;
-    QWeakPointer<LastFmConfig> m_configWidget;
-    QPixmap m_icon;
+    QPointer<Tomahawk::ExternalResolverGui> m_resolver;
+    QPointer<Tomahawk::InfoSystem::LastFmInfoPlugin> m_infoPlugin;
+    QPointer<LastFmConfig> m_configWidget;
 };
 
-
 }
+
 }
 
 #endif // LASTFMACCOUNT_H

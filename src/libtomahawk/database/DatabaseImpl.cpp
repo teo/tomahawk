@@ -20,19 +20,25 @@
 
 #include "DatabaseImpl.h"
 
-#include <QCoreApplication>
-#include <QRegExp>
-#include <QStringList>
-#include <QtAlgorithms>
-#include <QFile>
-
 #include "database/Database.h"
-#include "SourceList.h"
-#include "Result.h"
-#include "Artist.h"
-#include "Album.h"
 #include "utils/TomahawkUtils.h"
 #include "utils/Logger.h"
+
+#include "Album.h"
+#include "Artist.h"
+#include "FuzzyIndex.h"
+#include "PlaylistEntry.h"
+#include "Result.h"
+#include "SourceList.h"
+#include "Track.h"
+
+#include <QtAlgorithms>
+#include <QCoreApplication>
+#include <QFile>
+#include <QRegExp>
+#include <QStringList>
+#include <QTime>
+#include <QTimer>
 
 /* !!!! You need to manually generate Schema.sql.h when the schema changes:
     cd src/libtomahawk/database
@@ -40,9 +46,9 @@
 */
 #include "Schema.sql.h"
 
-#define CURRENT_SCHEMA_VERSION 29
+#define CURRENT_SCHEMA_VERSION 31
 
-DatabaseImpl::DatabaseImpl( const QString& dbname )
+Tomahawk::DatabaseImpl::DatabaseImpl( const QString& dbname )
 {
     QTime t;
     t.start();
@@ -84,7 +90,7 @@ DatabaseImpl::DatabaseImpl( const QString& dbname )
 }
 
 
-DatabaseImpl::DatabaseImpl( const QString& dbname, bool internal )
+Tomahawk::DatabaseImpl::DatabaseImpl( const QString& dbname, bool internal )
 {
     Q_UNUSED( internal );
     openDatabase( dbname, false );
@@ -93,7 +99,7 @@ DatabaseImpl::DatabaseImpl( const QString& dbname, bool internal )
 
 
 void
-DatabaseImpl::init()
+Tomahawk::DatabaseImpl::init()
 {
     m_lastartid = m_lastalbid = m_lasttrkid = 0;
 
@@ -104,7 +110,7 @@ DatabaseImpl::init()
 }
 
 
-DatabaseImpl::~DatabaseImpl()
+Tomahawk::DatabaseImpl::~DatabaseImpl()
 {
     tDebug() << "Shutting down database connection.";
 
@@ -125,7 +131,7 @@ DatabaseImpl::~DatabaseImpl()
 
 
 TomahawkSqlQuery
-DatabaseImpl::newquery()
+Tomahawk::DatabaseImpl::newquery()
 {
     QMutexLocker lock( &m_mutex );
     return TomahawkSqlQuery( m_db );
@@ -133,15 +139,15 @@ DatabaseImpl::newquery()
 
 
 QSqlDatabase&
-DatabaseImpl::database()
+Tomahawk::DatabaseImpl::database()
 {
     QMutexLocker lock( &m_mutex );
     return m_db;
 }
 
 
-DatabaseImpl*
-DatabaseImpl::clone() const
+Tomahawk::DatabaseImpl*
+Tomahawk::DatabaseImpl::clone() const
 {
     QMutexLocker lock( &m_mutex );
 
@@ -153,7 +159,7 @@ DatabaseImpl::clone() const
 
 
 void
-DatabaseImpl::dumpDatabase()
+Tomahawk::DatabaseImpl::dumpDatabase()
 {
     QFile dump( "dbdump.txt" );
     if ( !dump.open( QIODevice::WriteOnly | QIODevice::Text ) )
@@ -181,7 +187,7 @@ DatabaseImpl::dumpDatabase()
 
 
 void
-DatabaseImpl::loadIndex()
+Tomahawk::DatabaseImpl::loadIndex()
 {
     connect( m_fuzzyIndex, SIGNAL( indexReady() ), SIGNAL( indexReady() ) );
     m_fuzzyIndex->loadLuceneIndex();
@@ -189,7 +195,7 @@ DatabaseImpl::loadIndex()
 
 
 bool
-DatabaseImpl::updateSchema( int oldVersion )
+Tomahawk::DatabaseImpl::updateSchema( int oldVersion )
 {
     // we are called here with the old database. we must migrate it to the CURRENT_SCHEMA_VERSION from the oldVersion
     if ( oldVersion == 0 ) // empty database, so create our tables and stuff
@@ -250,7 +256,7 @@ DatabaseImpl::updateSchema( int oldVersion )
 
 
 QString
-DatabaseImpl::cleanSql( const QString& sql )
+Tomahawk::DatabaseImpl::cleanSql( const QString& sql )
 {
     QString fixed = sql;
     QRegExp r( "--[^\\n]*" );
@@ -260,7 +266,7 @@ DatabaseImpl::cleanSql( const QString& sql )
 
 
 Tomahawk::result_ptr
-DatabaseImpl::file( int fid )
+Tomahawk::DatabaseImpl::file( int fid )
 {
     Tomahawk::result_ptr r;
     TomahawkSqlQuery query = newquery();
@@ -277,40 +283,23 @@ DatabaseImpl::file( int fid )
 
     if ( query.next() )
     {
-        Tomahawk::source_ptr s;
         QString url = query.value( 0 ).toString();
-
-        if ( query.value( 15 ).toUInt() == 0 )
-        {
-            s = SourceList::instance()->getLocal();
-        }
-        else
-        {
-            s = SourceList::instance()->get( query.value( 15 ).toUInt() );
-            if ( s.isNull() )
-            {
-                return r;
-            }
-
-            url = QString( "servent://%1\t%2" ).arg( s->userName() ).arg( url );
-        }
+        Tomahawk::source_ptr s = SourceList::instance()->get( query.value( 15 ).toUInt() );
+        if ( !s )
+            return r;
+        if ( !s->isLocal() )
+            url = QString( "servent://%1\t%2" ).arg( s->nodeId() ).arg( url );
 
         r = Tomahawk::Result::get( url );
-        Tomahawk::artist_ptr artist = Tomahawk::Artist::get( query.value( 7 ).toUInt(), query.value( 11 ).toString() );
-        Tomahawk::album_ptr album = Tomahawk::Album::get( query.value( 8 ).toUInt(), query.value( 12 ).toString(), artist );
-        Tomahawk::artist_ptr composer = Tomahawk::Artist::get( query.value( 10 ).toUInt(), query.value( 14 ).toString() );
+
+        Tomahawk::track_ptr track = Tomahawk::Track::get( query.value( 9 ).toUInt(), query.value( 11 ).toString(), query.value( 13 ).toString(), query.value( 12 ).toString(), query.value( 5 ).toUInt(), query.value( 14 ).toString(), 0, 0 );
+        r->setTrack( track );
 
         r->setModificationTime( query.value( 1 ).toUInt() );
         r->setSize( query.value( 2 ).toUInt() );
         r->setMimetype( query.value( 4 ).toString() );
-        r->setDuration( query.value( 5 ).toUInt() );
         r->setBitrate( query.value( 6 ).toUInt() );
-        r->setArtist( artist );
-        r->setAlbum( album );
-        r->setComposer( composer );
-        r->setTrack( query.value( 13 ).toString() );
-        r->setTrackId( query.value( 9 ).toUInt() );
-        r->setCollection( s->collection() );
+        r->setCollection( s->dbCollection() );
         r->setScore( 1.0 );
         r->setFileId( fid );
     }
@@ -320,13 +309,13 @@ DatabaseImpl::file( int fid )
 
 
 int
-DatabaseImpl::artistId( const QString& name_orig, bool autoCreate )
+Tomahawk::DatabaseImpl::artistId( const QString& name_orig, bool autoCreate )
 {
     if ( m_lastart == name_orig )
         return m_lastartid;
 
     int id = 0;
-    QString sortname = DatabaseImpl::sortname( name_orig );
+    QString sortname = Tomahawk::DatabaseImpl::sortname( name_orig );
 
     TomahawkSqlQuery query = newquery();
     query.prepare( "SELECT id FROM artist WHERE sortname = ?" );
@@ -365,10 +354,10 @@ DatabaseImpl::artistId( const QString& name_orig, bool autoCreate )
 
 
 int
-DatabaseImpl::trackId( int artistid, const QString& name_orig, bool autoCreate )
+Tomahawk::DatabaseImpl::trackId( int artistid, const QString& name_orig, bool autoCreate )
 {
     int id = 0;
-    QString sortname = DatabaseImpl::sortname( name_orig );
+    QString sortname = Tomahawk::DatabaseImpl::sortname( name_orig );
     //if( ( id = m_artistcache[sortname] ) ) return id;
 
     TomahawkSqlQuery query = newquery();
@@ -408,7 +397,7 @@ DatabaseImpl::trackId( int artistid, const QString& name_orig, bool autoCreate )
 
 
 int
-DatabaseImpl::albumId( int artistid, const QString& name_orig, bool autoCreate )
+Tomahawk::DatabaseImpl::albumId( int artistid, const QString& name_orig, bool autoCreate )
 {
     if ( name_orig.isEmpty() )
     {
@@ -420,7 +409,7 @@ DatabaseImpl::albumId( int artistid, const QString& name_orig, bool autoCreate )
         return m_lastalbid;
 
     int id = 0;
-    QString sortname = DatabaseImpl::sortname( name_orig );
+    QString sortname = Tomahawk::DatabaseImpl::sortname( name_orig );
     //if( ( id = m_albumcache[sortname] ) ) return id;
 
     TomahawkSqlQuery query = newquery();
@@ -462,7 +451,7 @@ DatabaseImpl::albumId( int artistid, const QString& name_orig, bool autoCreate )
 
 
 QList< QPair<int, float> >
-DatabaseImpl::search( const Tomahawk::query_ptr& query, uint limit )
+Tomahawk::DatabaseImpl::search( const Tomahawk::query_ptr& query, uint limit )
 {
     QList< QPair<int, float> > resultslist;
 
@@ -471,7 +460,7 @@ DatabaseImpl::search( const Tomahawk::query_ptr& query, uint limit )
     {
         resultslist << QPair<int, float>( i, (float)resultsmap.value( i ) );
     }
-    qSort( resultslist.begin(), resultslist.end(), DatabaseImpl::scorepairSorter );
+    qSort( resultslist.begin(), resultslist.end(), Tomahawk::DatabaseImpl::scorepairSorter );
 
     if ( !limit )
         return resultslist;
@@ -487,7 +476,7 @@ DatabaseImpl::search( const Tomahawk::query_ptr& query, uint limit )
 
 
 QList< QPair<int, float> >
-DatabaseImpl::searchAlbum( const Tomahawk::query_ptr& query, uint limit )
+Tomahawk::DatabaseImpl::searchAlbum( const Tomahawk::query_ptr& query, uint limit )
 {
     QList< QPair<int, float> > resultslist;
 
@@ -496,7 +485,7 @@ DatabaseImpl::searchAlbum( const Tomahawk::query_ptr& query, uint limit )
     {
         resultslist << QPair<int, float>( i, (float)resultsmap.value( i ) );
     }
-    qSort( resultslist.begin(), resultslist.end(), DatabaseImpl::scorepairSorter );
+    qSort( resultslist.begin(), resultslist.end(), Tomahawk::DatabaseImpl::scorepairSorter );
 
     if ( !limit )
         return resultslist;
@@ -512,7 +501,7 @@ DatabaseImpl::searchAlbum( const Tomahawk::query_ptr& query, uint limit )
 
 
 QList< int >
-DatabaseImpl::getTrackFids( int tid )
+Tomahawk::DatabaseImpl::getTrackFids( int tid )
 {
     QList< int > ret;
 
@@ -530,7 +519,7 @@ DatabaseImpl::getTrackFids( int tid )
 
 
 QString
-DatabaseImpl::sortname( const QString& str, bool replaceArticle )
+Tomahawk::DatabaseImpl::sortname( const QString& str, bool replaceArticle )
 {
     QString s = str.toLower().trimmed().replace( QRegExp( "[\\s]{2,}" ), " " );
 
@@ -544,7 +533,7 @@ DatabaseImpl::sortname( const QString& str, bool replaceArticle )
 
 
 QVariantMap
-DatabaseImpl::artist( int id )
+Tomahawk::DatabaseImpl::artist( int id )
 {
     TomahawkSqlQuery query = newquery();
     query.exec( QString( "SELECT id, name, sortname FROM artist WHERE id = %1" ).arg( id ) );
@@ -561,7 +550,7 @@ DatabaseImpl::artist( int id )
 
 
 QVariantMap
-DatabaseImpl::track( int id )
+Tomahawk::DatabaseImpl::track( int id )
 {
     TomahawkSqlQuery query = newquery();
     query.exec( QString( "SELECT id, artist, name, sortname FROM track WHERE id = %1" ).arg( id ) );
@@ -579,7 +568,7 @@ DatabaseImpl::track( int id )
 
 
 QVariantMap
-DatabaseImpl::album( int id )
+Tomahawk::DatabaseImpl::album( int id )
 {
     TomahawkSqlQuery query = newquery();
     query.exec( QString( "SELECT id, artist, name, sortname FROM album WHERE id = %1" ).arg( id ) );
@@ -597,7 +586,7 @@ DatabaseImpl::album( int id )
 
 
 Tomahawk::result_ptr
-DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
+Tomahawk::DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
 {
     QString url = origquery->resultHint();
     TomahawkSqlQuery query = newquery();
@@ -625,12 +614,11 @@ DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
         res = Tomahawk::Result::get( url );
         res->setRID( uuid() );
         res->setScore( 1.0 );
-        res->setArtist( Tomahawk::Artist::get( artistId( origquery->artist(), false ), origquery->artist() ) );
-        res->setAlbum( Tomahawk::Album::get( albumId( res->artist()->id(), origquery->album(), false ), origquery->album(), res->artist() ) );
-        res->setTrack( origquery->track() );
-        res->setDuration( origquery->duration() );
         const QUrl u = QUrl::fromUserInput( url );
         res->setFriendlySource( u.host() );
+
+        Tomahawk::track_ptr track = Tomahawk::Track::get( origquery->queryTrack()->artist(), origquery->queryTrack()->track(), origquery->queryTrack()->album(), origquery->queryTrack()->duration() );
+        res->setTrack( track );
 
         return res;
     }
@@ -655,9 +643,8 @@ DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
                             "file_join.discnumber, "                                //17
                             "artist.id as artid, "                                  //18
                             "album.id as albid, "                                   //19
-                            "composer.id as cmpid, "                                //20
-                            "track_attributes.v as year "                           //21
-                            "FROM file, file_join, artist, track, track_attributes "
+                            "composer.id as cmpid "                                 //20
+                            "FROM file, file_join, artist, track "
                             "LEFT JOIN album ON album.id = file_join.album "
                             "LEFT JOIN artist AS composer on composer.id = file_join.composer "
                             "WHERE "
@@ -665,7 +652,6 @@ DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
                             "track.id = file_join.track AND "
                             "file.source %1 AND "
                             "file_join.file = file.id AND "
-                            "file.id = track_attributes.id AND "
                             "file.url = ?"
         ).arg( searchlocal ? "IS NULL" : QString( "= %1" ).arg( s->id() ) );
 
@@ -673,47 +659,28 @@ DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
     query.bindValue( 0, fileUrl );
     query.exec();
 
-    if( query.next() )
+    if ( query.next() )
     {
-        Tomahawk::source_ptr s;
         QString url = query.value( 0 ).toString();
-
-        if ( query.value( 15 ).toUInt() == 0 )
-        {
-            s = SourceList::instance()->getLocal();
-        }
-        else
-        {
-            s = SourceList::instance()->get( query.value( 15 ).toUInt() );
-            if ( s.isNull() )
-            {
-                return res;
-            }
-
-            url = QString( "servent://%1\t%2" ).arg( s->userName() ).arg( url );
-        }
+        Tomahawk::source_ptr s = SourceList::instance()->get( query.value( 15 ).toUInt() );
+        if ( !s )
+            return res;
+        if ( !s->isLocal() )
+            url = QString( "servent://%1\t%2" ).arg( s->nodeId() ).arg( url );
 
         res = Tomahawk::Result::get( url );
-        Tomahawk::artist_ptr artist = Tomahawk::Artist::get( query.value( 18 ).toUInt(), query.value( 11 ).toString() );
-        Tomahawk::album_ptr album = Tomahawk::Album::get( query.value( 19 ).toUInt(), query.value( 12 ).toString(), artist );
-        Tomahawk::artist_ptr composer = Tomahawk::Artist::get( query.value( 20 ).toUInt(), query.value( 14 ).toString() );
+
+        Tomahawk::track_ptr track = Tomahawk::Track::get( query.value( 9 ).toUInt(), query.value( 11 ).toString(), query.value( 13 ).toString(), query.value( 12 ).toString(), query.value( 5 ).toInt(), query.value( 14 ).toString(), query.value( 16 ).toUInt(), query.value( 17 ).toUInt() );
+        track->loadAttributes();
+        res->setTrack( track );
 
         res->setModificationTime( query.value( 1 ).toUInt() );
         res->setSize( query.value( 2 ).toUInt() );
         res->setMimetype( query.value( 4 ).toString() );
-        res->setDuration( query.value( 5 ).toInt() );
         res->setBitrate( query.value( 6 ).toInt() );
-        res->setArtist( artist );
-        res->setAlbum( album );
-        res->setComposer( composer );
         res->setScore( 1.0 );
-        res->setTrack( query.value( 13 ).toString() );
-        res->setAlbumPos( query.value( 16 ).toUInt() );
-        res->setDiscNumber( query.value( 17 ).toUInt() );
         res->setRID( uuid() );
-        res->setTrackId( query.value( 9 ).toUInt() );
-        res->setCollection( s->collection() );
-        res->setYear( query.value( 21 ).toUInt() );
+        res->setCollection( s->dbCollection() );
     }
 
     return res;
@@ -721,7 +688,7 @@ DatabaseImpl::resultFromHint( const Tomahawk::query_ptr& origquery )
 
 
 bool
-DatabaseImpl::openDatabase( const QString& dbname, bool checkSchema )
+Tomahawk::DatabaseImpl::openDatabase( const QString& dbname, bool checkSchema )
 {
     QString connName( "tomahawk" );
     if ( !checkSchema )

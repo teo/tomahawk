@@ -18,12 +18,15 @@
 
 #include "DatabaseCommand_SocialAction.h"
 
-#include <QSqlQuery>
-
+#include "collection/Collection.h"
 #include "database/Database.h"
-#include "DatabaseImpl.h"
 #include "network/Servent.h"
 #include "utils/Logger.h"
+
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
+
+#include <QSqlQuery>
 
 using namespace Tomahawk;
 
@@ -36,6 +39,10 @@ DatabaseCommand_SocialAction::postCommitHook()
     {
         Servent::instance()->triggerDBSync();
     }
+
+    trackdata_ptr trackData = TrackData::get( 0, m_artist, m_title );
+    if ( trackData )
+        trackData->loadSocialActions( true );
 
     source()->reportSocialAttributesChanged( this );
 }
@@ -51,13 +58,13 @@ DatabaseCommand_SocialAction::exec( DatabaseImpl* dbi )
 
     QVariant srcid = source()->isLocal() ? QVariant( QVariant::Int ) : source()->id();
 
-    if ( m_artist.isNull() || m_track.isEmpty() )
+    if ( m_artist.isNull() || m_title.isEmpty() || m_action.isEmpty() )
         return;
 
     int artid = dbi->artistId( m_artist, true );
     if ( artid < 1 )
         return;
-    int trkid = dbi->trackId( artid, m_track, true );
+    int trkid = dbi->trackId( artid, m_title, true );
     if ( trkid < 1 )
         return;
 

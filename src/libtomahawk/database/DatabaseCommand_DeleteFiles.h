@@ -29,7 +29,9 @@
 
 #include "DllMacro.h"
 
-#include "utils/Logger.h"
+
+namespace Tomahawk
+{
 
 class DLLEXPORT DatabaseCommand_DeleteFiles : public DatabaseCommandLoggable
 {
@@ -84,5 +86,7 @@ private:
     QList<unsigned int> m_idList;
     bool m_deleteAll;
 };
+
+}
 
 #endif // DATABASECOMMAND_DELETEFILES_H

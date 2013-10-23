@@ -18,16 +18,24 @@
 
 #include "DatabaseCommand_TrackStats.h"
 
-#include "DatabaseImpl.h"
-#include "SourceList.h"
 #include "utils/Logger.h"
+
+#include "Artist.h"
+#include "DatabaseImpl.h"
+#include "PlaylistEntry.h"
+#include "SourceList.h"
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "collection/Collection.h"
+#endif
 
 using namespace Tomahawk;
 
 
-DatabaseCommand_TrackStats::DatabaseCommand_TrackStats( const query_ptr& query, QObject* parent )
+DatabaseCommand_TrackStats::DatabaseCommand_TrackStats( const trackdata_ptr& track, QObject* parent )
     : DatabaseCommand( parent )
-    , m_query( query )
+    , m_track( track )
 {
 }
 
@@ -44,23 +52,47 @@ DatabaseCommand_TrackStats::exec( DatabaseImpl* dbi )
 {
     TomahawkSqlQuery query = dbi->newquery();
 
-    if ( !m_query.isNull() )
+    if ( m_track )
     {
-        int artid = dbi->artistId( m_query->artist(), false );
-        if( artid < 1 )
+        if ( m_track->trackId() == 0 )
             return;
 
-        int trkid = dbi->trackId( artid, m_query->track(), false );
-        if( trkid < 1 )
-            return;
+        query.prepare( "SELECT COUNT(*) AS counter, track.id "
+                       "FROM playback_log, track "
+                       "WHERE playback_log.source IS NULL AND track.id = playback_log.track "
+                       "GROUP BY track.id "
+                       "ORDER BY counter DESC" );
+        query.exec();
+
+        unsigned int chartPos = 0;
+        unsigned int chartCount = 0;
+        const unsigned int trackId = m_track->trackId();
+
+        QHash< QString, unsigned int > charts;
+        while ( query.next() )
+        {
+            if ( query.value( 0 ).toUInt() < 2 )
+                break;
+
+            chartCount++;
+            if ( chartPos == 0 && query.value( 1 ).toUInt() == trackId )
+            {
+                chartPos = chartCount;
+            }
+        }
+
+        if ( chartPos == 0 )
+            chartPos = chartCount;
+
+        emit trackStats( chartPos, chartCount );
 
         query.prepare( "SELECT * "
                        "FROM playback_log "
                        "WHERE track = ? ORDER BY playtime ASC" );
-        query.addBindValue( trkid );
+        query.addBindValue( m_track->trackId() );
         query.exec();
     }
-    else if ( !m_artist.isNull() )
+    else if ( m_artist )
     {
         query.prepare( "SELECT playback_log.* "
                        "FROM playback_log, track "
@@ -77,12 +109,12 @@ DatabaseCommand_TrackStats::exec( DatabaseImpl* dbi )
         log.timestamp = query.value( 3 ).toUInt();
         log.secsPlayed = query.value( 4 ).toUInt();
 
-        if ( !log.source.isNull() )
+        if ( log.source )
             playbackData.append( log );
     }
 
-    if ( !m_query.isNull() )
-        m_query->setPlaybackHistory( playbackData );
+    if ( m_track )
+        m_track->setPlaybackHistory( playbackData );
     else
         m_artist->setPlaybackHistory( playbackData );
 

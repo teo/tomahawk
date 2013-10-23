@@ -23,6 +23,7 @@
 #include "accounts/Account.h"
 #include "accounts/AccountManager.h"
 #include "accounts/DelegateConfigWrapper.h"
+#include "accounts/AccountConfigWidget.h"
 #include "TomahawkSettings.h"
 
 namespace TomahawkUtils
@@ -99,7 +100,7 @@ createAccountFromFactory( Tomahawk::Accounts::AccountFactory* factory, QWidget* 
     {
 #ifdef Q_WS_MAC
         // on osx a sheet needs to be non-modal
-        DelegateConfigWrapper* dialog = new DelegateConfigWrapper( account->configurationWidget(), account->aboutWidget(), QString("%1 Config" ).arg( account->accountFriendlyName() ), parent, Qt::Sheet );
+        DelegateConfigWrapper* dialog = new DelegateConfigWrapper( account->configurationWidget(), account->aboutWidget(), QObject::tr( "%1 Config" ).arg( account->accountFriendlyName() ), parent, Qt::Sheet );
         dialog->setProperty( "accountplugin", QVariant::fromValue< QObject* >( account ) );
 
         UtilsObject* obj = new UtilsObject( dialog );
@@ -110,8 +111,8 @@ createAccountFromFactory( Tomahawk::Accounts::AccountFactory* factory, QWidget* 
 
         dialog->show();
 #else
-        DelegateConfigWrapper dialog( account->configurationWidget(), account->aboutWidget(), QString("%1 Config" ).arg( account->accountFriendlyName() ), parent );
-        QWeakPointer< DelegateConfigWrapper > watcher( &dialog );
+        DelegateConfigWrapper dialog( account->configurationWidget(), account->aboutWidget(), QObject::tr( "%1 Config" ).arg( account->accountFriendlyName() ), parent );
+        QPointer< DelegateConfigWrapper > watcher( &dialog );
 
         if( account->configurationWidget()->metaObject()->indexOfSignal( "dataError(bool)" ) > -1 )
             QObject::connect( account->configurationWidget(), SIGNAL( dataError( bool ) ), &dialog, SLOT( toggleOkButton( bool ) ), Qt::UniqueConnection );
@@ -139,9 +140,9 @@ openAccountConfig( Tomahawk::Accounts::Account* account, QWidget* parent, bool s
     if( account->configurationWidget() )
     {
 #ifndef Q_OS_MAC
-        DelegateConfigWrapper dialog( account->configurationWidget(), account->aboutWidget(), QString("%1 Configuration" ).arg( account->accountFriendlyName() ), parent );
+        DelegateConfigWrapper dialog( account->configurationWidget(), account->aboutWidget(), QObject::tr("%1 Configuration" ).arg( account->accountFriendlyName() ), parent );
         dialog.setShowDelete( showDelete );
-        QWeakPointer< DelegateConfigWrapper > watcher( &dialog );
+        QPointer< DelegateConfigWrapper > watcher( &dialog );
         int ret = dialog.exec();
         if ( !watcher.isNull() && dialog.deleted() )
         {
@@ -154,7 +155,7 @@ openAccountConfig( Tomahawk::Accounts::Account* account, QWidget* parent, bool s
         }
 #else
         // on osx a sheet needs to be non-modal
-        DelegateConfigWrapper* dialog = new DelegateConfigWrapper( account->configurationWidget(), account->aboutWidget(), QString("%1 Configuration" ).arg( account->accountFriendlyName() ), parent, Qt::Sheet );
+        DelegateConfigWrapper* dialog = new DelegateConfigWrapper( account->configurationWidget(), account->aboutWidget(), QObject::tr("%1 Configuration" ).arg( account->accountFriendlyName() ), parent, Qt::Sheet );
         dialog->setShowDelete( showDelete );
         dialog->setProperty( "accountplugin", QVariant::fromValue< QObject* >( account ) );
         UtilsObject* obj = new UtilsObject( dialog );

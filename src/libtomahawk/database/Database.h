@@ -17,22 +17,50 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include <QSharedPointer>
+#include "DllMacro.h"
+#include "Typedefs.h"
+
+#include <QMutex>
 #include <QVariant>
 
-#include "Artist.h"
-#include "Album.h"
-#include "DatabaseCommand.h"
 
-#include "DllMacro.h"
+namespace Tomahawk
+{
 
 class DatabaseImpl;
+class DatabaseCommand;
 class DatabaseWorkerThread;
 class DatabaseWorker;
 class IdThreadWorker;
+
+class DLLEXPORT DatabaseCommandFactory : public QObject
+{
+Q_OBJECT
+    friend class Database;
+
+public:
+    virtual ~DatabaseCommandFactory() {}
+    dbcmd_ptr newInstance();
+
+signals:
+    void created( const Tomahawk::dbcmd_ptr& command );
+
+protected:
+    void notifyCreated( const Tomahawk::dbcmd_ptr& command );
+
+    virtual DatabaseCommand* create() const = 0;
+};
+
+template <class COMMAND>
+class DatabaseCommandFactoryImplementation : public DatabaseCommandFactory
+{
+protected:
+    virtual COMMAND* create() const { return new COMMAND(); }
+};
 
 /*
     This class is really a firewall/pimpl - the public functions of LibraryImpl
@@ -59,28 +87,49 @@ public:
 
     DatabaseImpl* impl();
 
+    dbcmd_ptr createCommandInstance( const QVariant& op, const Tomahawk::source_ptr& source );
+
+    // Template implementations need to stay in header!
+    template<typename T> void registerCommand()
+    {
+        registerCommand( new DatabaseCommandFactoryImplementation<T>() );
+    }
+
+    template<typename T> DatabaseCommandFactory* commandFactory()
+    {
+        return commandFactoryByClassName( T::staticMetaObject.className() );
+    }
+
 signals:
     void indexReady(); // search index
     void ready();
 
-    void newJobRO( QSharedPointer<DatabaseCommand> );
-    void newJobRW( QSharedPointer<DatabaseCommand> );
+    void newJobRO( Tomahawk::dbcmd_ptr );
+    void newJobRW( Tomahawk::dbcmd_ptr );
 
 public slots:
-    void enqueue( const QSharedPointer<DatabaseCommand>& lc );
-    void enqueue( const QList< QSharedPointer<DatabaseCommand> >& lc );
+    void enqueue( const Tomahawk::dbcmd_ptr& lc );
+    void enqueue( const QList< Tomahawk::dbcmd_ptr >& lc );
 
 private slots:
-    void setIsReadyTrue() { m_ready = true; }
+    void markAsReady();
 
 private:
+    void registerCommand( DatabaseCommandFactory* commandFactory );
+    DatabaseCommandFactory* commandFactoryByClassName( const QString& className );
+    DatabaseCommandFactory* commandFactoryByCommandName( const QString& commandName );
+    dbcmd_ptr createCommandInstance( const QString& commandName );
+
     bool m_ready;
 
     DatabaseImpl* m_impl;
-    QWeakPointer< DatabaseWorkerThread > m_workerRW;
-    QList< QWeakPointer< DatabaseWorkerThread > > m_workerThreads;
+    QPointer< DatabaseWorkerThread > m_workerRW;
+    QList< QPointer< DatabaseWorkerThread > > m_workerThreads;
     IdThreadWorker* m_idWorker;
     int m_maxConcurrentThreads;
+
+    QHash< QString, DatabaseCommandFactory* > m_commandFactories;
+    QHash< QString, QString> m_commandNameClassNameMapping;
 
     QHash< QThread*, DatabaseImpl* > m_implHash;
     QMutex m_mutex;
@@ -90,5 +139,7 @@ private:
     friend class Tomahawk::Artist;
     friend class Tomahawk::Album;
 };
+
+}
 
 #endif // DATABASE_H

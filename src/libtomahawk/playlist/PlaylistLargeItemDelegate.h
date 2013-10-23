@@ -23,50 +23,33 @@
 #include <QTextDocument>
 #include <QTextOption>
 
+#include "PlaylistItemDelegate.h"
 #include "DllMacro.h"
 #include "Typedefs.h"
 
-namespace Tomahawk {
-class PixmapDelegateFader;
-}
-
-class TrackModel;
 class PlayableItem;
 class PlayableProxyModel;
 class TrackView;
 
-class DLLEXPORT PlaylistLargeItemDelegate : public QStyledItemDelegate
+class DLLEXPORT PlaylistLargeItemDelegate : public PlaylistItemDelegate
 {
 Q_OBJECT
 
 public:
     enum DisplayMode
-    { LovedTracks, RecentlyPlayed, LatestAdditions };
+    { LovedTracks, RecentlyPlayed, LatestAdditions, Inbox };
 
-    PlaylistLargeItemDelegate( DisplayMode mode, TrackView* parent = 0, PlayableProxyModel* proxy = 0 );
+    PlaylistLargeItemDelegate( DisplayMode mode, TrackView* parent, PlayableProxyModel* proxy );
+
+    virtual QSize sizeHint( const QStyleOptionViewItem& option, const QModelIndex& index ) const;
 
 protected:
     void paint( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
-    QSize sizeHint( const QStyleOptionViewItem& option, const QModelIndex& index ) const;
-    QWidget* createEditor( QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
 
-signals:
-    void updateIndex( const QModelIndex& idx );
-
-private slots:
-    void modelChanged();
-    void doUpdateIndex( const QPersistentModelIndex& idx );
+protected slots:
+    virtual void modelChanged();
 
 private:
-    void prepareStyleOption( QStyleOptionViewItemV4* option, const QModelIndex& index, PlayableItem* item ) const;
-    void drawRichText( QPainter* painter, const QStyleOptionViewItem& option, const QRect& rect, int flags, QTextDocument& text ) const;
-
-    QTextOption m_topOption;
-    QTextOption m_centerRightOption;
-    QTextOption m_bottomOption;
-
-    mutable QHash< QPersistentModelIndex, QSharedPointer< Tomahawk::PixmapDelegateFader > > m_pixmaps;
-
     TrackView* m_view;
     PlayableProxyModel* m_model;
     DisplayMode m_mode;

@@ -21,10 +21,12 @@
 
 #include "audio/AudioEngine.h"
 #include "playlist/TrackView.h"
-#include "PlayableItem.h"
-#include "ViewManager.h"
-#include "Source.h"
 #include "utils/Logger.h"
+
+#include "PlayableItem.h"
+#include "Result.h"
+#include "Source.h"
+#include "ViewManager.h"
 
 using namespace Tomahawk;
 
@@ -32,6 +34,8 @@ using namespace Tomahawk;
 QueueProxyModel::QueueProxyModel( TrackView* parent )
     : PlayableProxyModel( parent )
 {
+    connect( this, SIGNAL( indexPlayable( QModelIndex ) ), SLOT( onIndexChanged( QModelIndex ) ) );
+    connect( this, SIGNAL( indexResolved( QModelIndex ) ), SLOT( onIndexChanged( QModelIndex ) ) );
     connect( parent, SIGNAL( itemActivated( QModelIndex ) ), SLOT( onIndexActivated( QModelIndex ) ) );
     connect( AudioEngine::instance(), SIGNAL( loading( Tomahawk::result_ptr ) ), SLOT( onPlaybackStarted( Tomahawk::result_ptr ) ) );
 }
@@ -43,6 +47,21 @@ QueueProxyModel::~QueueProxyModel()
 
 
 void
+QueueProxyModel::onIndexChanged( const QModelIndex& index )
+{
+    PlayableItem* item = itemFromIndex( mapToSource( index ) );
+    if ( item && item->query() )
+    {
+        tDebug() << item->query()->toString() << item->query()->resolvingFinished() << item->query()->playable();
+    }
+    if ( !item || !item->query() || ( item->query()->resolvingFinished() && !item->query()->playable() ) )
+    {
+        removeIndex( index );
+    }
+}
+
+
+void
 QueueProxyModel::onPlaybackStarted( const Tomahawk::result_ptr& result )
 {
     for ( int i = 0; i < rowCount(); i++ )
@@ -50,7 +69,7 @@ QueueProxyModel::onPlaybackStarted( const Tomahawk::result_ptr& result )
         QModelIndex idx = index( i, 0 );
         PlayableItem* item = itemFromIndex( mapToSource( idx ) );
         if ( item && item->query() && ( item->query()->results().contains( result ) ||
-                                        item->query()->equals( result->toQuery() ) ) )
+                                        item->query()->track()->equals( result->track() ) ) )
         {
             removeIndex( idx );
             if ( !rowCount() )

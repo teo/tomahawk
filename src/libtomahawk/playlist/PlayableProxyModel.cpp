@@ -19,16 +19,17 @@
 
 #include "PlayableProxyModel.h"
 
-#include <QTreeView>
-
-#include "PlayableProxyModelPlaylistInterface.h"
-#include "Artist.h"
-#include "Album.h"
-#include "Query.h"
-#include "Source.h"
-#include "PlayableItem.h"
 #include "utils/Logger.h"
 
+#include "Artist.h"
+#include "Album.h"
+#include "PlayableItem.h"
+#include "PlayableProxyModelPlaylistInterface.h"
+#include "Query.h"
+#include "Result.h"
+#include "Source.h"
+
+#include <QTreeView>
 
 PlayableProxyModel::PlayableProxyModel( QObject* parent )
     : QSortFilterProxyModel( parent )
@@ -40,6 +41,8 @@ PlayableProxyModel::PlayableProxyModel( QObject* parent )
     , m_cutoffDirection( ShowAfter )
     , m_cutoffRow( -1 )
 {
+    m_playlistInterface = Tomahawk::playlistinterface_ptr( new Tomahawk::PlayableProxyModelPlaylistInterface( this ) );
+
     setFilterCaseSensitivity( Qt::CaseInsensitive );
     setSortCaseSensitivity( Qt::CaseInsensitive );
     setDynamicSortFilter( true );
@@ -49,6 +52,20 @@ PlayableProxyModel::PlayableProxyModel( QObject* parent )
     m_headerStyle[ Large ]      << PlayableModel::Name;
     m_headerStyle[ Detailed ]   << PlayableModel::Artist << PlayableModel::Track << PlayableModel::Composer << PlayableModel::Album << PlayableModel::AlbumPos << PlayableModel::Duration << PlayableModel::Bitrate << PlayableModel::Age << PlayableModel::Year << PlayableModel::Filesize << PlayableModel::Origin << PlayableModel::Score;
     m_headerStyle[ Collection ] << PlayableModel::Name << PlayableModel::Composer << PlayableModel::Duration << PlayableModel::Bitrate << PlayableModel::Age << PlayableModel::Year << PlayableModel::Filesize << PlayableModel::Origin;
+}
+
+
+Tomahawk::playlistinterface_ptr
+PlayableProxyModel::playlistInterface() const
+{
+    return m_playlistInterface;
+}
+
+
+void
+PlayableProxyModel::setPlaylistInterface( const Tomahawk::playlistinterface_ptr& playlistInterface )
+{
+    m_playlistInterface = playlistInterface;
 }
 
 
@@ -92,6 +109,10 @@ PlayableProxyModel::setSourcePlayableModel( PlayableModel* sourceModel )
     {
         disconnect( m_model, SIGNAL( loadingStarted() ), this, SIGNAL( loadingStarted() ) );
         disconnect( m_model, SIGNAL( loadingFinished() ), this, SIGNAL( loadingFinished() ) );
+        disconnect( m_model, SIGNAL( itemCountChanged( unsigned int ) ), this, SIGNAL( itemCountChanged( unsigned int ) ) );
+        disconnect( m_model, SIGNAL( indexPlayable( QModelIndex ) ), this, SLOT( onIndexPlayable( QModelIndex ) ) );
+        disconnect( m_model, SIGNAL( indexResolved( QModelIndex ) ), this, SLOT( onIndexResolved( QModelIndex ) ) );
+        disconnect( m_model, SIGNAL( currentIndexChanged() ), this, SIGNAL( currentIndexChanged() ) );
     }
 
     m_model = sourceModel;
@@ -100,6 +121,10 @@ PlayableProxyModel::setSourcePlayableModel( PlayableModel* sourceModel )
     {
         connect( m_model, SIGNAL( loadingStarted() ), SIGNAL( loadingStarted() ) );
         connect( m_model, SIGNAL( loadingFinished() ), SIGNAL( loadingFinished() ) );
+        connect( m_model, SIGNAL( itemCountChanged( unsigned int ) ), SIGNAL( itemCountChanged( unsigned int ) ) );
+        connect( m_model, SIGNAL( indexPlayable( QModelIndex ) ), SLOT( onIndexPlayable( QModelIndex ) ) );
+        connect( m_model, SIGNAL( indexResolved( QModelIndex ) ), SLOT( onIndexResolved( QModelIndex ) ) );
+        connect( m_model, SIGNAL( currentIndexChanged() ), SIGNAL( currentIndexChanged() ) );
     }
 
     QSortFilterProxyModel::setSourceModel( m_model );
@@ -125,7 +150,7 @@ PlayableProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourcePa
     if ( !pi )
         return false;
 
-    if ( m_maxVisibleItems >= 0 && sourceRow > m_maxVisibleItems - 1 )
+    if ( m_maxVisibleItems > 0 && sourceRow > m_maxVisibleItems - 1 )
         return false;
 
     if ( m_hideDupeItems )
@@ -147,13 +172,9 @@ PlayableProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourcePa
 
     if ( pi->query() )
     {
-        const Tomahawk::query_ptr& q = pi->query()->displayQuery();
-        if ( q.isNull() ) // uh oh? filter out invalid queries i guess
-            return false;
-
         Tomahawk::result_ptr r;
-        if ( q->numResults() )
-            r = q->results().first();
+        if ( pi->query()->numResults() )
+            r = pi->query()->results().first();
 
         if ( !m_showOfflineResults && ( r.isNull() || !r->isOnline() ) )
             return false;
@@ -165,9 +186,9 @@ PlayableProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourcePa
         foreach( QString s, sl )
         {
             s = s.toLower();
-            if ( !q->artist().toLower().contains( s ) &&
-                !q->album().toLower().contains( s ) &&
-                !q->track().toLower().contains( s ) )
+            if ( !pi->query()->track()->artist().toLower().contains( s ) &&
+                 !pi->query()->track()->album().toLower().contains( s ) &&
+                 !pi->query()->track()->track().toLower().contains( s ) )
             {
                 return false;
             }
@@ -288,19 +309,21 @@ PlayableProxyModel::setMaxVisibleItems( int items )
 bool
 PlayableProxyModel::lessThan( int column, const Tomahawk::query_ptr& q1, const Tomahawk::query_ptr& q2 ) const
 {
-    const QString artist1 = q1->artistSortname();
-    const QString artist2 = q2->artistSortname();
-    const QString album1 = q1->albumSortname();
-    const QString album2 = q2->albumSortname();
-    const QString track1 = q1->trackSortname();
-    const QString track2 = q2->trackSortname();
-    const QString composer1 = q1->composerSortname();
-    const QString composer2 = q2->composerSortname();
-    const unsigned int albumpos1 = q1->albumpos();
-    const unsigned int albumpos2 = q2->albumpos();
-    const unsigned int discnumber1 = q1->discnumber();
-    const unsigned int discnumber2 = q2->discnumber();
-    unsigned int duration1 = q1->duration(), duration2 = q2->duration();
+    const Tomahawk::track_ptr& t1 = q1->track();
+    const Tomahawk::track_ptr& t2 = q2->track();
+    const QString artist1 = t1->artistSortname();
+    const QString artist2 = t2->artistSortname();
+    const QString album1 = t1->albumSortname();
+    const QString album2 = t2->albumSortname();
+    const QString track1 = t1->trackSortname();
+    const QString track2 = t2->trackSortname();
+    const QString composer1 = t1->composerSortname();
+    const QString composer2 = t2->composerSortname();
+    const unsigned int albumpos1 = t1->albumpos();
+    const unsigned int albumpos2 = t2->albumpos();
+    const unsigned int discnumber1 = t1->discnumber();
+    const unsigned int discnumber2 = t2->discnumber();
+    unsigned int duration1 = t1->duration(), duration2 = t2->duration();
     unsigned int bitrate1 = 0, bitrate2 = 0;
     unsigned int mtime1 = 0, mtime2 = 0;
     unsigned int size1 = 0, size2 = 0;
@@ -310,29 +333,25 @@ PlayableProxyModel::lessThan( int column, const Tomahawk::query_ptr& q1, const T
     QString origin2;
     qint64 id1 = 0, id2 = 0;
 
-    if ( q1->numResults() )
+    if ( !q1->results().isEmpty() )
     {
-        const Tomahawk::result_ptr& r = q1->results().at( 0 );
+        Tomahawk::result_ptr r = q1->results().first();
         bitrate1 = r->bitrate();
-        duration1 = r->duration();
         mtime1 = r->modificationTime();
         size1 = r->size();
-        year1 = r->year();
+        year1 = r->track()->year();
         score1 = r->score();
         origin1 = r->friendlySource().toLower();
-        id1 = (qint64)&r;
     }
-    if ( q2->numResults() )
+    if ( !q2->results().isEmpty() )
     {
-        const Tomahawk::result_ptr& r = q2->results().at( 0 );
+        Tomahawk::result_ptr r = q2->results().first();
         bitrate2 = r->bitrate();
-        duration2 = r->duration();
         mtime2 = r->modificationTime();
         size2 = r->size();
-        year2 = r->year();
+        year2 = r->track()->year();
         score2 = r->score();
         origin2 = r->friendlySource().toLower();
-        id2 = (qint64)&r;
     }
 
     // This makes it a stable sorter and prevents items from randomly jumping about.
@@ -465,8 +484,8 @@ PlayableProxyModel::lessThan( int column, const Tomahawk::query_ptr& q1, const T
         }
     }
 
-    const QString& lefts = q1->track();
-    const QString& rights = q2->track();
+    const QString& lefts = t1->track();
+    const QString& rights = t2->track();
     if ( lefts == rights )
         return id1 < id2;
 
@@ -487,24 +506,10 @@ PlayableProxyModel::lessThan( const QModelIndex& left, const QModelIndex& right 
 
     if ( p1->query() && p2->query() )
     {
-        const Tomahawk::query_ptr& q1 = p1->query()->displayQuery();
-        const Tomahawk::query_ptr& q2 = p2->query()->displayQuery();
-        return lessThan( left.column(), q1, q2 );
+        return lessThan( left.column(), p1->query(), p2->query() );
     }
 
     return QString::localeAwareCompare( sourceModel()->data( left ).toString(), sourceModel()->data( right ).toString() ) < 0;
-}
-
-
-Tomahawk::playlistinterface_ptr
-PlayableProxyModel::playlistInterface()
-{
-    if ( m_playlistInterface.isNull() )
-    {
-        m_playlistInterface = Tomahawk::playlistinterface_ptr( new Tomahawk::PlayableProxyModelPlaylistInterface( this ) );
-    }
-
-    return m_playlistInterface;
 }
 
 
@@ -516,7 +521,6 @@ PlayableProxyModel::columnCount( const QModelIndex& parent ) const
     switch ( m_style )
     {
         case Short:
-        case ShortWithAvatars:
         case Large:
             return 1;
             break;
@@ -537,13 +541,13 @@ QVariant
 PlayableProxyModel::data( const QModelIndex& index, int role ) const
 {
     if ( role == StyleRole )
-    {
         return m_style;
-    }
 
     if ( !sourceModel() )
         return QVariant();
     if ( !m_headerStyle.contains( m_style ) )
+        return QVariant();
+    if ( index.column() < 0 || index.column() >= m_headerStyle[ m_style ].count() )
         return QVariant();
 
     PlayableModel::Columns col = m_headerStyle[ m_style ].at( index.column() );
@@ -580,7 +584,6 @@ PlayableProxyModel::columnWeights() const
     switch ( m_style )
     {
         case Short:
-        case ShortWithAvatars:
         case Large:
             w << 1.0;
             break;
@@ -611,12 +614,12 @@ PlayableProxyModel::updateDetailedInfo( const QModelIndex& index )
 
     if ( style() == PlayableProxyModel::Short || style() == PlayableProxyModel::Large )
     {
-        item->query()->cover( QSize( 0, 0 ) );
+        item->query()->track()->cover( QSize( 0, 0 ) );
     }
 
     if ( style() == PlayableProxyModel::Large )
     {
-        item->query()->loadSocialActions();
+        item->query()->track()->loadSocialActions();
     }
 }
 
@@ -649,4 +652,26 @@ PlayableProxyModel::setFilter( const QString& pattern )
         setFilterRegExp( pattern );
         emit filterChanged( pattern );
     }
+}
+
+
+void
+PlayableProxyModel::setCurrentIndex( const QModelIndex& index )
+{
+    tDebug() << Q_FUNC_INFO;
+    m_model->setCurrentIndex( mapToSource( index ) );
+}
+
+
+void
+PlayableProxyModel::onIndexPlayable( const QModelIndex& index )
+{
+    emit indexPlayable( mapFromSource( index ) );
+}
+
+
+void
+PlayableProxyModel::onIndexResolved( const QModelIndex& index )
+{
+    emit indexResolved( mapFromSource( index ) );
 }

@@ -20,13 +20,17 @@
 
 #include "PipelineStatusItem.h"
 
-#include "utils/TomahawkUtils.h"
+#include "utils/TomahawkUtilsGui.h"
+
 #include "Pipeline.h"
+#include "Source.h"
+#include "Track.h"
+
+#ifndef ENABLE_HEADLESS
 #include "JobStatusModel.h"
 #include "JobStatusView.h"
-#include "Source.h"
+#endif
 
-QPixmap* PipelineStatusItem::s_pixmap = 0;
 
 PipelineStatusItem::PipelineStatusItem( const Tomahawk::query_ptr& q )
     : JobStatusItem()
@@ -69,12 +73,7 @@ PipelineStatusItem::idle()
 QPixmap
 PipelineStatusItem::icon() const
 {
-    if ( !s_pixmap )
-    {
-        s_pixmap = new QPixmap( RESPATH"images/search-icon.png" );
-    }
-
-    return *s_pixmap;
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::Search );
 }
 
 
@@ -84,10 +83,8 @@ PipelineStatusItem::resolving( const Tomahawk::query_ptr& query )
     if ( query->isFullTextQuery() )
         m_latestQuery = query->fullTextQuery();
     else
-        m_latestQuery = QString( "%1 - %2" ).arg( query->artist() ).arg( query->track() );
+        m_latestQuery = QString( "%1 - %2" ).arg( query->queryTrack()->artist() ).arg( query->queryTrack()->track() );
 
-    if ( m_latestQuery.isEmpty() )
-        qDebug() << "EMPTY STRING IN STATUS ITEM:" << query->fullTextQuery() << query->track() << query->artist() << query->album();
     Q_ASSERT( !m_latestQuery.isEmpty() );
 
     emit statusChanged();
@@ -104,10 +101,14 @@ PipelineStatusManager::PipelineStatusManager( QObject* parent )
 void
 PipelineStatusManager::resolving( const Tomahawk::query_ptr& p )
 {
+    Q_UNUSED( p );
+
+#ifndef ENABLE_HEADLESS
     if ( m_curItem.isNull() )
     {
         // No current query item and we're resolving something, so show it
-        m_curItem = QWeakPointer< PipelineStatusItem >( new PipelineStatusItem( p ) );
+        m_curItem = QPointer< PipelineStatusItem >( new PipelineStatusItem( p ) );
         JobStatusView::instance()->model()->addJob( m_curItem.data() );
     }
+#endif
 }

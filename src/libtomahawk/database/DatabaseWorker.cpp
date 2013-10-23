@@ -19,21 +19,26 @@
 
 #include "DatabaseWorker.h"
 
-#include <QTimer>
-#include <QTime>
-#include <QSqlQuery>
+#include "utils/Logger.h"
 
-#include "Source.h"
 #include "Database.h"
 #include "DatabaseImpl.h"
 #include "DatabaseCommandLoggable.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
 #include "TomahawkSqlQuery.h"
-#include "utils/Logger.h"
+
+#include <QTimer>
+#include <QTime>
+#include <QSqlQuery>
 
 #ifndef QT_NO_DEBUG
     //#define DEBUG_TIMING TRUE
 #endif
 
+
+namespace Tomahawk
+{
 
 DatabaseWorkerThread::DatabaseWorkerThread( Database* db, bool mutates )
     : QThread()
@@ -47,8 +52,8 @@ void
 DatabaseWorkerThread::run()
 {
     tDebug() << Q_FUNC_INFO << "DatabaseWorkerThread starting...";
-    m_worker = QWeakPointer< DatabaseWorker >( new DatabaseWorker( m_db, m_mutates ) );
-    exec();    
+    m_worker = QPointer< DatabaseWorker >( new DatabaseWorker( m_db, m_mutates ) );
+    exec();
     tDebug() << Q_FUNC_INFO << "DatabaseWorkerThread finishing...";
     if ( m_worker )
         delete m_worker.data();
@@ -60,7 +65,7 @@ DatabaseWorkerThread::~DatabaseWorkerThread()
 }
 
 
-QWeakPointer< DatabaseWorker >
+QPointer< DatabaseWorker >
 DatabaseWorkerThread::worker() const
 {
     return m_worker;
@@ -83,7 +88,7 @@ DatabaseWorker::~DatabaseWorker()
 
     if ( m_outstanding )
     {
-        foreach ( const QSharedPointer<DatabaseCommand>& cmd, m_commands )
+        foreach ( const Tomahawk::dbcmd_ptr& cmd, m_commands )
         {
             tDebug() << "Outstanding db command to finish:" << cmd->guid() << cmd->commandname();
         }
@@ -92,7 +97,7 @@ DatabaseWorker::~DatabaseWorker()
 
 
 void
-DatabaseWorker::enqueue( const QList< QSharedPointer<DatabaseCommand> >& cmds )
+DatabaseWorker::enqueue( const QList< Tomahawk::dbcmd_ptr >& cmds )
 {
     QMutexLocker lock( &m_mut );
     m_outstanding += cmds.count();
@@ -104,7 +109,7 @@ DatabaseWorker::enqueue( const QList< QSharedPointer<DatabaseCommand> >& cmds )
 
 
 void
-DatabaseWorker::enqueue( const QSharedPointer<DatabaseCommand>& cmd )
+DatabaseWorker::enqueue( const Tomahawk::dbcmd_ptr& cmd )
 {
     QMutexLocker lock( &m_mut );
     m_outstanding++;
@@ -131,8 +136,8 @@ DatabaseWorker::doWork()
     timer.start();
 #endif
 
-    QList< QSharedPointer<DatabaseCommand> > cmdGroup;
-    QSharedPointer<DatabaseCommand> cmd;
+    QList< Tomahawk::dbcmd_ptr > cmdGroup;
+    Tomahawk::dbcmd_ptr cmd;
     {
         QMutexLocker lock( &m_mut );
         cmd = m_commands.takeFirst();
@@ -222,7 +227,7 @@ DatabaseWorker::doWork()
             tDebug() << "DBCmd Duration:" << duration << "ms, now running postcommit for" << cmd->commandname();
 #endif
 
-            foreach ( QSharedPointer<DatabaseCommand> c, cmdGroup )
+            foreach ( Tomahawk::dbcmd_ptr c, cmdGroup )
                 c->postCommit();
 
 #ifdef DEBUG_TIMING
@@ -230,7 +235,7 @@ DatabaseWorker::doWork()
 #endif
         }
     }
-    catch( const char * msg )
+    catch ( const char * msg )
     {
         tLog() << endl
                  << "*ERROR* processing databasecommand:"
@@ -245,7 +250,7 @@ DatabaseWorker::doWork()
 
         Q_ASSERT( false );
     }
-    catch(...)
+    catch (...)
     {
         qDebug() << "Uncaught exception processing dbcmd";
         if ( cmd->doesMutates() )
@@ -255,7 +260,7 @@ DatabaseWorker::doWork()
         throw;
     }
 
-    foreach ( QSharedPointer<DatabaseCommand> c, cmdGroup )
+    foreach ( Tomahawk::dbcmd_ptr c, cmdGroup )
         c->emitFinished();
 
     QMutexLocker lock( &m_mut );
@@ -270,7 +275,7 @@ void
 DatabaseWorker::logOp( DatabaseCommandLoggable* command )
 {
     TomahawkSqlQuery oplogquery = Database::instance()->impl()->newquery();
-    qDebug() << "INSERTING INTO OPTLOG:" << command->source()->id() << command->guid() << command->commandname();
+    qDebug() << "INSERTING INTO OPLOG:" << command->source()->id() << command->guid() << command->commandname();
     oplogquery.prepare( "INSERT INTO oplog(source, guid, command, singleton, compressed, json) "
                         "VALUES(?, ?, ?, ?, ?, ?)" );
 
@@ -280,7 +285,7 @@ DatabaseWorker::logOp( DatabaseCommandLoggable* command )
 //     qDebug() << "OP JSON:" << ba.isNull() << ba << "from:" << variant; // debug
 
     bool compressed = false;
-    if( ba.length() >= 512 )
+    if ( ba.length() >= 512 )
     {
         // We need to compress this in this thread, since inserting into the log
         // has to happen as part of the same transaction as the dbcmd.
@@ -314,9 +319,11 @@ DatabaseWorker::logOp( DatabaseCommandLoggable* command )
     oplogquery.bindValue( 3, command->singletonCmd() );
     oplogquery.bindValue( 4, compressed );
     oplogquery.bindValue( 5, ba );
-    if( !oplogquery.exec() )
+    if ( !oplogquery.exec() )
     {
         tLog() << "Error saving to oplog";
         throw "Failed to save to oplog";
     }
+}
+
 }

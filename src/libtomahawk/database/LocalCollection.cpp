@@ -20,14 +20,18 @@
 
 #include "LocalCollection.h"
 
+#include "utils/Logger.h"
+#include "utils/TomahawkUtilsGui.h"
+
+#include "PlaylistEntry.h"
 #include "SourceList.h"
 #include <TomahawkSettings.h>
-#include "utils/Logger.h"
 
 #ifndef ENABLE_HEADLESS
     #include "ViewManager.h"
 #endif
 
+using namespace Tomahawk;
 
 LocalCollection::LocalCollection( const Tomahawk::source_ptr& source, QObject* parent )
     : DatabaseCollection( source, parent )
@@ -36,36 +40,15 @@ LocalCollection::LocalCollection( const Tomahawk::source_ptr& source, QObject* p
 }
 
 
-Tomahawk::playlist_ptr
-LocalCollection::bookmarksPlaylist()
+QString
+LocalCollection::prettyName() const
 {
-    if( TomahawkSettings::instance()->bookmarkPlaylist().isEmpty() )
-        return Tomahawk::playlist_ptr();
-
-    return playlist( TomahawkSettings::instance()->bookmarkPlaylist() );
+    return tr( "My Collection" );
 }
 
 
-void
-LocalCollection::createBookmarksPlaylist()
+QString
+LocalCollection::emptyText() const
 {
-    if( bookmarksPlaylist().isNull() ) {
-        QString guid = uuid();
-        Tomahawk::playlist_ptr p = Tomahawk::Playlist::create( SourceList::instance()->getLocal(), guid, tr( "Bookmarks" ), tr( "Saved tracks" ), QString(), false );
-
-#ifndef ENABLE_HEADLESS
-        ViewManager::instance()->createPageForPlaylist( p );
-//         connect( p.data(), SIGNAL( revisionLoaded( Tomahawk::PlaylistRevision ) ), this, SLOT( loaded( Tomahawk::PlaylistRevision ) ), Qt::QueuedConnection );
-        connect( p.data(), SIGNAL( created() ), this, SLOT( created() ) );
-#endif
-        TomahawkSettings::instance()->setBookmarkPlaylist( guid );
-//         p->createNewRevision( uuid(), p->currentrevision(), QList< Tomahawk::plentry_ptr >() );
-    }
-}
-
-
-void
-LocalCollection::created()
-{
-    emit bookmarkPlaylistCreated( bookmarksPlaylist() );
+    return tr( "After you have scanned your music collection you will find your tracks right here." );
 }

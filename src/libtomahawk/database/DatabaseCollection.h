@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi            <lfranchi@kde.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,13 +21,16 @@
 #ifndef DATABASECOLLECTION_H
 #define DATABASECOLLECTION_H
 
-#include <QDir>
-
-#include "Collection.h"
+#include "collection/Collection.h"
+#include "DllMacro.h"
 #include "Source.h"
 #include "Typedefs.h"
 
-#include "DllMacro.h"
+#include <QDir>
+
+
+namespace Tomahawk
+{
 
 class DLLEXPORT DatabaseCollection : public Tomahawk::Collection
 {
@@ -39,6 +43,8 @@ public:
         qDebug() << Q_FUNC_INFO;
     }
 
+    virtual BackendType backendType() const { return DatabaseCollectionType; }
+
     virtual void loadPlaylists();
     virtual void loadAutoPlaylists();
     virtual void loadStations();
@@ -46,6 +52,12 @@ public:
     virtual QList< Tomahawk::playlist_ptr > playlists();
     virtual QList< Tomahawk::dynplaylist_ptr > autoPlaylists();
     virtual QList< Tomahawk::dynplaylist_ptr > stations();
+
+    virtual Tomahawk::ArtistsRequest* requestArtists();
+    virtual Tomahawk::AlbumsRequest*  requestAlbums( const Tomahawk::artist_ptr& artist );
+    virtual Tomahawk::TracksRequest*  requestTracks( const Tomahawk::album_ptr& album );
+
+    virtual int trackCount() const;
 
 public slots:
     virtual void addTracks( const QList<QVariant>& newitems );
@@ -55,5 +67,7 @@ private slots:
     void stationCreated( const Tomahawk::source_ptr& source, const QVariantList& data );
     void autoPlaylistCreated( const Tomahawk::source_ptr& source, const QVariantList& data );
 };
+
+}
 
 #endif // DATABASECOLLECTION_H

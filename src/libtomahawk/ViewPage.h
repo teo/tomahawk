@@ -24,6 +24,7 @@
 #include "PlaylistInterface.h"
 #include "Artist.h"
 #include "Album.h"
+#include "Source.h"
 #include "utils/TomahawkUtils.h"
 #include "playlist/PlaylistUpdaterInterface.h"
 
@@ -64,6 +65,9 @@ public:
 
     virtual QString filter() const { return m_filter; }
     virtual bool setFilter( const QString& filter );
+
+    virtual bool willAcceptDrag( const QMimeData* data ) const;
+    virtual bool dropMimeData( const QMimeData*, Qt::DropAction );
 
     virtual bool jumpToCurrentTrack() = 0;
 

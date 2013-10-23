@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,17 +21,16 @@
 #ifndef DATABASECOMMAND_H
 #define DATABASECOMMAND_H
 
-#include <QObject>
 #include <QMetaType>
-#include <QTime>
-#include <QSqlQuery>
 #include <QVariant>
 
-#include "Typedefs.h"
-#include "database/Op.h"
-
 #include "DllMacro.h"
+#include "Typedefs.h"
 
+namespace Tomahawk
+{
+
+class DatabaseCommandPrivate;
 class DatabaseImpl;
 
 class DLLEXPORT DatabaseCommand : public QObject
@@ -48,7 +48,7 @@ public:
     explicit DatabaseCommand( QObject* parent = 0 );
     explicit DatabaseCommand( const Tomahawk::source_ptr& src, QObject* parent = 0 );
 
-    DatabaseCommand( const DatabaseCommand &other );
+    DatabaseCommand( const DatabaseCommand &other ); //needed for QMetaType
 
     virtual ~DatabaseCommand();
 
@@ -56,7 +56,7 @@ public:
 
     // doesMutates = true => makes changes to the db, like an insert or update command
     virtual bool doesMutates() const { return true; }
-    State state() const { return m_state; }
+    State state() const;
 
     // if i make this pure virtual, i get compile errors in qmetatype.h.
     // we need Q_DECLARE_METATYPE to use in queued sig/slot connections.
@@ -66,8 +66,8 @@ public:
 
     // stuff to do once transaction applied ok.
     // Don't change the database from in here, duh.
-    void postCommit() { postCommitHook(); emit committed(); }
-    virtual void postCommitHook(){};
+    void postCommit() { postCommitHook(); emitCommitted(); }
+    virtual void postCommitHook(){}
 
     void setSource( const Tomahawk::source_ptr& s );
     const Tomahawk::source_ptr& source() const;
@@ -84,35 +84,39 @@ public:
 
     virtual bool localOnly() const { return false; }
 
-    virtual QVariant data() const { return m_data; }
-    virtual void setData( const QVariant& data ) { m_data = data; }
+    virtual QVariant data() const;
+    virtual void setData( const QVariant& data );
 
-    QString guid() const
-    {
-        if( m_guid.isEmpty() )
-            m_guid = uuid();
+    QString guid() const;
+    void setGuid( const QString& g );
 
-        return m_guid;
-    }
-    void setGuid( const QString& g ) { m_guid = g; }
+    void emitFinished();
+    void emitCommitted();
+    void emitRunning();
 
-    void emitFinished() { emit finished(); }
-
-    static DatabaseCommand* factory( const QVariant& op, const Tomahawk::source_ptr& source );
+    QWeakPointer< Tomahawk::DatabaseCommand > weakRef() const;
+    void setWeakRef( QWeakPointer< Tomahawk::DatabaseCommand > weakRef );
 
 signals:
     void running();
+    void running( const Tomahawk::dbcmd_ptr& );
+
     void finished();
+    void finished( const Tomahawk::dbcmd_ptr& );
+
     void committed();
+    void committed( const Tomahawk::dbcmd_ptr& );
+protected:
+    explicit DatabaseCommand( QObject* parent, DatabaseCommandPrivate* d );
+
+    QScopedPointer<DatabaseCommandPrivate> d_ptr;
 
 private:
-    State m_state;
-    Tomahawk::source_ptr m_source;
-    mutable QString m_guid;
-
-    QVariant m_data;
+    Q_DECLARE_PRIVATE( DatabaseCommand )
 };
 
-Q_DECLARE_METATYPE( DatabaseCommand )
+}
+
+Q_DECLARE_METATYPE( Tomahawk::DatabaseCommand )
 
 #endif // DATABASECOMMAND_H

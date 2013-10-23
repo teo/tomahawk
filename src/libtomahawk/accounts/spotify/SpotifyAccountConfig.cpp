@@ -36,7 +36,7 @@ bool InfoSorter( const SpotifyPlaylistInfo* left, const SpotifyPlaylistInfo* rig
 }
 
 SpotifyAccountConfig::SpotifyAccountConfig( SpotifyAccount *account )
-    : QWidget( 0 )
+    : AccountConfigWidget( 0 )
     , m_ui( new Ui::SpotifyConfig )
     , m_loggedInUser( 0 )
     , m_account( account )
@@ -49,6 +49,8 @@ SpotifyAccountConfig::SpotifyAccountConfig( SpotifyAccount *account )
     m_ui->loginButton->setDefault( true );
 
     connect( m_ui->loginButton, SIGNAL( clicked( bool ) ), this, SLOT( doLogin() ) );
+    connect( m_ui->loveSync, SIGNAL( toggled( bool ) ), this, SLOT( showStarredPlaylist( bool ) ) );
+    connect( m_ui->persitentPrivacy, SIGNAL( toggled( bool ) ), this, SIGNAL( updatePrivacy( bool ) ) );
 
     connect( m_ui->usernameEdit, SIGNAL( textEdited( QString ) ), this, SLOT( resetLoginButton() ) );
     connect( m_ui->passwordEdit, SIGNAL( textEdited( QString ) ), this, SLOT( resetLoginButton() ) );
@@ -77,6 +79,8 @@ SpotifyAccountConfig::loadFromConfig()
     m_ui->passwordEdit->setText( m_account->credentials().value( "password" ).toString() );
     m_ui->streamingCheckbox->setChecked( m_account->credentials().value( "highQuality" ).toBool() );
     m_ui->deleteOnUnsync->setChecked( m_account->deleteOnUnsync() );
+    m_ui->loveSync->setChecked( m_account->loveSync() );
+    m_ui->persitentPrivacy->setChecked( m_account->persitentPrivacy() );
 
     if ( m_account->loggedIn() )
     {
@@ -100,8 +104,16 @@ SpotifyAccountConfig::saveSettings()
         const bool toSync = ( item->checkState() == Qt::Checked );
         if ( pl->sync != toSync )
         {
+            qDebug() << Q_FUNC_INFO << "Setting sync";
             pl->changed = true;
             pl->sync = toSync;
+        }
+
+        if ( ( pl->starContainer && loveSync() ) && ( pl->loveSync != loveSync() ) )
+        {
+            qDebug() << Q_FUNC_INFO << "Setting lovesync";
+            pl->loveSync = loveSync();
+            pl->changed = true;
         }
     }
 }
@@ -133,6 +145,20 @@ SpotifyAccountConfig::deleteOnUnsync() const
 }
 
 
+bool
+SpotifyAccountConfig::loveSync() const
+{
+    return m_ui->loveSync->isChecked();
+}
+
+
+bool
+SpotifyAccountConfig::persitentPrivacy() const
+{
+    return m_ui->persitentPrivacy->isChecked();
+}
+
+
 void
 SpotifyAccountConfig::setPlaylists( const QList<SpotifyPlaylistInfo *>& playlists )
 {
@@ -147,8 +173,12 @@ SpotifyAccountConfig::setPlaylists( const QList<SpotifyPlaylistInfo *>& playlist
 
     foreach ( SpotifyPlaylistInfo* pl, myList )
     {
+        bool starContainer = ( pl->starContainer || pl->name == "Starred Tracks" );
         QListWidgetItem* item = new QListWidgetItem( pl->name, m_ui->playlistList );
         item->setData( Qt::UserRole, QVariant::fromValue< SpotifyPlaylistInfo* >( pl ) );
+        item->setData( Qt::UserRole+2, starContainer );
+        if( loveSync() &&  starContainer )
+            item->setHidden(true);
         item->setFlags( Qt::ItemIsUserCheckable | Qt::ItemIsSelectable | Qt::ItemIsEnabled );
         item->setCheckState( pl->sync ? Qt::Checked : Qt::Unchecked );
     }
@@ -203,6 +233,17 @@ SpotifyAccountConfig::loginResponse( bool success, const QString& msg, const QSt
 
 }
 
+
+void
+SpotifyAccountConfig::showStarredPlaylist( bool hide )
+{
+    for ( int i = 0; i < m_ui->playlistList->count(); i++ )
+    {
+        QListWidgetItem* item = m_ui->playlistList->item( i );
+        if ( item->data( Qt::UserRole+2 ).toBool() )
+            item->setHidden( hide );
+    }
+}
 void
 SpotifyAccountConfig::selectAllPlaylists()
 {

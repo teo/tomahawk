@@ -53,7 +53,8 @@ public:
 
     void addAllCollections();
     void addCollection( const Tomahawk::collection_ptr& collection );
-    void addFilteredCollection( const Tomahawk::collection_ptr& collection, unsigned int amount, DatabaseCommand_AllArtists::SortOrder order );
+    //TODO: Unused, but will be useful for supporting filtered queries. - Teo 1/2013
+    //void addFilteredCollection( const Tomahawk::collection_ptr& collection, unsigned int amount, DatabaseCommand_AllArtists::SortOrder order );
 
     void addArtists( const Tomahawk::artist_ptr& artist );
     void addTracks( const Tomahawk::album_ptr& album, const QModelIndex& parent, bool autoRefetch = false );
@@ -61,11 +62,16 @@ public:
 
     void getCover( const QModelIndex& index );
 
-    QModelIndex indexFromArtist( const Tomahawk::artist_ptr& artist ) const;
-    QModelIndex indexFromAlbum( const Tomahawk::album_ptr& album ) const;
+    virtual PlayableItem* itemFromResult( const Tomahawk::result_ptr& result ) const;
+
+    virtual QModelIndex indexFromArtist( const Tomahawk::artist_ptr& artist ) const;
+    virtual QModelIndex indexFromAlbum( const Tomahawk::album_ptr& album ) const;
+    virtual QModelIndex indexFromResult( const Tomahawk::result_ptr& result ) const;
+    virtual QModelIndex indexFromQuery( const Tomahawk::query_ptr& query ) const;
 
 public slots:
     void addAlbums( const QModelIndex& parent, const QList<Tomahawk::album_ptr>& albums );
+    void reloadCollection();
 
 signals:
     void modeChanged( Tomahawk::ModelMode mode );

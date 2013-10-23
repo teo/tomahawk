@@ -1,6 +1,6 @@
 include_directories(${JREEN_INCLUDE_DIR})
 
-add_tomahawk_plugin(xmpp
+tomahawk_add_plugin(xmpp
     TYPE account
     EXPORT_MACRO ACCOUNTDLLEXPORT_PRO
     SOURCES
@@ -18,6 +18,5 @@ add_tomahawk_plugin(xmpp
     LINK_LIBRARIES
         ${TOMAHAWK_LIBRARIES}
         ${JREEN_LIBRARIES}
+    SHARED_LIB
 )
-
-add_subdirectory(googlewrapper)

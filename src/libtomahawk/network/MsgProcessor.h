@@ -30,16 +30,10 @@
 #ifndef MSGPROCESSOR_H
 #define MSGPROCESSOR_H
 
+#include "Typedefs.h"
+#include "Msg.h" // Needed because we have msg_ptr in a slot
+
 #include <QObject>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
-
-#include <qjson/parser.h>
-#include <qjson/serializer.h>
-#include <qjson/qobjecthelper.h>
-
-#include "Msg.h"
 
 class MsgProcessor : public QObject
 {

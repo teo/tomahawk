@@ -22,7 +22,9 @@
 
 #include "infosystem/InfoSystem.h"
 #include "infosystem/InfoSystemWorker.h"
-#include "infoplugins/InfoPluginDllMacro.h"
+
+#include "../../InfoPluginDllMacro.h"
+
 
 #include <QNetworkReply>
 #include <QObject>
@@ -37,6 +39,7 @@ namespace InfoSystem
 
 class INFOPLUGINDLLEXPORT SpotifyPlugin : public InfoPlugin
 {
+    Q_PLUGIN_METADATA( IID "org.tomahawk-player.Player.InfoPlugin" )
     Q_OBJECT
     Q_INTERFACES( Tomahawk::InfoSystem::InfoPlugin )
 

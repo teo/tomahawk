@@ -4,6 +4,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2011, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013, Uwe L. Korn <uwelk@xhochy.com>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,6 +32,7 @@
 #endif
 
 #include "accounts/AccountDllMacro.h"
+#include "accounts/Account.h"
 
 #include "../XmppInfoPlugin.h"
 
@@ -88,8 +90,9 @@ public slots:
     virtual void disconnectPlugin();
     virtual void checkSettings();
     virtual void configurationChanged();
-    virtual void sendMsg( const QString& peerId, const SipInfo& info );
-    virtual void addContact( const QString& peerId, const QString& msg = QString() );
+    virtual bool addContact( const QString& peerId, AddContactOptions options = NoOptions, const QString& msg = QString() );
+
+    virtual void sendSipInfos( const Tomahawk::peerinfo_ptr& receiver, const QList<SipInfo>& info );
 
     void showAddFriendDialog();
     void publishTune( const QUrl& url, const Tomahawk::InfoSystem::InfoStringHash& trackInfo );
@@ -132,7 +135,7 @@ private:
     int m_currentPort;
     QString m_currentResource;
 
-    QWeakPointer< Tomahawk::InfoSystem::XmppInfoPlugin > m_infoPlugin;
+    QPointer< Tomahawk::InfoSystem::XmppInfoPlugin > m_infoPlugin;
     Tomahawk::Accounts::Account::ConnectionState m_state;
 
     // sort out
@@ -141,6 +144,7 @@ private:
     Jreen::MUCRoom* m_room;
     Jreen::SimpleRoster* m_roster;
     QHash< Jreen::JID, Jreen::Presence::Type > m_peers;
+    QHash< QString, QString > m_jidsNames;
 
 #ifndef ENABLE_HEADLESS
     QHash< Jreen::JID, QMessageBox* > m_subscriptionConfirmBoxes;
@@ -151,6 +155,10 @@ private:
     enum IqContext { NoContext, RequestDisco, RequestedDisco, SipMessageSent, RequestedVCard, RequestVersion, RequestedVersion };
     AvatarManager* m_avatarManager;
     Jreen::PubSub::Manager* m_pubSubManager;
+    QMap< QString, Tomahawk::peerinfo_ptr > peersWaitingForSip;
+    QMap< QString, Tomahawk::peerinfo_ptr > peersWaitingForVersionString;
+    QMap< QString, QList< SipInfo > > sipinfosQueue;
+    QMutex peerQueueMutex;
 };
 
 #endif

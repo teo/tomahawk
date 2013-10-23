@@ -20,12 +20,13 @@
 #ifndef TRACKPROXYMODELPLAYLISTINTERFACE_H
 #define TRACKPROXYMODELPLAYLISTINTERFACE_H
 
-#include <QtGui/QSortFilterProxyModel>
-
 #include "PlaylistInterface.h"
 #include "playlist/PlayableModel.h"
 
 #include "DllMacro.h"
+
+#include <QSortFilterProxyModel>
+#include <QPointer>
 
 class PlayableProxyModel;
 
@@ -39,17 +40,18 @@ public:
     explicit PlayableProxyModelPlaylistInterface( PlayableProxyModel* proxyModel );
     virtual ~PlayableProxyModelPlaylistInterface();
 
-    virtual QList<Tomahawk::query_ptr> tracks();
+    virtual QList<Tomahawk::query_ptr> tracks() const;
 
     virtual int trackCount() const;
 
-    virtual Tomahawk::query_ptr itemAt( unsigned int position ) const;
-    virtual int indexOfResult( const Tomahawk::result_ptr& result ) const;
-    virtual int indexOfQuery( const Tomahawk::query_ptr& query ) const;
+    virtual void setCurrentIndex( qint64 index );
+    virtual Tomahawk::result_ptr resultAt( qint64 index ) const;
+    virtual Tomahawk::query_ptr queryAt( qint64 index ) const;
+    virtual qint64 indexOfResult( const Tomahawk::result_ptr& result ) const;
+    virtual qint64 indexOfQuery( const Tomahawk::query_ptr& query ) const;
 
     virtual Tomahawk::result_ptr currentItem() const;
-    virtual Tomahawk::result_ptr siblingItem( int itemsAway, bool readOnly );
-    virtual bool hasNextItem();
+    virtual qint64 siblingIndex( int itemsAway, qint64 rootIndex = -1 ) const;
 
     virtual QString filter() const;
 
@@ -60,13 +62,16 @@ public slots:
     virtual void setRepeatMode( Tomahawk::PlaylistModes::RepeatMode mode ) { m_repeatMode = mode; emit repeatModeChanged( mode ); }
     virtual void setShuffled( bool enabled ) { m_shuffled = enabled; emit shuffleModeChanged( enabled ); }
 
+private slots:
+    void onCurrentIndexChanged();
+
 protected:
-    QWeakPointer< PlayableProxyModel > m_proxyModel;
+    QPointer< PlayableProxyModel > m_proxyModel;
 
     PlaylistModes::RepeatMode m_repeatMode;
     bool m_shuffled;
-    QList< Tomahawk::query_ptr > m_shuffleHistory;
-    QPersistentModelIndex m_shuffleCache;
+    mutable QList< Tomahawk::query_ptr > m_shuffleHistory;
+    mutable QPersistentModelIndex m_shuffleCache;
 };
 
 } //ns

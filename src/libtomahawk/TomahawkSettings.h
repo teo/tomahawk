@@ -21,14 +21,16 @@
 #ifndef TOMAHAWK_SETTINGS_H
 #define TOMAHAWK_SETTINGS_H
 
+#include "network/Enums.h"
+
 #include "DllMacro.h"
 #include "Typedefs.h"
 
 #include <QSettings>
-#include <QtNetwork/QNetworkProxy>
+#include <QNetworkProxy>
 #include <QStringList>
 
-#define TOMAHAWK_SETTINGS_VERSION 13
+#define TOMAHAWK_SETTINGS_VERSION 15
 
 /**
  * Convenience wrapper around QSettings for tomahawk-specific config
@@ -79,6 +81,9 @@ public:
     bool menuBarVisible() const;
     void setMenuBarVisible( bool visible );
 
+    bool fullscreenEnabled() const;
+    void setFullscreenEnabled( bool fullscreen );
+
     // Collection Stuff
     bool showOfflineSources() const;
     void setShowOfflineSources( bool show );
@@ -105,6 +110,9 @@ public:
     // remove shuffle state and repeat state
     void removePlaylistSettings( const QString& playlistid );
 
+    QVariant queueState() const;
+    void setQueueState( const QVariant& state );
+
     /// SIP plugins
     // all plugins we know about. loaded, unloaded, enabled, disabled.
     void setSipPlugins( const QStringList& plugins );
@@ -124,20 +132,24 @@ public:
     void addAccount( const QString& accountId );
     void removeAccount( const QString& accountId );
 
-
     void setBookmarkPlaylist( const QString& guid );
     QString bookmarkPlaylist() const;
 
     /// Network settings
-    enum ExternalAddressMode { Lan, Upnp, Static };
-    ExternalAddressMode externalAddressMode();
-    void setExternalAddressMode( ExternalAddressMode externalAddressMode );
+    Tomahawk::Network::ExternalAddress::Mode externalAddressMode();
+    void setExternalAddressMode( Tomahawk::Network::ExternalAddress::Mode externalAddressMode );
 
     bool httpEnabled() const; /// true by default
     void setHttpEnabled( bool enable );
 
     bool crashReporterEnabled() const; /// true by default
     void setCrashReporterEnabled( bool enable );
+
+    bool songChangeNotificationEnabled() const; /// true by default
+    void setSongChangeNotificationEnabled( bool enable );
+
+    bool autoDetectExternalIp() const;
+    void setAutoDetectExternalIp( bool autoDetect );
 
     QString externalHostname() const;
     void setExternalHostname( const QString& externalHostname );
@@ -147,40 +159,35 @@ public:
     void setExternalPort( int externalPort );
 
     QString proxyHost() const;
-    void setProxyHost( const QString &host );
-
+    void setProxyHost( const QString& host );
     QString proxyNoProxyHosts() const;
-    void setProxyNoProxyHosts( const QString &hosts );
-
+    void setProxyNoProxyHosts( const QString& hosts );
     qulonglong proxyPort() const;
     void setProxyPort( const qulonglong port );
-
     QString proxyUsername() const;
-    void setProxyUsername( const QString &username );
-
+    void setProxyUsername( const QString& username );
     QString proxyPassword() const;
-    void setProxyPassword( const QString &password );
-
+    void setProxyPassword( const QString& password );
     QNetworkProxy::ProxyType proxyType() const;
     void setProxyType( const QNetworkProxy::ProxyType type );
-
     bool proxyDns() const;
     void setProxyDns( bool lookupViaProxy );
 
     /// ACL settings
     QVariantList aclEntries() const;
-    void setAclEntries( const QVariantList &entries );
+    void setAclEntries( const QVariantList& entries );
+
+    bool isSslCertKnown( const QByteArray& sslDigest ) const;
+    bool isSslCertTrusted( const QByteArray& sslDigest ) const;
+    void setSslCertTrusted( const QByteArray& sslDigest, bool trusted );
 
     /// XMPP Component Settings
     QString xmppBotServer() const;
-    void setXmppBotServer( const QString &server );
-
+    void setXmppBotServer( const QString& server );
     QString xmppBotJid() const;
-    void setXmppBotJid( const QString &component );
-
+    void setXmppBotJid( const QString& component );
     QString xmppBotPassword() const;
-    void setXmppBotPassword( const QString &password );
-
+    void setXmppBotPassword( const QString& password );
     int xmppBotPort() const;
     void setXmppBotPort( const int port );
 

@@ -3,6 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,23 +19,24 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "TomahawkVersion.h"
-#include "config.h"
-#include "TomahawkSettings.h"
-
 #include "utils/TomahawkUtils.h"
-#include "utils/Logger.h"
-#include "Source.h"
+
+#include "config.h"
+
 #include "BinaryExtractWorker.h"
+#include "Query.h"
 #include "SharedTimeLine.h"
+#include "Source.h"
+#include "TomahawkSettings.h"
+#include "TomahawkVersion.h"
+#include "Track.h"
 
 #ifdef LIBLASTFM_FOUND
     #include <lastfm/ws.h>
 #endif
 
-#include <quazip.h>
-#include <quazipfile.h>
-
+#include <quazip/quazip.h>
+#include <quazip/quazipfile.h>
 
 #include <QNetworkConfiguration>
 #include <QNetworkAccessManager>
@@ -46,6 +48,12 @@
 #include <QMutex>
 #include <QCryptographicHash>
 #include <QProcess>
+#include <QStringList>
+#include <QTranslator>
+
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    #include <QUrlQuery>
+#endif
 
 #ifdef Q_OS_WIN
     #include <windows.h>
@@ -60,6 +68,8 @@
 #ifdef QCA2_FOUND
     #include <QtCrypto>
 #endif
+
+#include "Logger.h"
 
 namespace TomahawkUtils
 {
@@ -155,7 +165,7 @@ appDataDir()
 {
     QString path;
 
-    #ifdef Q_WS_WIN
+    #ifdef Q_OS_WIN
         if ( ( QSysInfo::WindowsVersion & QSysInfo::WV_DOS_based ) == 0 )
         {
             // Use this for non-DOS-based Windowses
@@ -167,9 +177,9 @@ appDataDir()
                 path = QString::fromLocal8Bit( acPath );
             }
         }
-    #elif defined(Q_WS_MAC)
+    #elif defined(Q_OS_MAC)
         path = appSupportFolderPath();
-    #elif defined(Q_WS_X11)
+    #elif defined(Q_OS_LINUX)
         path = QDir::home().filePath( ".local/share" );
     #else
         path = QCoreApplication::applicationDirPath();
@@ -320,6 +330,7 @@ extensionToMimetype( const QString& extension )
         s_ext2mime.insert( "flac", "audio/flac" );
         s_ext2mime.insert( "aiff", "audio/aiff" );
         s_ext2mime.insert( "aif",  "audio/aiff" );
+        s_ext2mime.insert( "wv",   "audio/x-wavpack" );
     }
 
     return s_ext2mime.value( extension, "unknown" );
@@ -417,243 +428,6 @@ levenshtein( const QString& source, const QString& target )
 }
 
 
-static QMutex s_noProxyHostsMutex;
-static QStringList s_noProxyHosts;
-
-NetworkProxyFactory::NetworkProxyFactory( const NetworkProxyFactory& other )
-{
-    m_proxy = QNetworkProxy( other.m_proxy );
-}
-
-
-QList< QNetworkProxy >
-NetworkProxyFactory::queryProxy( const QNetworkProxyQuery& query )
-{
-    //tDebug() << Q_FUNC_INFO << "query hostname is" << query.peerHostName() << ", proxy host is" << m_proxy.hostName();
-
-    QList< QNetworkProxy > proxies;
-    QString hostname = query.peerHostName();
-    s_noProxyHostsMutex.lock();
-    if ( !hostname.isEmpty() && s_noProxyHosts.contains( hostname ) )
-        proxies << QNetworkProxy::NoProxy << systemProxyForQuery( query );
-    else if ( m_proxy.hostName().isEmpty() || TomahawkSettings::instance()->proxyType() == QNetworkProxy::NoProxy )
-        proxies << systemProxyForQuery( query );
-    else
-        proxies << m_proxy << systemProxyForQuery( query );
-    s_noProxyHostsMutex.unlock();
-    return proxies;
-}
-
-
-void
-NetworkProxyFactory::setNoProxyHosts( const QStringList& hosts )
-{
-    QStringList newList;
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "No-proxy hosts:" << hosts;
-    foreach ( const QString& host, hosts )
-    {
-        QString munge = host.simplified();
-        newList << munge;
-        //TODO: wildcard support
-    }
-
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "New no-proxy hosts:" << newList;
-
-    s_noProxyHostsMutex.lock();
-    s_noProxyHosts = newList;
-    s_noProxyHostsMutex.unlock();
-}
-
-
-void
-NetworkProxyFactory::setProxy( const QNetworkProxy& proxy )
-{
-    m_proxyChanged = false;
-    if ( m_proxy != proxy )
-        m_proxyChanged = true;
-
-    m_proxy = proxy;
-    QFlags< QNetworkProxy::Capability > proxyCaps;
-    proxyCaps |= QNetworkProxy::TunnelingCapability;
-    proxyCaps |= QNetworkProxy::ListeningCapability;
-    if ( TomahawkSettings::instance()->proxyDns() )
-        proxyCaps |= QNetworkProxy::HostNameLookupCapability;
-
-    m_proxy.setCapabilities( proxyCaps );
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Proxy using host" << proxy.hostName() << "and port" << proxy.port();
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "setting proxy to use proxy DNS?" << (TomahawkSettings::instance()->proxyDns() ? "true" : "false");
-}
-
-
-NetworkProxyFactory&
-NetworkProxyFactory::operator=( const NetworkProxyFactory& rhs )
-{
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO;
-    if ( this != &rhs )
-    {
-        m_proxy = QNetworkProxy( rhs.m_proxy );
-    }
-
-    return *this;
-}
-
-
-bool NetworkProxyFactory::operator==( const NetworkProxyFactory& other ) const
-{
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO;
-    if ( m_proxy != other.m_proxy )
-        return false;
-
-    return true;
-}
-
-static QMap< QThread*, QNetworkAccessManager* > s_threadNamHash;
-static QMap< QThread*, NetworkProxyFactory* > s_threadProxyFactoryHash;
-static QMutex s_namAccessMutex;
-
-NetworkProxyFactory*
-proxyFactory( bool makeClone, bool noMutexLocker )
-{
-    // Don't lock if being called from nam()
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO;
-    QMutex otherMutex;
-    QMutexLocker locker( noMutexLocker ? &otherMutex : &s_namAccessMutex );
-
-    if ( !makeClone )
-    {
-        if ( s_threadProxyFactoryHash.contains( QThread::currentThread() ) )
-            return s_threadProxyFactoryHash[ QThread::currentThread() ];
-    }
-
-    // create a new proxy factory for this thread
-    TomahawkUtils::NetworkProxyFactory *newProxyFactory = new TomahawkUtils::NetworkProxyFactory();
-    if ( s_threadProxyFactoryHash.contains( QCoreApplication::instance()->thread() ) )
-    {
-        TomahawkUtils::NetworkProxyFactory *mainProxyFactory = s_threadProxyFactoryHash[ QCoreApplication::instance()->thread() ];
-        *newProxyFactory = *mainProxyFactory;
-    }
-
-    if ( !makeClone )
-        s_threadProxyFactoryHash[ QThread::currentThread() ] = newProxyFactory;
-
-    return newProxyFactory;
-}
-
-
-void
-setProxyFactory( NetworkProxyFactory* factory, bool noMutexLocker )
-{
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO;
-    Q_ASSERT( factory );
-    // Don't lock if being called from setNam()
-    QMutex otherMutex;
-    QMutexLocker locker( noMutexLocker ? &otherMutex : &s_namAccessMutex );
-
-    if ( !s_threadProxyFactoryHash.contains( QCoreApplication::instance()->thread() ) )
-        return;
-
-    if ( QThread::currentThread() == QCoreApplication::instance()->thread() )
-    {
-        foreach ( QThread* thread, s_threadProxyFactoryHash.keys() )
-        {
-            if ( thread != QThread::currentThread() )
-            {
-                TomahawkUtils::NetworkProxyFactory *currFactory = s_threadProxyFactoryHash[ thread ];
-                *currFactory = *factory;
-            }
-        }
-        QNetworkProxyFactory::setApplicationProxyFactory( factory );
-    }
-
-    *s_threadProxyFactoryHash[ QThread::currentThread() ] = *factory;
-}
-
-
-QNetworkAccessManager*
-nam()
-{
-    QMutexLocker locker( &s_namAccessMutex );
-    if ( s_threadNamHash.contains(  QThread::currentThread() ) )
-    {
-        //tDebug() << Q_FUNC_INFO << "Found current thread in nam hash";
-        return s_threadNamHash[ QThread::currentThread() ];
-    }
-
-    if ( !s_threadNamHash.contains( QCoreApplication::instance()->thread() ) )
-    {
-        if ( QThread::currentThread() == QCoreApplication::instance()->thread() )
-        {
-            setNam( new QNetworkAccessManager(), true );
-            return s_threadNamHash[ QThread::currentThread() ];
-        }
-        else
-            return 0;
-    }
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "Found gui thread in nam hash";
-
-    // Create a nam for this thread based on the main thread's settings but with its own proxyfactory
-    QNetworkAccessManager *mainNam = s_threadNamHash[ QCoreApplication::instance()->thread() ];
-    QNetworkAccessManager* newNam = new QNetworkAccessManager();
-
-    newNam->setConfiguration( QNetworkConfiguration( mainNam->configuration() ) );
-    newNam->setNetworkAccessible( mainNam->networkAccessible() );
-    newNam->setProxyFactory( proxyFactory( false, true ) );
-
-    s_threadNamHash[ QThread::currentThread() ] = newNam;
-
-    tDebug( LOGVERBOSE ) << Q_FUNC_INFO << "created new nam for thread" << QThread::currentThread();
-    //QNetworkProxy proxy = dynamic_cast< TomahawkUtils::NetworkProxyFactory* >( newNam->proxyFactory() )->proxy();
-    //tDebug() << Q_FUNC_INFO << "reply proxy properties:" << proxy.type() << proxy.hostName() << proxy.port();
-
-    return newNam;
-}
-
-
-void
-setNam( QNetworkAccessManager* nam, bool noMutexLocker )
-{
-    Q_ASSERT( nam );
-    // Don't lock if being called from nam()()
-    QMutex otherMutex;
-    QMutexLocker locker( noMutexLocker ? &otherMutex : &s_namAccessMutex );
-    if ( !s_threadNamHash.contains( QCoreApplication::instance()->thread() ) &&
-            QThread::currentThread() == QCoreApplication::instance()->thread() )
-    {
-        tDebug( LOGVERBOSE ) << "creating initial gui thread (" << QCoreApplication::instance()->thread() << ") nam";
-        // Should only get here on first initialization of the nam
-        TomahawkSettings *s = TomahawkSettings::instance();
-        TomahawkUtils::NetworkProxyFactory* proxyFactory = new TomahawkUtils::NetworkProxyFactory();
-        if ( s->proxyType() != QNetworkProxy::NoProxy && !s->proxyHost().isEmpty() )
-        {
-            tDebug( LOGVERBOSE ) << "Setting proxy to saved values";
-            QNetworkProxy proxy( s->proxyType(), s->proxyHost(), s->proxyPort(), s->proxyUsername(), s->proxyPassword() );
-            proxyFactory->setProxy( proxy );
-            //FIXME: Jreen is broke without this
-            //QNetworkProxy::setApplicationProxy( proxy );
-            s_noProxyHostsMutex.lock();
-            if ( !s->proxyNoProxyHosts().isEmpty() && s_noProxyHosts.isEmpty() )
-            {
-                s_noProxyHostsMutex.unlock();
-                proxyFactory->setNoProxyHosts( s->proxyNoProxyHosts().split( ',', QString::SkipEmptyParts ) );
-            }
-            else
-                s_noProxyHostsMutex.unlock();
-        }
-
-        QNetworkProxyFactory::setApplicationProxyFactory( proxyFactory );
-        nam->setProxyFactory( proxyFactory );
-        s_threadNamHash[ QThread::currentThread() ] = nam;
-        s_threadProxyFactoryHash[ QThread::currentThread() ] = proxyFactory;
-        return;
-    }
-
-    s_threadNamHash[ QThread::currentThread() ] = nam;
-
-    if ( QThread::currentThread() == QCoreApplication::instance()->thread() )
-        setProxyFactory( dynamic_cast< TomahawkUtils::NetworkProxyFactory* >( nam->proxyFactory() ), true );
-}
-
-
 bool
 newerVersion( const QString& oldVersion, const QString& newVersion )
 {
@@ -694,9 +468,9 @@ mergePlaylistChanges( const QList< Tomahawk::query_ptr >& orig, const QList< Tom
     {
         foreach ( const Tomahawk::query_ptr& oldq, orig )
         {
-            if ( newquery->track() == oldq->track() &&
-                newquery->artist() == oldq->artist() &&
-                newquery->album() == oldq->album() )
+            if ( newquery->queryTrack()->track() == oldq->queryTrack()->track() &&
+                newquery->queryTrack()->artist() == oldq->queryTrack()->artist() &&
+                newquery->queryTrack()->album() == oldq->queryTrack()->album() )
             {
                 sameCount++;
                 if ( tosave.contains( newquery ) )
@@ -766,11 +540,65 @@ md5( const QByteArray& data )
 }
 
 
+bool
+isHttpResult( const QString& url )
+{
+    return url.startsWith( "http://" ); // || url.startsWith( "https://" );
+}
+
+
+bool
+isLocalResult( const QString& url )
+{
+    return url.startsWith( "file://" );
+}
+
+
 void
 crash()
 {
     volatile int* a = (int*)(NULL);
     *a = 1;
+}
+
+
+void
+installTranslator( QObject* parent )
+{
+#if QT_VERSION >= 0x040800
+    QString locale = QLocale::system().uiLanguages().first().replace( "-", "_" );
+#else
+    QString locale = QLocale::system().name();
+#endif
+    if ( locale == "C" )
+        locale = "en";
+
+    // Tomahawk translations
+    QTranslator* translator = new QTranslator( parent );
+    if ( translator->load( QString( ":/lang/tomahawk_" ) + locale ) )
+    {
+        qDebug() << "Translation: Tomahawk: Using system locale:" << locale;
+    }
+    else
+    {
+        qDebug() << "Translation: Tomahawk: Using default locale, system locale one not found:" << locale;
+        translator->load( QString( ":/lang/tomahawk_en" ) );
+    }
+
+    QCoreApplication::installTranslator( translator );
+
+    // Qt translations
+    translator = new QTranslator( parent );
+    if ( translator->load( QString( ":/lang/qt_" ) + locale ) )
+    {
+        qDebug() << "Translation: Qt: Using system locale:" << locale;
+    }
+    else
+    {
+        qDebug() << "Translation: Qt: Using default locale, system locale one not found:" << locale;
+    }
+
+    QCoreApplication::installTranslator( translator );
 }
 
 
@@ -850,16 +678,17 @@ verifyFile( const QString& filePath, const QString& signature )
 
 
 QString
-extractScriptPayload( const QString& filename, const QString& resolverId )
+extractScriptPayload( const QString& filename, const QString& resolverId, const QString& dirName )
 {
     // uses QuaZip to extract the temporary zip file to the user's tomahawk data/resolvers directory
     QDir resolverDir = appDataDir();
-    if ( !resolverDir.mkpath( QString( "atticaresolvers/%1" ).arg( resolverId ) ) )
+    if ( !resolverDir.mkpath( QString( "%1/%2" ).arg( dirName )
+                                                .arg( resolverId ) ) )
     {
-        tLog() << "Failed to mkdir resolver save dir:" << TomahawkUtils::appDataDir().absoluteFilePath( QString( "atticaresolvers/%1" ).arg( resolverId ) );
+        tLog() << "Failed to mkdir resolver save dir:" << TomahawkUtils::appDataDir().absoluteFilePath( QString( "%1/%2" ).arg( dirName ).arg( resolverId ) );
         return QString();
     }
-    resolverDir.cd( QString( "atticaresolvers/%1" ).arg( resolverId ) );
+    resolverDir.cd( QString( "%1/%2" ).arg( dirName ).arg( resolverId ) );
 
     if ( !unzipFileInFolder( filename, resolverDir ) )
     {
@@ -880,7 +709,8 @@ unzipFileInFolder( const QString& zipFileName, const QDir& folder )
     QuaZip zipFile( zipFileName );
     if ( !zipFile.open( QuaZip::mdUnzip ) )
     {
-        qWarning() << "Failed to QuaZip open:" << zipFile.getZipError();
+        qWarning() << "Failed to QuaZip open" << zipFileName
+                   << "with error:" << zipFile.getZipError();
         return false;
     }
 
@@ -943,13 +773,125 @@ extractBinaryResolver( const QString& zipFilename, QObject* receiver )
 
 
 bool
-whitelistedHttpResultHint( const QString& url )
+whitelistedHttpResultHint( const QUrl& url )
 {
     // For now, just http/https
-    return url.startsWith( "http" );
+    return ( url.scheme().startsWith( "http" ) && !url.host().endsWith( "youtube.com" ) );
 }
 
 
-} // ns
+int
+compareVersionStrings( const QString& first, const QString& second )
+{
+    QStringList a = first.split( '.', QString::SkipEmptyParts );
+    QStringList b = second.split( '.', QString::SkipEmptyParts );
 
-#include "TomahawkUtils.moc"
+    const int depth = qMax( a.count(), b.count() );
+
+    while ( a.count() < depth )
+        a.append( "0" );
+
+    while ( b.count() < depth )
+        b.append( "0" );
+
+    int verdict = 0;
+    for ( int i = 0; i < depth; ++i )
+    {
+        bool aOk;
+        int aNumber = a.at( i ).toInt( &aOk );
+        bool bOk;
+        int bNumber = b.at( i ).toInt( &bOk );
+
+        if ( aOk && bOk )
+        {
+            if ( aNumber < bNumber )
+            {
+                verdict = -1;
+                break;
+            }
+            if ( aNumber > bNumber )
+            {
+                verdict = 1;
+                break;
+            }
+        }
+        else //fallback: string comparison
+        {
+            verdict = a.at( i ).compare( b.at( i ) );
+            if ( verdict != 0 )
+                break;
+        }
+    }
+
+    return verdict;
+}
+
+
+void
+urlAddQueryItem( QUrl& url, const QString& key, const QString& value )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    QUrlQuery urlQuery( url );
+    urlQuery.addQueryItem( key, value );
+    url.setQuery( urlQuery );
+#else
+    url.addQueryItem( key, value );
+#endif
+}
+
+
+QString
+urlQueryItemValue( const QUrl& url, const QString& key )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    return QUrlQuery( url ).queryItemValue( key ).replace( "+", " " );
+#else
+    return url.queryItemValue( key ).replace( "+", " " );
+#endif
+}
+
+
+bool
+urlHasQueryItem( const QUrl& url, const QString& key )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    return QUrlQuery( url ).hasQueryItem( key );
+#else
+    return url.hasQueryItem( key );
+#endif
+}
+
+
+QList<QPair<QString, QString> >
+urlQueryItems( const QUrl& url )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    return QUrlQuery( url ).queryItems();
+#else
+    return url.queryItems();
+#endif
+}
+
+
+void
+urlSetQuery( QUrl& url, const QString& query )
+{
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 0, 0 )
+    url.setQuery( query );
+#else
+    url.setEncodedQuery( query.toLocal8Bit() );
+#endif
+}
+
+QByteArray
+percentEncode( const QUrl& url )
+{
+    QByteArray data = url.toEncoded();
+
+    data.replace( "'", "%27" ); // QUrl doesn't encode ', which it doesn't have to. Some apps don't like ' though, and want %27. Both are valid.
+    data.replace( "%20", "+" );
+
+    return data;
+}
+
+} // ns

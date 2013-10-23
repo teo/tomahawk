@@ -2,6 +2,7 @@
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
+ *   Copyright 2013,      Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,23 +20,25 @@
 
 #include "TreeProxyModel.h"
 
-#include <QtGui/QListView>
-
 #include "TreeProxyModelPlaylistInterface.h"
 #include "Source.h"
 #include "Query.h"
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
+#include "collection/AlbumsRequest.h"
+#include "collection/ArtistsRequest.h"
 #include "database/DatabaseCommand_AllAlbums.h"
 #include "PlayableItem.h"
 #include "utils/Logger.h"
 
+#include <QListView>
 
 TreeProxyModel::TreeProxyModel( QObject* parent )
     : PlayableProxyModel( parent )
     , m_artistsFilterCmd( 0 )
     , m_model( 0 )
 {
+    setPlaylistInterface( Tomahawk::playlistinterface_ptr( new Tomahawk::TreeProxyModelPlaylistInterface( this ) ) );
 }
 
 
@@ -71,14 +74,18 @@ TreeProxyModel::onRowsInserted( const QModelIndex& parent, int /* start */, int 
     if ( pi->artist().isNull() )
         return;
 
-    DatabaseCommand_AllAlbums* cmd = new DatabaseCommand_AllAlbums( m_model->collection() );
-    cmd->setArtist( pi->artist() );
+    Tomahawk::AlbumsRequest* cmd = 0;
+    if ( !m_model->collection().isNull() )
+        cmd = m_model->collection()->requestAlbums( pi->artist() );
+    else
+        cmd = new Tomahawk::DatabaseCommand_AllAlbums( Tomahawk::collection_ptr(), pi->artist() );
+
     cmd->setFilter( m_filter );
 
-    connect( cmd, SIGNAL( albums( QList<Tomahawk::album_ptr>, QVariant ) ),
-                    SLOT( onFilterAlbums( QList<Tomahawk::album_ptr> ) ) );
+    connect( dynamic_cast< QObject* >( cmd ), SIGNAL( albums( QList<Tomahawk::album_ptr> ) ),
+             SLOT( onFilterAlbums( QList<Tomahawk::album_ptr> ) ) );
 
-    Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+    cmd->enqueue();
 }
 
 
@@ -97,12 +104,15 @@ TreeProxyModel::setFilter( const QString& pattern )
     emit filteringStarted();
 
     m_filter = pattern;
+
+    beginResetModel();
     m_albumsFilter.clear();
+    endResetModel();
 
     if ( m_artistsFilterCmd )
     {
-        disconnect( m_artistsFilterCmd, SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
-                    this,                 SLOT( onFilterArtists( QList<Tomahawk::artist_ptr> ) ) );
+        disconnect( dynamic_cast< QObject* >( m_artistsFilterCmd ), SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
+                    this, SLOT( onFilterArtists( QList<Tomahawk::artist_ptr> ) ) );
 
         m_artistsFilterCmd = 0;
     }
@@ -113,15 +123,27 @@ TreeProxyModel::setFilter( const QString& pattern )
     }
     else
     {
-        DatabaseCommand_AllArtists* cmd = new DatabaseCommand_AllArtists( m_model->collection() );
+        Tomahawk::ArtistsRequest* cmd = 0;
+        if ( !m_model->collection().isNull() )
+            cmd = m_model->collection()->requestArtists();
+        else
+            cmd = new Tomahawk::DatabaseCommand_AllArtists(); //for SuperCollection, TODO: replace with a proper proxy-ArtistsRequest
+
         cmd->setFilter( pattern );
         m_artistsFilterCmd = cmd;
 
-        connect( cmd, SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
-                        SLOT( onFilterArtists( QList<Tomahawk::artist_ptr> ) ) );
+        connect( dynamic_cast< QObject* >( cmd ), SIGNAL( artists( QList<Tomahawk::artist_ptr> ) ),
+                 SLOT( onFilterArtists( QList<Tomahawk::artist_ptr> ) ) );
 
-        Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+        cmd->enqueue();
     }
+}
+
+
+QString
+TreeProxyModel::filter() const
+{
+    return m_filter;
 }
 
 
@@ -139,14 +161,14 @@ TreeProxyModel::onFilterArtists( const QList<Tomahawk::artist_ptr>& artists )
         {
             finished = false;
 
-            DatabaseCommand_AllAlbums* cmd = new DatabaseCommand_AllAlbums( m_model->collection() );
-            cmd->setArtist( artist );
+            Tomahawk::AlbumsRequest* cmd = m_model->collection()->requestAlbums( artist );
+
             cmd->setFilter( m_filter );
 
-            connect( cmd, SIGNAL( albums( QList<Tomahawk::album_ptr>, QVariant ) ),
-                            SLOT( onFilterAlbums( QList<Tomahawk::album_ptr> ) ) );
+            connect( dynamic_cast< QObject* >( cmd ), SIGNAL( albums( QList<Tomahawk::album_ptr> ) ),
+                     SLOT( onFilterAlbums( QList<Tomahawk::album_ptr> ) ) );
 
-            Database::instance()->enqueue( QSharedPointer<DatabaseCommand>( cmd ) );
+            cmd->enqueue();
         }
     }
 
@@ -190,8 +212,8 @@ TreeProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourceParent
             if ( cachedQuery.isNull() )
                 continue;
 
-            if ( cachedQuery->track() == item->query()->track() &&
-               ( cachedQuery->albumpos() == item->query()->albumpos() || cachedQuery->albumpos() == 0 ) )
+            if ( cachedQuery->track()->track() == item->query()->track()->track() &&
+               ( cachedQuery->track()->albumpos() == item->query()->track()->albumpos() || cachedQuery->track()->albumpos() == 0 ) )
             {
                 return ( cachedQuery.data() == item->query().data() );
             }
@@ -206,7 +228,7 @@ TreeProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourceParent
 
             if ( ti && ti->name() == item->name() && !ti->query().isNull() )
             {
-                if ( ti->query()->albumpos() == item->query()->albumpos() || ti->query()->albumpos() == 0 || item->query()->albumpos() == 0 )
+                if ( ti->query()->track()->albumpos() == item->query()->track()->albumpos() || ti->query()->track()->albumpos() == 0 || item->query()->track()->albumpos() == 0 )
                 {
                     if ( item->result().isNull() )
                         return false;
@@ -276,27 +298,27 @@ TreeProxyModel::lessThan( const QModelIndex& left, const QModelIndex& right ) co
     unsigned int discnumber2 = 0;
     if ( !p1->query().isNull() )
     {
-        albumpos1 = p1->query()->albumpos();
-        discnumber1 = p1->query()->discnumber();
+        albumpos1 = p1->query()->track()->albumpos();
+        discnumber1 = p1->query()->track()->discnumber();
     }
     if ( !p2->query().isNull() )
     {
-        albumpos2 = p2->query()->albumpos();
-        discnumber2 = p2->query()->discnumber();
+        albumpos2 = p2->query()->track()->albumpos();
+        discnumber2 = p2->query()->track()->discnumber();
     }
     if ( !p1->result().isNull() )
     {
         if ( albumpos1 == 0 )
-            albumpos1 = p1->result()->albumpos();
+            albumpos1 = p1->result()->track()->albumpos();
         if ( discnumber1 == 0 )
-            discnumber1 = p1->result()->discnumber();
+            discnumber1 = p1->result()->track()->discnumber();
     }
     if ( !p2->result().isNull() )
     {
         if ( albumpos2 == 0 )
-            albumpos2 = p2->result()->albumpos();
+            albumpos2 = p2->result()->track()->albumpos();
         if ( discnumber2 == 0 )
-            discnumber2 = p2->result()->discnumber();
+            discnumber2 = p2->result()->track()->discnumber();
     }
     discnumber1 = qMax( 1, (int)discnumber1 );
     discnumber2 = qMax( 1, (int)discnumber2 );
@@ -332,28 +354,44 @@ TreeProxyModel::textForItem( PlayableItem* item ) const
     }
     else if ( !item->album().isNull() )
     {
-        return DatabaseImpl::sortname( item->album()->name() );
+        return Tomahawk::DatabaseImpl::sortname( item->album()->name() );
     }
     else if ( !item->result().isNull() )
     {
-        return DatabaseImpl::sortname( item->result()->track() );
+        return item->result()->track()->trackSortname();
     }
     else if ( !item->query().isNull() )
     {
-        return item->query()->track();
+        return item->query()->track()->track();
     }
 
     return QString();
 }
 
 
-Tomahawk::playlistinterface_ptr
-TreeProxyModel::playlistInterface()
+QModelIndex
+TreeProxyModel::indexFromArtist( const Tomahawk::artist_ptr& artist ) const
 {
-    if ( m_playlistInterface.isNull() )
-    {
-        m_playlistInterface = Tomahawk::playlistinterface_ptr( new Tomahawk::TreeProxyModelPlaylistInterface( this ) );
-    }
+    return mapFromSource( m_model->indexFromArtist( artist ) );
+}
 
-    return m_playlistInterface;
+
+QModelIndex
+TreeProxyModel::indexFromAlbum( const Tomahawk::album_ptr& album ) const
+{
+    return mapFromSource( m_model->indexFromAlbum( album ) );
+}
+
+
+QModelIndex
+TreeProxyModel::indexFromResult( const Tomahawk::result_ptr& result ) const
+{
+    return mapFromSource( m_model->indexFromResult( result ) );
+}
+
+
+QModelIndex
+TreeProxyModel::indexFromQuery( const Tomahawk::query_ptr& query ) const
+{
+    return mapFromSource( m_model->indexFromQuery( query ) );
 }

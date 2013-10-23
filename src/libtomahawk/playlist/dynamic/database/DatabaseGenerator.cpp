@@ -18,11 +18,13 @@
 
 #include "DatabaseGenerator.h"
 
-#include "DatabaseControl.h"
-#include "utils/Logger.h"
-#include "Source.h"
 #include "database/DatabaseCommand_GenericSelect.h"
 #include "database/Database.h"
+#include "utils/Logger.h"
+
+#include "DatabaseControl.h"
+#include "PlaylistEntry.h"
+#include "Source.h"
 
 using namespace Tomahawk;
 
@@ -134,7 +136,7 @@ DatabaseGenerator::generate( int number )
                                                                               );
 
         connect( cmd, SIGNAL( tracks( QList<Tomahawk::query_ptr> ) ), this, SLOT( tracksGenerated( QList<Tomahawk::query_ptr> ) ) );
-        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
+        Database::instance()->enqueue( Tomahawk::dbcmd_ptr( cmd ) );
 
         return;
     }

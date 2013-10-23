@@ -21,7 +21,7 @@
 #define TOMAHAWKALBUMPLAYLISTINTERFACE_H
 
 #include <QtCore/QObject>
-#include <QtCore/QSharedPointer>
+#include <QtCore/QPointer>
 
 #include "Album.h"
 #include "Typedefs.h"
@@ -40,18 +40,18 @@ public:
     AlbumPlaylistInterface( Tomahawk::Album* album, Tomahawk::ModelMode mode, const Tomahawk::collection_ptr& collection );
     virtual ~AlbumPlaylistInterface();
 
-    QList<Tomahawk::query_ptr> tracks();
+    QList<Tomahawk::query_ptr> tracks() const;
 
     virtual int trackCount() const { return m_queries.count(); }
 
-    virtual Tomahawk::result_ptr siblingItem( int itemsAway, bool readOnly = false );
+    virtual void setCurrentIndex( qint64 index );
+    virtual qint64 siblingIndex( int itemsAway, qint64 rootIndex = -1 ) const;
 
-    virtual Tomahawk::query_ptr itemAt( unsigned int position ) const { Q_UNUSED( position ); Q_ASSERT( false ); return Tomahawk::query_ptr(); }
-    virtual int indexOfResult( const Tomahawk::result_ptr& result ) const { Q_UNUSED( result ); Q_ASSERT( false ); return -1; }
-    virtual int indexOfQuery( const Tomahawk::query_ptr& query ) const { Q_UNUSED( query ); Q_ASSERT( false ); return -1; }
+    virtual Tomahawk::result_ptr resultAt( qint64 index ) const;
+    virtual Tomahawk::query_ptr queryAt( qint64 index ) const;
+    virtual qint64 indexOfResult( const Tomahawk::result_ptr& result ) const;
+    virtual qint64 indexOfQuery( const Tomahawk::query_ptr& query ) const;
 
-    virtual bool hasNextItem();
-    virtual bool hasPreviousItem();
     virtual Tomahawk::result_ptr currentItem() const;
 
     virtual PlaylistModes::RepeatMode repeatMode() const { return PlaylistModes::NoRepeat; }
@@ -70,9 +70,10 @@ private slots:
     void infoSystemFinished( const QString& infoId );
 
 private:
+    void checkQueries();
+
     QList< Tomahawk::query_ptr > m_queries;
-    result_ptr m_currentItem;
-    unsigned int m_currentTrack;
+    mutable result_ptr m_currentItem;
 
     bool m_infoSystemLoaded;
     bool m_databaseLoaded;
@@ -80,7 +81,9 @@ private:
     Tomahawk::ModelMode m_mode;
     Tomahawk::collection_ptr m_collection;
 
-    QWeakPointer< Tomahawk::Album > m_album;
+    QPointer< Tomahawk::Album > m_album;
+
+    int m_lastQueryTimestamp; //To prevent infinite loops on empty responses. This should not happen, but let's make sure.
 };
 
 }; // ns

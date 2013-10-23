@@ -1,7 +1,7 @@
 
 include_directories(${QTWEETLIB_INCLUDE_DIR})
 
-add_tomahawk_plugin(twitter
+tomahawk_add_plugin(twitter
     TYPE account
     EXPORT_MACRO ACCOUNTDLLEXPORT_PRO
     SOURCES
@@ -9,7 +9,7 @@ add_tomahawk_plugin(twitter
         TwitterInfoPlugin.cpp
         TwitterConfigWidget.cpp
         TomahawkOAuthTwitter.cpp
-        sip/TwitterSip.cpp
+#        sip/TwitterSip.cpp
     UI
         TwitterConfigWidget.ui
     LINK_LIBRARIES

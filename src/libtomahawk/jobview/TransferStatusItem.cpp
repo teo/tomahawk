@@ -18,18 +18,30 @@
 
 #include "TransferStatusItem.h"
 
-#include "JobStatusView.h"
-#include "JobStatusModel.h"
 #include "network/StreamConnection.h"
 #include "network/Servent.h"
 #include "utils/TomahawkUtils.h"
+#include "utils/TomahawkUtilsGui.h"
+
+#include "Artist.h"
 #include "Result.h"
 #include "Source.h"
-#include "Artist.h"
+#include "Track.h"
+
+#ifndef ENABLE_HEADLESS
+    #include "JobStatusModel.h"
+    #include "JobStatusView.h"
+#endif
+
+// Forward Declarations breaking QSharedPointer
+#if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
+    #include "collection/Collection.h"
+#endif
+
 
 TransferStatusItem::TransferStatusItem( TransferStatusManager* p, StreamConnection* sc )
     : m_parent( p )
-    , m_stream( QWeakPointer< StreamConnection >( sc ) )
+    , m_stream( QPointer< StreamConnection >( sc ) )
 {
     if ( m_stream.data()->type() == StreamConnection::RECEIVING )
         m_type = "receive";
@@ -52,9 +64,9 @@ TransferStatusItem::mainText() const
         return QString();
 
     if ( m_stream.data()->source().isNull() && !m_stream.data()->track().isNull() )
-        return QString( "%1" ).arg( QString( "%1 - %2" ).arg( m_stream.data()->track()->artist()->name() ).arg( m_stream.data()->track()->track() ) );
+        return QString( "%1" ).arg( QString( "%1 - %2" ).arg( m_stream.data()->track()->track()->artist() ).arg( m_stream.data()->track()->track()->track() ) );
     else if ( !m_stream.data()->source().isNull() && !m_stream.data()->track().isNull() )
-        return QString( "%1 %2 %3" ).arg( QString( "%1 - %2" ).arg( m_stream.data()->track()->artist()->name() ).arg( m_stream.data()->track()->track() ) )
+        return QString( "%1 %2 %3" ).arg( QString( "%1 - %2" ).arg( m_stream.data()->track()->track()->artist() ).arg( m_stream.data()->track()->track()->track() ) )
                                 .arg( m_stream.data()->type() == StreamConnection::RECEIVING ? tr( "from", "streaming artist - track from friend" ) : tr( "to", "streaming artist - track to friend" ) )
                                 .arg( m_stream.data()->source()->friendlyName() );
     else
@@ -84,9 +96,9 @@ TransferStatusItem::icon() const
         return QPixmap();
 
     if ( m_stream.data()->type() == StreamConnection::SENDING )
+        return m_parent->txPixmap();
+    else
         return m_parent->rxPixmap();
-   else
-       return m_parent->txPixmap();
 }
 
 
@@ -100,14 +112,28 @@ TransferStatusItem::onTransferUpdate()
 TransferStatusManager::TransferStatusManager( QObject* parent )
     : QObject( parent )
 {
-    m_rxPixmap.load( RESPATH "images/uploading.png" );
-    m_txPixmap.load( RESPATH "images/downloading.png" );
-
     connect( Servent::instance(), SIGNAL( streamStarted( StreamConnection* ) ), SLOT( streamRegistered( StreamConnection* ) ) );
 }
+
 
 void
 TransferStatusManager::streamRegistered( StreamConnection* sc )
 {
+#ifndef ENABLE_HEADLESS
     JobStatusView::instance()->model()->addJob( new TransferStatusItem( this, sc ) );
+#endif
+}
+
+
+QPixmap
+TransferStatusManager::rxPixmap() const
+{
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::Downloading, TomahawkUtils::Original, QSize( 128, 128 ) );
+}
+
+
+QPixmap
+TransferStatusManager::txPixmap() const
+{
+    return TomahawkUtils::defaultPixmap( TomahawkUtils::Uploading, TomahawkUtils::Original, QSize( 128, 128 ) );
 }

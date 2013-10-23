@@ -43,10 +43,13 @@ class DLLEXPORT GridItemDelegate : public QStyledItemDelegate
 Q_OBJECT
 
 public:
-    GridItemDelegate( QAbstractItemView* parent = 0, PlayableProxyModel* proxy = 0 );
+    GridItemDelegate( QAbstractItemView* parent, PlayableProxyModel* proxy );
 
     QSize itemSize() const { return m_itemSize; }
     void setItemSize( const QSize& size ) { m_itemSize = size; }
+
+public slots:
+    void resetHoverIndex();
 
 protected:
     void paint( QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index ) const;
@@ -64,19 +67,26 @@ signals:
 private slots:
     void modelChanged();
     void doUpdateIndex( const QPersistentModelIndex& idx );
+    void onCurrentIndexChanged();
 
     void onViewChanged();
     void onPlaybackStarted( const QPersistentModelIndex& index );
+
     void onPlaybackFinished();
 
     void onPlayClicked( const QPersistentModelIndex& index );
-    void onPlaylistChanged( const QPersistentModelIndex& index );
 
     void fadingFrameChanged( const QPersistentModelIndex& );
     void fadingFrameFinished( const QPersistentModelIndex& );
 
+    void updatePlayPauseButton(ImageButton* button , bool setState = false );
+    void onPlayPauseHover( const QPersistentModelIndex& index );
+    void onPlayPausedClicked();
+
 private:
     QTimeLine* createTimeline( QTimeLine::Direction direction );
+    void createPauseButton( const QPersistentModelIndex& index );
+    void clearButtons();
 
     QAbstractItemView* m_view;
     PlayableProxyModel* m_model;
@@ -94,7 +104,6 @@ private:
     mutable QHash< QPersistentModelIndex, ImageButton* > m_playButton;
     mutable QHash< QPersistentModelIndex, ImageButton* > m_pauseButton;
     mutable QHash< QPersistentModelIndex, QTimeLine* > m_hoverFaders;
-    mutable QHash< QPersistentModelIndex, _detail::Closure* > m_closures;
 };
 
 #endif // GRIDITEMDELEGATE_H

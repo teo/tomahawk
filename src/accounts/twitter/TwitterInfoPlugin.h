@@ -21,7 +21,7 @@
 #define TWITTERINFOPLUGIN_H
 
 #include "infosystem/InfoSystem.h"
-#include "accounts/twitter/TomahawkOAuthTwitter.h"
+#include "TomahawkOAuthTwitter.h"
 
 #include <QTweetLib/qtweetuser.h>
 #include <QTweetLib/qtweetstatus.h>
@@ -68,7 +68,7 @@ namespace Tomahawk {
             bool isValid() const;
             
             Tomahawk::Accounts::TwitterAccount* m_account;
-            QWeakPointer< TomahawkOAuthTwitter > m_twitterAuth;
+            QPointer< TomahawkOAuthTwitter > m_twitterAuth;
         };
 
     }

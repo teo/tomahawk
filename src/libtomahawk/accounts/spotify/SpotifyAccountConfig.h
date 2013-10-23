@@ -19,6 +19,8 @@
 #ifndef SPOTIFYACCOUNTCONFIG_H
 #define SPOTIFYACCOUNTCONFIG_H
 
+#include "accounts/AccountConfigWidget.h"
+
 #include <QWidget>
 #include <QVariantMap>
 #include <QTimer>
@@ -40,7 +42,7 @@ namespace Accounts
 class SpotifyAccount;
 struct SpotifyPlaylistInfo;
 
-class SpotifyAccountConfig : public QWidget
+class SpotifyAccountConfig : public AccountConfigWidget
 {
     Q_OBJECT
 public:
@@ -50,6 +52,8 @@ public:
     QString password() const;
     bool highQuality() const;
     bool deleteOnUnsync() const;
+    bool loveSync() const;
+    bool persitentPrivacy() const;
 
     void setPlaylists( const QList< SpotifyPlaylistInfo* >& playlists );
 
@@ -63,6 +67,7 @@ public:
 signals:
     void login( const QString& username, const QString& pw );
     void logout();
+    void updatePrivacy( bool );
 
 protected:
     void showEvent( QShowEvent* event );
@@ -71,6 +76,7 @@ private slots:
     void doLogin();
     void resetLoginButton();
     void selectAllPlaylists();
+    void showStarredPlaylist( bool );
 
 private:
     void showLoggedIn();
