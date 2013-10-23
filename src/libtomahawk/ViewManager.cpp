@@ -37,8 +37,8 @@
 #include "playlist/TreeWidget.h"
 #include "playlist/GridView.h"
 #include "playlist/AlbumModel.h"
-#include "ListeningRoom.h"
-#include "ListeningRoomModel.h"
+#include "Party.h"
+#include "PartyModel.h"
 #include "SourceList.h"
 #include "TomahawkSettings.h"
 
@@ -56,7 +56,7 @@
 #include "widgets/infowidgets/TrackInfoWidget.h"
 #include "widgets/NewPlaylistWidget.h"
 #include "widgets/AnimatedSplitter.h"
-#include "widgets/ListeningRoomWidget.h"
+#include "widgets/PartyWidget.h"
 
 #include "utils/Logger.h"
 #include "utils/TomahawkUtilsGui.h"
@@ -159,15 +159,15 @@ ViewManager::createPageForPlaylist( const playlist_ptr& playlist )
     return view;
 }
 
-ListeningRoomWidget*
-ViewManager::createPageForListeningRoom( const listeningroom_ptr& room )
+PartyWidget*
+ViewManager::createPageForParty( const party_ptr& party )
 {
-    ListeningRoomWidget* w = new ListeningRoomWidget();
-    ListeningRoomModel* model = new ListeningRoomModel();
+    PartyWidget* w = new PartyWidget();
+    PartyModel* model = new PartyModel();
 
-    model->loadListeningRoom( room );
+    model->loadParty( party );
     w->setModel( model );
-    room->resolve();
+    party->resolve();
 
     return w;
 }
@@ -235,17 +235,17 @@ ViewManager::show( const Tomahawk::playlist_ptr& playlist )
 
 
 Tomahawk::ViewPage*
-ViewManager::show( const Tomahawk::listeningroom_ptr& listeningRoom )
+ViewManager::show( const Tomahawk::party_ptr& party )
 {
-    ListeningRoomWidget* w;
-    if ( !m_listeningRoomWidgets.contains( listeningRoom ) || m_listeningRoomWidgets.value( listeningRoom ).isNull() )
+    PartyWidget* w;
+    if ( !m_partyWidgets.contains( party ) || m_partyWidgets.value( party ).isNull() )
     {
-        w = createPageForListeningRoom( listeningRoom );
-        m_listeningRoomWidgets.insert( listeningRoom, w );
+        w = createPageForParty( party );
+        m_partyWidgets.insert( party, w );
     }
     else
     {
-        w = m_listeningRoomWidgets.value( listeningRoom ).data();
+        w = m_partyWidgets.value( party ).data();
     }
     setPage( w );
     return w;
@@ -798,9 +798,9 @@ ViewManager::pageForPlaylist( const playlist_ptr& pl ) const
 
 
 ViewPage*
-ViewManager::pageForListeningRoom( const listeningroom_ptr& lr ) const
+ViewManager::pageForParty( const party_ptr& lr ) const
 {
-    return m_listeningRoomWidgets.value( lr ).data();
+    return m_partyWidgets.value( lr ).data();
 }
 
 

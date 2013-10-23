@@ -23,7 +23,7 @@
 
 #include "Artist.h"
 #include "Album.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 #include "PlaylistEntry.h"
 #include "Query.h"
 #include "Result.h"

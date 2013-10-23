@@ -101,9 +101,9 @@ ActionCollection::initActions()
     m_actionCollection[ "quit" ]->setShortcutContext( Qt::ApplicationShortcut );
     m_actionCollection[ "quit" ]->setMenuRole( QAction::QuitRole );
 
-    // listening room actions
-    m_actionCollection[ "renameListeningRoom" ]  = new QAction( tr( "&Rename Listening Room" ), this );
-    m_actionCollection[ "disbandListeningRoom" ] = new QAction( tr( "&Disband Listening Room" ), this );
+    // party actions
+    m_actionCollection[ "renameParty" ]  = new QAction( tr( "&Rename Party" ), this );
+    m_actionCollection[ "disbandParty" ] = new QAction( tr( "&Disband Party" ), this );
 
     // connect actions to AudioEngine
     AudioEngine *ae = AudioEngine::instance();

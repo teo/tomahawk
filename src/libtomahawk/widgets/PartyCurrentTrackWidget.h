@@ -16,8 +16,8 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LISTENINGROOMCURRENTTRACKWIDGET_H
-#define LISTENINGROOMCURRENTTRACKWIDGET_H
+#ifndef PARTYCURRENTTRACKWIDGET_H
+#define PARTYCURRENTTRACKWIDGET_H
 
 #include <QWidget>
 
@@ -26,11 +26,11 @@ class QLabel;
 class ElidedLabel;
 class QPersistentModelIndex;
 
-class ListeningRoomCurrentTrackWidget : public QWidget
+class PartyCurrentTrackWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomCurrentTrackWidget( QWidget* parent = 0 );
+    explicit PartyCurrentTrackWidget( QWidget* parent = 0 );
 
     void setItem( const QPersistentModelIndex& idx );
 
@@ -45,4 +45,4 @@ private:
     QPixmap m_albumArtPlaceholder;
 };
 
-#endif // LISTENINGROOMCURRENTTRACKWIDGET_H
+#endif // PARTYCURRENTTRACKWIDGET_H

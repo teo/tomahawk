@@ -16,9 +16,9 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ListeningRoomHeader.h"
+#include "PartyHeader.h"
 
-#include "ListeningRoomWidget.h"
+#include "PartyWidget.h"
 #include "SourceList.h"
 #include "utils/TomahawkUtilsGui.h"
 
@@ -27,7 +27,7 @@
 #include <QtGui/QPushButton>
 
 
-ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent )
+PartyHeader::PartyHeader( PartyWidget* parent )
     : BasicHeader( parent )
     , m_buttonState( Disband ) //just so the first setting gets applied
 {
@@ -39,9 +39,9 @@ ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent )
     controlsLayout->addWidget( m_joinLeaveButton );
     controlsLayout->addStretch();
 
-    m_buttonStrings[ Join ]    = tr( "Join", "Button for a listener to join a listening room" );
-    m_buttonStrings[ Leave ]   = tr( "Leave", "Button for a listener to leave a listening room" );
-    m_buttonStrings[ Disband ] = tr( "Disband", "Button for a DJ to disband a listening room" );
+    m_buttonStrings[ Join ]    = tr( "Join", "Button for a listener to join a party" );
+    m_buttonStrings[ Leave ]   = tr( "Leave", "Button for a listener to leave a party" );
+    m_buttonStrings[ Disband ] = tr( "Disband", "Button for a DJ to disband a party" );
 
     m_buttonIcons[ Join ]    = QIcon( RESPATH "images/list-add.png" );
     m_buttonIcons[ Leave ]   = QIcon( RESPATH "images/list-remove.png" );
@@ -70,12 +70,12 @@ ListeningRoomHeader::ListeningRoomHeader( ListeningRoomWidget* parent )
 //TODO: unmargin maybe?
 }
 
-ListeningRoomHeader::~ListeningRoomHeader()
+PartyHeader::~PartyHeader()
 {
 }
 
 void
-ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
+PartyHeader::setListeners( const QStringList& listenerDbids )
 {
     qDeleteAll( m_avatarLabels );
     m_avatarLabels.clear();
@@ -107,7 +107,7 @@ ListeningRoomHeader::setListeners( const QStringList& listenerDbids )
     fillListeners();
 }
 
-void ListeningRoomHeader::setButtonState( ListeningRoomHeader::ButtonState state )
+void PartyHeader::setButtonState( PartyHeader::ButtonState state )
 {
     if ( state == m_buttonState )
         return;
@@ -120,7 +120,7 @@ void ListeningRoomHeader::setButtonState( ListeningRoomHeader::ButtonState state
 
 
 void
-ListeningRoomHeader::fillListeners()
+PartyHeader::fillListeners()
 {
     if ( m_unnamedListeners )
         m_unnamedListenersLabel->setText( tr( "and %n other listener(s).", "", m_unnamedListeners ) );
@@ -134,7 +134,7 @@ ListeningRoomHeader::fillListeners()
 
 
 void
-ListeningRoomHeader::onJoinLeaveButtonClicked()
+PartyHeader::onJoinLeaveButtonClicked()
 {
     emit joinLeaveButtonClicked( m_buttonState );
 }

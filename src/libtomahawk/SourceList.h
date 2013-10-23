@@ -61,7 +61,7 @@ public slots:
     // called by the playlist creation dbcmds
     void createPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
     void createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVariant& contents );
-    void createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents );
+    void createParty( const Tomahawk::source_ptr& src, const QVariant& contents );
 
     void onResolverAdded( Tomahawk::Resolver* resolver );
     void onResolverRemoved( Tomahawk::Resolver* resolver );

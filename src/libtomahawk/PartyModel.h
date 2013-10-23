@@ -17,12 +17,12 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LISTENINGROOMMODEL_H
-#define LISTENINGROOMMODEL_H
+#ifndef PARTYMODEL_H
+#define PARTYMODEL_H
 
 #include "playlist/PlayableModel.h"
 
-class DLLEXPORT ListeningRoomModel : public PlayableModel
+class DLLEXPORT PartyModel : public PlayableModel
 {
     Q_OBJECT
 
@@ -33,16 +33,16 @@ class DLLEXPORT ListeningRoomModel : public PlayableModel
     } DropStorageData;
 
 public:
-    explicit ListeningRoomModel( QObject* parent = 0 );
-    virtual ~ListeningRoomModel();
+    explicit PartyModel( QObject* parent = 0 );
+    virtual ~PartyModel();
 
     QMimeData* mimeData( const QModelIndexList& indexes ) const;
     bool dropMimeData( const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent );
 
-    Tomahawk::listeningroom_ptr listeningRoom() const { return m_listeningRoom; }
+    Tomahawk::party_ptr party() const { return m_party; }
 
 public slots:    
-    virtual void loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries = true );
+    virtual void loadParty( const Tomahawk::party_ptr& party, bool loadEntries = true );
 
     void clear();
 
@@ -58,12 +58,12 @@ public slots:
     void setCurrentItem( const QModelIndex& index );
 
 signals:
-    void listeningRoomDeleted();
+    void partyDeleted();
     void currentRowChanged();
     void listenersChanged();
 
 protected:
-    QList<Tomahawk::lrentry_ptr> listeningRoomEntries() const;
+    QList<Tomahawk::lrentry_ptr> partyEntries() const;
 
 private slots:
     void parsedDroppedTracks( QList<Tomahawk::query_ptr> );
@@ -76,7 +76,7 @@ private:
     void beginRoomChanges();
     void endRoomChanges();
 
-    Tomahawk::listeningroom_ptr m_listeningRoom;
+    Tomahawk::party_ptr m_party;
     
     bool m_isLoading;
     bool m_changesOngoing;
@@ -89,4 +89,4 @@ private:
     DropStorageData m_dropStorage;
 };
 
-#endif // LISTENINGROOMMODEL_H
+#endif // PARTYMODEL_H

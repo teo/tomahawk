@@ -17,12 +17,12 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ListeningRoomModel.h"
+#include "PartyModel.h"
 
 #include "Album.h"
 #include "Artist.h"
 #include "DropJob.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 #include "Pipeline.h"
 #include "playlist/PlayableItem.h"
 #include "PlaylistInterface.h"
@@ -37,7 +37,7 @@
 using namespace Tomahawk;
 
 
-ListeningRoomModel::ListeningRoomModel( QObject* parent )
+PartyModel::PartyModel( QObject* parent )
     : PlayableModel( parent )
     , m_changesOngoing( false )
     , m_isLoading( false )
@@ -50,24 +50,24 @@ ListeningRoomModel::ListeningRoomModel( QObject* parent )
 }
 
 
-ListeningRoomModel::~ListeningRoomModel()
+PartyModel::~PartyModel()
 {
 }
 
 
 QMimeData*
-ListeningRoomModel::mimeData( const QModelIndexList& indexes ) const
+PartyModel::mimeData( const QModelIndexList& indexes ) const
 {
     QMimeData* d = PlayableModel::mimeData( indexes );
-    if ( !m_listeningRoom.isNull() )
-        d->setData( "application/tomahawk.listeningroom.id", m_listeningRoom->guid().toLatin1() );
+    if ( !m_party.isNull() )
+        d->setData( "application/tomahawk.party.id", m_party->guid().toLatin1() );
 
     return d;
 }
 
 
 bool
-ListeningRoomModel::dropMimeData( const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent )
+PartyModel::dropMimeData( const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent )
 {
     Q_UNUSED( column );
 
@@ -91,9 +91,9 @@ ListeningRoomModel::dropMimeData( const QMimeData* data, Qt::DropAction action, 
 
 #ifdef Q_WS_MAC
     // On mac, drags from outside the app are still Qt::MoveActions instead of Qt::CopyAction by default
-    // so check if the drag originated in this room to determine whether or not to copy
-    if ( !data->hasFormat( "application/tomahawk.listeningroom.id" ) ||
-       ( !m_listeningRoom.isNull() && data->data( "application/tomahawk.listeningroom.id" ) != m_listeningRoom->guid() ) )
+    // so check if the drag originated in this party to determine whether or not to copy
+    if ( !data->hasFormat( "application/tomahawk.party.id" ) ||
+       ( !m_party.isNull() && data->data( "application/tomahawk.party.id" ) != m_party->guid() ) )
     {
         dj->setDropAction( DropJob::Append );
     }
@@ -108,7 +108,7 @@ ListeningRoomModel::dropMimeData( const QMimeData* data, Qt::DropAction action, 
 
 
 void
-ListeningRoomModel::parsedDroppedTracks( QList< query_ptr > tracks )
+PartyModel::parsedDroppedTracks( QList< query_ptr > tracks )
 {
     if ( m_dropStorage.row == -10 ) //null value
         return;
@@ -140,9 +140,9 @@ ListeningRoomModel::parsedDroppedTracks( QList< query_ptr > tracks )
 
 
 void
-ListeningRoomModel::beginRoomChanges()
+PartyModel::beginRoomChanges()
 {
-    if ( m_listeningRoom.isNull() || !m_listeningRoom->author()->isLocal() )
+    if ( m_party.isNull() || !m_party->author()->isLocal() )
         return;
 
     Q_ASSERT( !m_changesOngoing );
@@ -151,9 +151,9 @@ ListeningRoomModel::beginRoomChanges()
 
 
 void
-ListeningRoomModel::endRoomChanges()
+PartyModel::endRoomChanges()
 {
-    if ( m_listeningRoom.isNull() || !m_listeningRoom->author()->isLocal() )
+    if ( m_party.isNull() || !m_party->author()->isLocal() )
         return;
 
     if ( m_changesOngoing )
@@ -187,7 +187,7 @@ ListeningRoomModel::endRoomChanges()
             if ( item->lrentry() == m_savedInsertTracks.first() )
             {
                 // Found our index
-                m_listeningRoom->moveEntries( m_savedInsertTracks, i );
+                m_party->moveEntries( m_savedInsertTracks, i );
                 break;
             }
         }
@@ -203,20 +203,20 @@ ListeningRoomModel::endRoomChanges()
             qs.append( e->query() );
         }
 
-        m_listeningRoom->insertEntries( qs, m_savedInsertPos );
+        m_party->insertEntries( qs, m_savedInsertPos );
         m_savedInsertPos = -1;
         m_savedInsertTracks.clear();
     }
     else if ( !m_savedRemoveTracks.isEmpty() )
     {
-        m_listeningRoom->removeEntries( m_savedRemoveTracks );
+        m_party->removeEntries( m_savedRemoveTracks );
         m_savedRemoveTracks.clear();
     }
 }
 
 
 QList< lrentry_ptr >
-ListeningRoomModel::listeningRoomEntries() const
+PartyModel::partyEntries() const
 {
     QList< lrentry_ptr > l;
     for ( int i = 0; i < rowCount( QModelIndex() ); ++i )
@@ -235,15 +235,15 @@ ListeningRoomModel::listeningRoomEntries() const
 
 
 void
-ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, bool loadEntries )
+PartyModel::loadParty( const Tomahawk::party_ptr& party, bool loadEntries )
 {
-    if ( !m_listeningRoom.isNull() ) //NOTE: LR already loaded, does this ever happen?
+    if ( !m_party.isNull() ) //NOTE: LR already loaded, does this ever happen?
     {
-        disconnect( m_listeningRoom.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
-                    this, SIGNAL( listeningRoomDeleted() ) );
-        disconnect( m_listeningRoom.data(), SIGNAL( changed() ),
+        disconnect( m_party.data(), SIGNAL( deleted( Tomahawk::party_ptr ) ),
+                    this, SIGNAL( partyDeleted() ) );
+        disconnect( m_party.data(), SIGNAL( changed() ),
                     this, SLOT( reload() ) );
-        disconnect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
+        disconnect( m_party.data(), SIGNAL( listenersChanged() ),
                     this, SLOT( reloadRoomMetadata() ) );
     }
 
@@ -252,15 +252,15 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
     if ( loadEntries )
         clear();
 
-    m_listeningRoom = room;
-    connect( m_listeningRoom.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
-             this, SIGNAL( listeningRoomDeleted() ) );
-    connect( m_listeningRoom.data(), SIGNAL( changed() ),
+    m_party = party;
+    connect( m_party.data(), SIGNAL( deleted( Tomahawk::party_ptr ) ),
+             this, SIGNAL( partyDeleted() ) );
+    connect( m_party.data(), SIGNAL( changed() ),
              this, SLOT( reload() ) );
-    connect( m_listeningRoom.data(), SIGNAL( listenersChanged() ),
+    connect( m_party.data(), SIGNAL( listenersChanged() ),
              this, SLOT( reloadRoomMetadata() ) );
 
-    setReadOnly( !m_listeningRoom->author()->isLocal() );
+    setReadOnly( !m_party->author()->isLocal() );
 
     reloadRoomMetadata();
 
@@ -276,32 +276,32 @@ ListeningRoomModel::loadListeningRoom( const Tomahawk::listeningroom_ptr& room, 
 
 
 void
-ListeningRoomModel::reloadRoomMetadata()
+PartyModel::reloadRoomMetadata()
 {
-    setTitle( m_listeningRoom->title() );
-    QString age = TomahawkUtils::ageToString( QDateTime::fromTime_t( m_listeningRoom->createdOn() ), true );
+    setTitle( m_party->title() );
+    QString age = TomahawkUtils::ageToString( QDateTime::fromTime_t( m_party->createdOn() ), true );
 
     //set the description
     QString desc;
-    int n = m_listeningRoom->listenerIds().count();
-    if ( m_listeningRoom->author()->isLocal() )
-        desc = tr( "A room you are hosting, with %n listener(s).", "", n );
+    int n = m_party->listenerIds().count();
+    if ( m_party->author()->isLocal() )
+        desc = tr( "A party you are hosting, with %n listener(s).", "", n );
     else
-        desc = tr( "A room hosted by %1, with %n listener(s).", "", n )
-               .arg( m_listeningRoom->author()->friendlyName() );
+        desc = tr( "A party hosted by %1, with %n listener(s).", "", n )
+               .arg( m_party->author()->friendlyName() );
     setDescription( desc );
 
     emit listenersChanged();
 }
 
 void
-ListeningRoomModel::reload()
+PartyModel::reload()
 {
     m_isLoading = true;
 
     reloadRoomMetadata();
 
-    QList< lrentry_ptr > entries = m_listeningRoom->entries();
+    QList< lrentry_ptr > entries = m_party->entries();
     foreach ( const lrentry_ptr& p, entries )
         tDebug() << p->guid() << p->query()->track()->track() << p->query()->track()->artist();
 
@@ -350,10 +350,10 @@ ListeningRoomModel::reload()
     }
 
     bool hasRowChanged = false;
-    if ( currentItem().row() != m_listeningRoom->currentRow() )
+    if ( currentItem().row() != m_party->currentRow() )
     {
         hasRowChanged = true;
-        int row = m_listeningRoom->currentRow();
+        int row = m_party->currentRow();
         if ( row >= 0 && row < rowCount( QModelIndex() ) )
             setCurrentItem( index( row, 0, QModelIndex() ) );
     }
@@ -366,7 +366,7 @@ ListeningRoomModel::reload()
 
 
 void
-ListeningRoomModel::clear()
+PartyModel::clear()
 {
     PlayableModel::clear();
     m_waitingForResolved.clear();
@@ -374,14 +374,14 @@ ListeningRoomModel::clear()
 
 
 void
-ListeningRoomModel::appendEntries( const QList< lrentry_ptr >& entries )
+PartyModel::appendEntries( const QList< lrentry_ptr >& entries )
 {
     insertEntriesPrivate( entries, rowCount( QModelIndex() ) );
 }
 
 
 void
-ListeningRoomModel::insertAlbums( const QList< album_ptr >& albums, int row )
+PartyModel::insertAlbums( const QList< album_ptr >& albums, int row )
 {
     foreach ( const album_ptr& album, albums )
     {
@@ -397,7 +397,7 @@ ListeningRoomModel::insertAlbums( const QList< album_ptr >& albums, int row )
 
 
 void
-ListeningRoomModel::insertArtists( const QList< artist_ptr >& artists, int row )
+PartyModel::insertArtists( const QList< artist_ptr >& artists, int row )
 {
     foreach ( const artist_ptr& artist, artists )
     {
@@ -413,12 +413,12 @@ ListeningRoomModel::insertArtists( const QList< artist_ptr >& artists, int row )
 
 
 void
-ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
+PartyModel::insertQueries( const QList< query_ptr >& queries, int row )
 {
     QList< Tomahawk::lrentry_ptr > entries;
     foreach ( const query_ptr& query, queries )
     {
-        lrentry_ptr entry = lrentry_ptr( new ListeningRoomEntry() );
+        lrentry_ptr entry = lrentry_ptr( new PartyEntry() );
 
         entry->setDuration( query->queryTrack()->duration() );
         entry->setLastmodified( 0 );
@@ -434,9 +434,9 @@ ListeningRoomModel::insertQueries( const QList< query_ptr >& queries, int row )
 
 
 void
-ListeningRoomModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, int row )
+PartyModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, int row )
 {
-    if ( entries.isEmpty() || !m_listeningRoom->author()->isLocal() )
+    if ( entries.isEmpty() || !m_party->author()->isLocal() )
         return;
 
     beginRoomChanges();
@@ -446,7 +446,7 @@ ListeningRoomModel::insertEntriesFromView( const QList< lrentry_ptr >& entries, 
 
 
 void
-ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, int row )
+PartyModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, int row )
 {
     if ( !entries.count() )
     {
@@ -500,7 +500,7 @@ ListeningRoomModel::insertEntriesPrivate( const QList< lrentry_ptr >& entries, i
 
 
 void
-ListeningRoomModel::trackResolved( bool )
+PartyModel::trackResolved( bool )
 {
     Query* q = qobject_cast< Query* >( sender() );
     if ( !q )
@@ -521,7 +521,7 @@ ListeningRoomModel::trackResolved( bool )
 
 
 void
-ListeningRoomModel::removeIndex( const QModelIndex& index, bool moreToCome )
+PartyModel::removeIndex( const QModelIndex& index, bool moreToCome )
 {
     PlayableItem* item = itemFromIndex( index );
 
@@ -550,12 +550,12 @@ ListeningRoomModel::removeIndex( const QModelIndex& index, bool moreToCome )
 
 
 void
-ListeningRoomModel::setCurrentItem( const QModelIndex& index )
+PartyModel::setCurrentItem( const QModelIndex& index )
 {
     PlayableModel::setCurrentIndex( index );
-    if ( !m_listeningRoom.isNull() && m_listeningRoom->author() == SourceList::instance()->getLocal() )
+    if ( !m_party.isNull() && m_party->author() == SourceList::instance()->getLocal() )
     {
-        m_listeningRoom->setCurrentRow( index.row() );
-        m_listeningRoom->pushUpdate();
+        m_party->setCurrentRow( index.row() );
+        m_party->pushUpdate();
     }
 }

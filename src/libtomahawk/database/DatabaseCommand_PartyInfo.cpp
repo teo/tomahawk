@@ -17,11 +17,11 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "DatabaseCommand_ListeningRoomInfo.h"
+#include "DatabaseCommand_PartyInfo.h"
 
 #include "network/Servent.h"
 #include "Source.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 #include "utils/Logger.h"
 
 #ifndef ENABLE_HEADLESS
@@ -34,66 +34,66 @@
 namespace Tomahawk
 {
 
-DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( QObject* parent )
+DatabaseCommand_PartyInfo::DatabaseCommand_PartyInfo( QObject* parent )
     : DatabaseCommandLoggable( parent )
 {
-    tDebug() << Q_FUNC_INFO << "dbcmd listeningroominfo received";
+    tDebug() << Q_FUNC_INFO << "dbcmd partyinfo received";
 }
 
 /*private*/
-DatabaseCommand_ListeningRoomInfo::DatabaseCommand_ListeningRoomInfo( Action action,
+DatabaseCommand_PartyInfo::DatabaseCommand_PartyInfo( Action action,
                                                                       const source_ptr& author )
     : DatabaseCommandLoggable( author )
     , m_action( action )
 {}
 
 
-DatabaseCommand_ListeningRoomInfo*
-DatabaseCommand_ListeningRoomInfo::RoomInfo( const source_ptr& author,
-                                             const listeningroom_ptr& listeningRoom )
+DatabaseCommand_PartyInfo*
+DatabaseCommand_PartyInfo::PartyInfo( const source_ptr& author,
+                                             const party_ptr& party )
 {
-    DatabaseCommand_ListeningRoomInfo* cmd =
-            new DatabaseCommand_ListeningRoomInfo( Info, author );
-    cmd->m_listeningRoom = listeningRoom;
-    cmd->m_guid = listeningRoom->guid();
+    DatabaseCommand_PartyInfo* cmd =
+            new DatabaseCommand_PartyInfo( Info, author );
+    cmd->m_party = party;
+    cmd->m_guid = party->guid();
 
     return cmd;
 }
 
-DatabaseCommand_ListeningRoomInfo*
-DatabaseCommand_ListeningRoomInfo::DisbandRoom( const Tomahawk::source_ptr& author,
-                                                const QString& roomGuid )
+DatabaseCommand_PartyInfo*
+DatabaseCommand_PartyInfo::DisbandParty( const Tomahawk::source_ptr& author,
+                                                const QString& partyGuid )
 {
-    DatabaseCommand_ListeningRoomInfo* cmd =
-            new DatabaseCommand_ListeningRoomInfo( Disband, author );
-    cmd->m_guid = roomGuid;
+    DatabaseCommand_PartyInfo* cmd =
+            new DatabaseCommand_PartyInfo( Disband, author );
+    cmd->m_guid = partyGuid;
 
     return cmd;
 }
 
 
 void
-DatabaseCommand_ListeningRoomInfo::exec( DatabaseImpl* lib )
+DatabaseCommand_PartyInfo::exec( DatabaseImpl* lib )
 {
     Q_UNUSED( lib );
     Q_ASSERT( !source().isNull() );
     if ( m_action == Info )
     {
         tDebug() << Q_FUNC_INFO << "with action Info";
-        Q_ASSERT( !( m_listeningRoom.isNull() && m_v.isNull() ) );
+        Q_ASSERT( !( m_party.isNull() && m_v.isNull() ) );
 
         uint now = 0;
-        if ( m_listeningRoom.isNull() ) //we don't have the unserialized version, so we're remote
+        if ( m_party.isNull() ) //we don't have the unserialized version, so we're remote
         {
             now = m_v.toMap()[ "createdon" ].toUInt();
         }
         else //we're executing locally
         {
-            if ( m_listeningRoom->createdOn() == 0 ) //creating it locally now
+            if ( m_party->createdOn() == 0 ) //creating it locally now
                 now = QDateTime::currentDateTime().toTime_t();
             else
-                now = m_listeningRoom->createdOn();
-            m_listeningRoom->setCreatedOn( now );
+                now = m_party->createdOn();
+            m_party->setCreatedOn( now );
         }
     }
     else if ( m_action == Disband )
@@ -105,19 +105,19 @@ DatabaseCommand_ListeningRoomInfo::exec( DatabaseImpl* lib )
 
 
 QVariant
-DatabaseCommand_ListeningRoomInfo::listeningRoomV() const
+DatabaseCommand_PartyInfo::partyV() const
 {
     if ( m_action == Info && m_v.isNull() ) //this is so that QVariant conversion only happens when serializing the DBcmd
-        return QJson::QObjectHelper::qobject2qvariant( (QObject*)m_listeningRoom.data() );
+        return QJson::QObjectHelper::qobject2qvariant( (QObject*)m_party.data() );
     else
         return m_v;
 }
 
 
 void
-DatabaseCommand_ListeningRoomInfo::postCommitHook()
+DatabaseCommand_PartyInfo::postCommitHook()
 {
-    tDebug() << Q_FUNC_INFO << "about to visibly create room.";
+    tDebug() << Q_FUNC_INFO << "about to visibly create party.";
 
     if ( source()->isLocal() )
     {
@@ -127,7 +127,7 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
 
     if ( m_action == Info )
     {
-        if ( m_listeningRoom.isNull() ) //if I'm not local
+        if ( m_party.isNull() ) //if I'm not local
         {
             source_ptr src = source();
     #ifndef ENABLE_HEADLESS
@@ -135,7 +135,7 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
             // But one must be careful what he does there, so to create something on the main thread,
             // you either emit a signal or do a queued invoke.
             QMetaObject::invokeMethod( ViewManager::instance(),
-                                      "createListeningRoom",
+                                      "createParty",
                                        Qt::BlockingQueuedConnection,
                                        QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
                                        Q_ARG( QVariant, m_v ) );
@@ -144,7 +144,7 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
         }
         else
         {
-            m_listeningRoom->reportCreated( m_listeningRoom );
+            m_party->reportCreated( m_party );
         }
     }
     else if ( m_action == Disband )
@@ -152,14 +152,14 @@ DatabaseCommand_ListeningRoomInfo::postCommitHook()
         if ( source().isNull() )
             return;
 
-        listeningroom_ptr room = source()->listeningRoom( m_guid );
-        if ( room.isNull() )
+        party_ptr party = source()->party( m_guid );
+        if ( party.isNull() )
         {
-            tDebug() << "The Listening Room does not exist or has already been disbanded.";
+            tDebug() << "The Party does not exist or has already been disbanded.";
             return;
         }
-        source()->removeListeningRoom( room );
-        room->reportDeleted( room );
+        source()->removeParty( party );
+        party->reportDeleted( party );
     }
 }
 

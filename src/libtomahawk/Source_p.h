@@ -50,7 +50,7 @@ public:
 
 private:
     QList< QSharedPointer<Collection> > collections;
-    QHash< QString, Tomahawk::listeningroom_ptr > listeningRooms;
+    QHash< QString, Tomahawk::party_ptr > partys;
     QVariantMap stats;
 
     bool isLocal;

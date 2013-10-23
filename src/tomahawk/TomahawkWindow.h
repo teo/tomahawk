@@ -94,7 +94,7 @@ protected:
 public slots:
     void createStation();
     void createPlaylist();
-    void createListeningRoom();
+    void createParty();
     void loadSpiff();
     void showSettingsDialog();
     void showDiagnosticsDialog();

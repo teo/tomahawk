@@ -71,11 +71,11 @@ private slots:
     void onItemDoubleClicked( const QModelIndex& idx );
 
     void loadPlaylist();
-    void deletePlaylistOrListeningRoom( const QModelIndex& = QModelIndex() );
+    void deletePlaylistOrParty( const QModelIndex& = QModelIndex() );
     void copyPlaylistLink();
     void exportPlaylist();
     void addToLocal();
-    void renameListeningRoom();
+    void renameParty();
 
     void latchOnOrCatchUp();
     void latchOff();
@@ -86,7 +86,7 @@ private slots:
     void onCustomContextMenu( const QPoint& pos );
     void onSelectionChanged();
 
-    void onDeletePlaylistOrListeningRoomResult( bool result );
+    void onDeletePlaylistOrPartyResult( bool result );
 
     void shortLinkReady( const Tomahawk::playlist_ptr& playlist, const QUrl& shortUrl );
 
@@ -119,8 +119,8 @@ private:
     QMenu m_roPlaylistMenu;
     QMenu m_latchMenu;
     QMenu m_privacyMenu;
-    QMenu m_listeningRoomMenu;
-    QMenu m_roListeningRoomMenu;
+    QMenu m_partyMenu;
+    QMenu m_roPartyMenu;
 
     bool m_dragging;
     QRect m_dropRect;

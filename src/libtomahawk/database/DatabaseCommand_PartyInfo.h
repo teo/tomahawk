@@ -17,8 +17,8 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DATABASECOMMAND_LISTENINGROOMINFO_H
-#define DATABASECOMMAND_LISTENINGROOMINFO_H
+#ifndef DATABASECOMMAND_PARTYINFO_H
+#define DATABASECOMMAND_PARTYINFO_H
 
 #include "Typedefs.h"
 #include "DatabaseCommandLoggable.h"
@@ -29,11 +29,11 @@
 namespace Tomahawk
 {
 
-class DLLEXPORT DatabaseCommand_ListeningRoomInfo : public DatabaseCommandLoggable
+class DLLEXPORT DatabaseCommand_PartyInfo : public DatabaseCommandLoggable
 {
     Q_OBJECT
-    Q_PROPERTY( QVariant listeningRoom      READ listeningRoomV WRITE setListeningRoomV )
-    Q_PROPERTY( QString listeningRoomGuid   READ listeningRoomGuid WRITE setListeningRoomGuid )
+    Q_PROPERTY( QVariant party      READ partyV WRITE setPartyV )
+    Q_PROPERTY( QString partyGuid   READ partyGuid WRITE setPartyGuid )
     Q_PROPERTY( int action                  READ action WRITE setAction )
 
 public:
@@ -49,46 +49,46 @@ public:
     };
 
     //Do not construct through this ctor
-    explicit DatabaseCommand_ListeningRoomInfo( QObject* parent = 0 );
+    explicit DatabaseCommand_PartyInfo( QObject* parent = 0 );
 
     //Named ctors, use these!
-    static DatabaseCommand_ListeningRoomInfo* RoomInfo( const Tomahawk::source_ptr& author,
-                                                        const Tomahawk::listeningroom_ptr& listeningRoom );
+    static DatabaseCommand_PartyInfo* PartyInfo( const Tomahawk::source_ptr& author,
+                                                        const Tomahawk::party_ptr& party );
 
-    static DatabaseCommand_ListeningRoomInfo* DisbandRoom( const Tomahawk::source_ptr& author,
-                                                           const QString& roomGuid );
+    static DatabaseCommand_PartyInfo* DisbandParty( const Tomahawk::source_ptr& author,
+                                                           const QString& partyGuid );
 
-    virtual ~DatabaseCommand_ListeningRoomInfo() {}
+    virtual ~DatabaseCommand_PartyInfo() {}
 
-    QString commandname() const { return "listeningroominfo"; }
+    QString commandname() const { return "partyinfo"; }
 
     virtual void exec( DatabaseImpl* lib );
     virtual void postCommitHook();
     virtual bool singletonCmd() const { return true; }
 
-    QVariant listeningRoomV() const;
-    void setListeningRoomV( const QVariant& v ) { m_v = v; }
+    QVariant partyV() const;
+    void setPartyV( const QVariant& v ) { m_v = v; }
 
-    QString listeningRoomGuid() const { return m_guid; }
-    void setListeningRoomGuid( const QString& guid ) { m_guid = guid; }
+    QString partyGuid() const { return m_guid; }
+    void setPartyGuid( const QString& guid ) { m_guid = guid; }
 
     int action() const { return m_action; }
     void setAction( int a ) { m_action = static_cast< Action >( a ); }
 
 protected:
-    void setListeningRoom( const Tomahawk::listeningroom_ptr& listeningRoom );
+    void setParty( const Tomahawk::party_ptr& party );
 
     QVariant m_v;
     QString m_guid;
 
 private:
-    explicit DatabaseCommand_ListeningRoomInfo( Action action,
+    explicit DatabaseCommand_PartyInfo( Action action,
                                                 const Tomahawk::source_ptr& author ); //used by named ctors
 
-    Tomahawk::listeningroom_ptr m_listeningRoom;
+    Tomahawk::party_ptr m_party;
     Action m_action;
 };
 
 } //ns
 
-#endif // DATABASECOMMAND_LISTENINGROOMINFO_H
+#endif // DATABASECOMMAND_PARTYINFO_H

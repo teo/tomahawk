@@ -89,10 +89,10 @@ public:
     // Starts playing from the beginning if resolved, or waits until a track is playable
     void startPlayingFromStart();
 
-    void setReadOnly( bool readOnly = true ); //default: false, used by listening room history view
+    void setReadOnly( bool readOnly = true ); //default: false, used by listening party history view
     bool isReadOnly() const { return m_readOnly; }
 
-    void setManualProgression( bool manual = true ); //default: false, used by listening room main view
+    void setManualProgression( bool manual = true ); //default: false, used by listening party main view
     bool isManualProgression() const { return m_manualProgression; }
 
 public slots:

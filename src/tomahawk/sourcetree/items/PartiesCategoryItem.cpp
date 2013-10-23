@@ -16,10 +16,10 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "ListeningRoomsCategoryItem.h"
+#include "PartiesCategoryItem.h"
 
-#include "ListeningRoom.h"
-#include "ListeningRoomItem.h"
+#include "Party.h"
+#include "PartyItem.h"
 #include "SourceList.h"
 #include "utils/Closure.h"
 #include "utils/Logger.h"
@@ -36,16 +36,16 @@ GroupCategoryItem::checkExpandedState()
 }
 
 
-ListeningRoomsCategoryItem::ListeningRoomsCategoryItem( SourcesModel* model,
+PartiesCategoryItem::PartiesCategoryItem( SourcesModel* model,
                                                         SourceTreeItem* parent,
                                                         int peerSortValue )
-    : GroupCategoryItem( model, parent, SourcesModel::ListeningRoomsCategory, true, peerSortValue )
+    : GroupCategoryItem( model, parent, SourcesModel::PartiesCategory, true, peerSortValue )
 {
 //useless because it's all empty at startup
     foreach ( const Tomahawk::source_ptr& src, SourceList::instance()->sources( true ) )
     {
-        connect( src.data(), SIGNAL( listeningRoomAdded( Tomahawk::listeningroom_ptr ) ),
-                 SLOT( onListeningRoomAdded( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
+        connect( src.data(), SIGNAL( partyAdded( Tomahawk::party_ptr ) ),
+                 SLOT( onPartyAdded( Tomahawk::party_ptr ) ), Qt::QueuedConnection );
     }
 
     connect( SourceList::instance(), SIGNAL( sourceAdded( Tomahawk::source_ptr ) ),
@@ -54,26 +54,26 @@ ListeningRoomsCategoryItem::ListeningRoomsCategoryItem( SourcesModel* model,
 
 
 void
-ListeningRoomsCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
+PartiesCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
 {
     tDebug() << "Begin" << Q_FUNC_INFO;
 
-    connect( src.data(), SIGNAL( listeningRoomAdded( Tomahawk::listeningroom_ptr ) ),
-             SLOT( onListeningRoomAdded( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
+    connect( src.data(), SIGNAL( partyAdded( Tomahawk::party_ptr ) ),
+             SLOT( onPartyAdded( Tomahawk::party_ptr ) ), Qt::QueuedConnection );
 
     _detail::Closure* srcRemovedClosure =
         NewClosure( src.data(), SIGNAL( offline() ),
                     this, SLOT( onSourceRemoved( Tomahawk::source_ptr ) ), src );
     srcRemovedClosure->setAutoDelete( false );
 
-    connect( src.data(), SIGNAL( listeningRoomRemoved( Tomahawk::listeningroom_ptr ) ),
-             SLOT( onListeningRoomCountChanged() ) );
+    connect( src.data(), SIGNAL( partyRemoved( Tomahawk::party_ptr ) ),
+             SLOT( onPartyCountChanged() ) );
 
     tDebug() << "End" << Q_FUNC_INFO;
 }
 
 void
-ListeningRoomsCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
+PartiesCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
 {
     if ( src->isOnline() )
         return;
@@ -81,15 +81,15 @@ ListeningRoomsCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
     tDebug() << "Removed source " << src->friendlyName();
     for ( int i = 0; i < children().count(); )
     {
-        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( children().at( i ) );
-        if( lrItem && lrItem->listeningroom()->author()->id() == src->id() )
+        PartyItem* lrItem = qobject_cast< PartyItem* >( children().at( i ) );
+        if( lrItem && lrItem->party()->author()->id() == src->id() )
         {
             beginRowsRemoved( i, i );
             removeChild( lrItem );
             endRowsRemoved();
 
-            src->removeListeningRoom( lrItem->listeningroom() );
-            lrItem->listeningroom()->deleteLater();
+            src->removeParty( lrItem->party() );
+            lrItem->party()->deleteLater();
 
             delete lrItem;
         }
@@ -100,7 +100,7 @@ ListeningRoomsCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
 
 
 void
-ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_ptr& p )
+PartiesCategoryItem::onPartyAdded( const Tomahawk::party_ptr& p )
 {
     if ( p.isNull() )
         return;
@@ -111,31 +111,31 @@ ListeningRoomsCategoryItem::onListeningRoomAdded( const Tomahawk::listeningroom_
         --count; //if an add item exists, it should always appear at the end of the list
 
     beginRowsAdded( count, count );
-    ListeningRoomItem* lrItem = new ListeningRoomItem( model(), this, p ); //inserts child too
+    PartyItem* lrItem = new PartyItem( model(), this, p ); //inserts child too
     endRowsAdded();
 
     if ( p->author()->isLocal() )
-        connect( p.data(), SIGNAL( aboutToBeDeleted( Tomahawk::listeningroom_ptr ) ),
-                 SLOT( onListeningRoomDeleted( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
+        connect( p.data(), SIGNAL( aboutToBeDeleted( Tomahawk::party_ptr ) ),
+                 SLOT( onPartyDeleted( Tomahawk::party_ptr ) ), Qt::QueuedConnection );
     else
-        connect( p.data(), SIGNAL( deleted( Tomahawk::listeningroom_ptr ) ),
-                 SLOT( onListeningRoomDeleted( Tomahawk::listeningroom_ptr ) ), Qt::QueuedConnection );
+        connect( p.data(), SIGNAL( deleted( Tomahawk::party_ptr ) ),
+                 SLOT( onPartyDeleted( Tomahawk::party_ptr ) ), Qt::QueuedConnection );
 
-    tDebug() << "listening room added to model." << p->title();
-    onListeningRoomCountChanged();
+    tDebug() << "party added to model." << p->title();
+    onPartyCountChanged();
 }
 
 
 void
-ListeningRoomsCategoryItem::onListeningRoomDeleted( const Tomahawk::listeningroom_ptr& p )
+PartiesCategoryItem::onPartyDeleted( const Tomahawk::party_ptr& p )
 {
     Q_ASSERT( p );
 
     int count = children().count();
     for ( int i = 0; i < count; ++i )
     {
-        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( children().at( i ) );
-        if( lrItem && lrItem->listeningroom() == p )
+        PartyItem* lrItem = qobject_cast< PartyItem* >( children().at( i ) );
+        if( lrItem && lrItem->party() == p )
         {
             beginRowsRemoved( i, i );
             removeChild( lrItem );
@@ -145,14 +145,14 @@ ListeningRoomsCategoryItem::onListeningRoomDeleted( const Tomahawk::listeningroo
             break;
         }
     }
-    //onListeningRoomCountChanged() is called afterwards through a signal from Source
+    //onPartyCountChanged() is called afterwards through a signal from Source
 }
 
 
 void
-ListeningRoomsCategoryItem::onListeningRoomCountChanged()
+PartiesCategoryItem::onPartyCountChanged()
 {
-    if ( SourceList::instance()->getLocal()->hasListeningRooms() ) //if this change affects my own LR
+    if ( SourceList::instance()->getLocal()->hasParties() ) //if this change affects my own LR
     {
         setAddItemVisible( false );
     }

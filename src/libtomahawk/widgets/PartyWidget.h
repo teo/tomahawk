@@ -16,32 +16,32 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef LISTENINGROOMWIDGET_H
-#define LISTENINGROOMWIDGET_H
+#ifndef PARTYWIDGET_H
+#define PARTYWIDGET_H
 
 #include <QtGui/QWidget>
 
 #include "Typedefs.h"
-#include "ListeningRoom.h"
-#include "ListeningRoomHeader.h"
+#include "Party.h"
+#include "PartyHeader.h"
 #include "ViewPage.h"
 
 #include <QtGui/QIcon>
 
-class ListeningRoomHeader;
-class ListeningRoomModel;
-class ListeningRoomCurrentTrackWidget;
+class PartyHeader;
+class PartyModel;
+class PartyCurrentTrackWidget;
 class TrackView;
 class QTimeLine;
 class QPushButton;
 class QModelIndex;
 
-class DLLEXPORT ListeningRoomWidget : public QWidget, public Tomahawk::ViewPage
+class DLLEXPORT PartyWidget : public QWidget, public Tomahawk::ViewPage
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomWidget( QWidget* parent = 0 );
-    virtual ~ListeningRoomWidget() {}
+    explicit PartyWidget( QWidget* parent = 0 );
+    virtual ~PartyWidget() {}
 
     QWidget* widget() { return this; }
     Tomahawk::playlistinterface_ptr playlistInterface() const;
@@ -56,13 +56,13 @@ public:
     bool jumpToCurrentTrack() { return true; } //FIXME: what does this do?
 
     /**
-     * @brief setModel sets the model for this ListeningRoomWidget
+     * @brief setModel sets the model for this PartyWidget
      * @param model a pointer to the model
-     * ListeningRoomModel wraps around a ListeningRoom object, for easy use with ListeningRoomWidget
+     * PartyModel wraps around a Party object, for easy use with PartyWidget
      * and its model-view-ish contents. Ideally, LRW should access LR data through LRM rather than
      * getting a pointer to LR and talking to it directly.
      */
-    void setModel( ListeningRoomModel* model );
+    void setModel( PartyModel* model );
     
 protected:
     void resizeEvent( QResizeEvent* e );
@@ -72,7 +72,7 @@ private slots:
     void onAnimationStep( int );
     void onAnimationFinished();
     void onListenersChanged();
-    void onJoinLeaveButtonClicked( ListeningRoomHeader::ButtonState );
+    void onJoinLeaveButtonClicked( PartyHeader::ButtonState );
 
     void onDataChanged( const QModelIndex&, const QModelIndex& );
 
@@ -80,15 +80,15 @@ private slots:
     void onMainViewItemActivated( const QModelIndex& idx );
 
 private:
-    ListeningRoomHeader *m_header;
+    PartyHeader *m_header;
     QWidget* m_historyDrawer;
     QPushButton* m_previousTracksButton;
     TrackView* m_historyView;
     QWidget* m_body;
-    ListeningRoomCurrentTrackWidget* m_currentTrackWidget;
+    PartyCurrentTrackWidget* m_currentTrackWidget;
 
     TrackView* m_view;
-    ListeningRoomModel* m_model;
+    PartyModel* m_model;
 
     QPixmap m_pixmap;
 
@@ -104,4 +104,4 @@ private:
     int m_currentRow;
 };
 
-#endif // LISTENINGROOMWIDGET_H
+#endif // PARTYWIDGET_H

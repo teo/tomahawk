@@ -16,8 +16,8 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef LISTENINGROOMSCATEGORYITEM_H
-#define LISTENINGROOMSCATEGORYITEM_H
+#ifndef PARTIESCATEGORYITEM_H
+#define PARTIESCATEGORYITEM_H
 
 #include "CategoryItems.h"
 #include "SourceTreeItem.h"
@@ -65,11 +65,11 @@ private:
 };
 
 
-class ListeningRoomsCategoryItem : public GroupCategoryItem
+class PartiesCategoryItem : public GroupCategoryItem
 {
     Q_OBJECT
 public:
-    ListeningRoomsCategoryItem( SourcesModel* model,
+    PartiesCategoryItem( SourcesModel* model,
                                 SourceTreeItem* parent,
                                 int peerSortValue = 0 );
 
@@ -78,11 +78,11 @@ public slots:
 
 private slots:
     void onSourceAdded( const Tomahawk::source_ptr& src );
-    void onListeningRoomAdded( const Tomahawk::listeningroom_ptr& p );
-    void onListeningRoomDeleted( const Tomahawk::listeningroom_ptr& p );
-    void onListeningRoomCountChanged();
+    void onPartyAdded( const Tomahawk::party_ptr& p );
+    void onPartyDeleted( const Tomahawk::party_ptr& p );
+    void onPartyCountChanged();
 };
 
 
 
-#endif // LISTENINGROOMSCATEGORYITEM_H
+#endif // PARTIESCATEGORYITEM_H

@@ -45,7 +45,7 @@ class TreeWidget;
 class CollectionModel;
 class ContextWidget;
 class FlexibleView;
-class ListeningRoomWidget;
+class PartyWidget;
 class FlexibleTreeView;
 class PlaylistModel;
 class PlaylistView;
@@ -107,7 +107,7 @@ public:
     Tomahawk::ViewPage* pageForPlaylist( const Tomahawk::playlist_ptr& pl ) const;
     Tomahawk::ViewPage* pageForDynPlaylist( const Tomahawk::dynplaylist_ptr& pl ) const;
 
-    Tomahawk::ViewPage* pageForListeningRoom( const Tomahawk::listeningroom_ptr& lr ) const;
+    Tomahawk::ViewPage* pageForParty( const Tomahawk::party_ptr& lr ) const;
 
     /// Get a playlist (or dynamic playlist ) from a ViewPage* if the page is PlaylistView or DynamicWidget.
     /// Lives here but used by SourcesModel
@@ -117,7 +117,7 @@ public:
     // linked to the sidebar. call it right after creating the playlist
     FlexibleView* createPageForPlaylist( const Tomahawk::playlist_ptr& playlist );
 
-    ListeningRoomWidget* createPageForListeningRoom( const Tomahawk::listeningroom_ptr& room );
+    PartyWidget* createPageForParty( const Tomahawk::party_ptr& party );
 
     FlexibleView* createPageForList( const QString& title, const QList< Tomahawk::query_ptr >& queries );
 
@@ -162,7 +162,7 @@ public slots:
     Tomahawk::ViewPage* show( const Tomahawk::query_ptr& query );
     Tomahawk::ViewPage* show( const Tomahawk::collection_ptr& collection );
     Tomahawk::ViewPage* show( const Tomahawk::source_ptr& source );
-    Tomahawk::ViewPage* show( const Tomahawk::listeningroom_ptr& listeningRoom );
+    Tomahawk::ViewPage* show( const Tomahawk::party_ptr& party );
 
     void historyBack();
     void historyForward();
@@ -218,7 +218,7 @@ private:
     QHash< Tomahawk::query_ptr, QPointer<TrackInfoWidget> > m_trackViews;
     QHash< Tomahawk::playlist_ptr, QPointer<FlexibleView> > m_playlistViews;
     QHash< Tomahawk::source_ptr, QPointer<SourceInfoWidget> > m_sourceViews;
-    QHash< Tomahawk::listeningroom_ptr, QPointer<ListeningRoomWidget> > m_listeningRoomWidgets;
+    QHash< Tomahawk::party_ptr, QPointer<PartyWidget> > m_partyWidgets;
 
     QList<Tomahawk::ViewPage*> m_pageHistoryBack;
     QList<Tomahawk::ViewPage*> m_pageHistoryFwd;

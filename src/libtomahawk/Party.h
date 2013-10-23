@@ -19,8 +19,8 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LISTENINGROOM_H
-#define LISTENINGROOM_H
+#ifndef PARTY_H
+#define PARTY_H
 
 #include <QVariant>
 #include <QSharedPointer>
@@ -31,13 +31,13 @@
 #include "DllMacro.h"
 
 class SourceTreePopupDialog;
-class DatabaseCommand_ListeningRoomInfo;
-class ListeningRoomModel;
+class DatabaseCommand_PartyInfo;
+class PartyModel;
 
 namespace Tomahawk
 {
 
-class DLLEXPORT ListeningRoomEntry : public QObject
+class DLLEXPORT PartyEntry : public QObject
 {
     Q_OBJECT
     Q_PROPERTY( QString guid              READ guid         WRITE setGuid )
@@ -47,8 +47,8 @@ class DLLEXPORT ListeningRoomEntry : public QObject
     Q_PROPERTY( int score                 READ score        WRITE setScore )
 
 public:
-    ListeningRoomEntry() {}
-    virtual ~ListeningRoomEntry() {}
+    PartyEntry() {}
+    virtual ~PartyEntry() {}
 
     bool isValid() const { return !m_query.isNull(); }
 
@@ -90,7 +90,7 @@ private:
 };
 
 
-class DLLEXPORT ListeningRoom : public QObject
+class DLLEXPORT Party : public QObject
 {
     Q_OBJECT
     Q_PROPERTY( QString guid            READ guid               WRITE setGuid )
@@ -101,23 +101,23 @@ class DLLEXPORT ListeningRoom : public QObject
     Q_PROPERTY( QVariantList listenerIds READ listenerIdsV      WRITE setListenerIdsV )
     Q_PROPERTY( int currentRow          READ currentRow         WRITE setCurrentRow )
 
-    friend class ::DatabaseCommand_ListeningRoomInfo;
-    friend class ::ListeningRoomModel;
+    friend class ::DatabaseCommand_PartyInfo;
+    friend class ::PartyModel;
 
 public:
-    virtual ~ListeningRoom();
+    virtual ~Party();
 
-    static Tomahawk::listeningroom_ptr load( const QString& guid );
+    static Tomahawk::party_ptr load( const QString& guid );
 
-    static Tomahawk::listeningroom_ptr create( const Tomahawk::source_ptr& author,
+    static Tomahawk::party_ptr create( const Tomahawk::source_ptr& author,
                                                const QString& guid,
                                                const QString& title,
                                                const QString& creator,
                                                const QList<query_ptr>& queries = QList< Tomahawk::query_ptr >() );
 
-    static void remove( const listeningroom_ptr& room );
+    static void remove( const party_ptr& party );
 
-    void updateFrom( const Tomahawk::listeningroom_ptr& other );
+    void updateFrom( const Tomahawk::party_ptr& other );
 
     source_ptr author() const       { return m_source; }
     QString title() const           { return m_title; }
@@ -152,7 +152,7 @@ public:
     // these need to exist and be public for the json serialization stuff
     // you SHOULD NOT call them.  They are used for an alternate CTOR method from json.
     // maybe friend QObjectHelper and make them private?
-    explicit ListeningRoom( const source_ptr& author );
+    explicit Party( const source_ptr& author );
     void setCreator( const QString& s )         { m_creator = s; }
     void setGuid( const QString& s )            { m_guid = s; }
     void setCreatedOn( uint createdOn )         { m_createdOn = createdOn; }
@@ -175,25 +175,25 @@ signals:
     void changed();
     void renamed( const QString& newTitle, const QString& oldTitle );
 
-    void aboutToBeDeleted( const Tomahawk::listeningroom_ptr& lr );
-    void deleted( const Tomahawk::listeningroom_ptr& lr );
+    void aboutToBeDeleted( const Tomahawk::party_ptr& lr );
+    void deleted( const Tomahawk::party_ptr& lr );
 
     /// Notification for tracks being inserted at a specific point
     /// Contiguous range from startPosition
     void tracksInserted( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
 
-    /// Notification for tracks being removed from the room
+    /// Notification for tracks being removed from the party
     void tracksRemoved( const QList< Tomahawk::lrentry_ptr >& tracks );
 
-    /// Notification for tracks being moved in a room. List is of new tracks, and new position of first track
+    /// Notification for tracks being moved in a party. List is of new tracks, and new position of first track
     /// Contiguous range from startPosition
     void tracksMoved( const QList< Tomahawk::lrentry_ptr >& tracks, int startPosition );
 
     void listenersChanged();
 
 public slots:
-    void reportCreated( const Tomahawk::listeningroom_ptr& self );
-    void reportDeleted( const Tomahawk::listeningroom_ptr& self );
+    void reportCreated( const Tomahawk::party_ptr& self );
+    void reportDeleted( const Tomahawk::party_ptr& self );
 
     // Only ever used by the LR host. Listeners do not add or remove themselves here, they just
     // latch on/off and the host takes care of adding them here and notifying everybody.
@@ -203,7 +203,7 @@ public slots:
 
     void resolve();
 
-    void setWeakSelf( QWeakPointer< ListeningRoom > self ) { m_weakSelf = self; }
+    void setWeakSelf( QWeakPointer< Party > self ) { m_weakSelf = self; }
 private slots:
     // Only ever used by the LR host!
     void pushUpdate();
@@ -214,17 +214,17 @@ private slots:
     void onDeleteResult( SourceTreePopupDialog* dialog );
 
 private:
-    explicit ListeningRoom( const source_ptr& author,
+    explicit Party( const source_ptr& author,
                             const QString& guid,
                             const QString& title,
                             const QString& creator,
                             const QList< Tomahawk::lrentry_ptr >& entries = QList< Tomahawk::lrentry_ptr >() );
 
 
-    ListeningRoom();
+    Party();
     void init();
 
-    QWeakPointer< ListeningRoom > m_weakSelf;
+    QWeakPointer< Party > m_weakSelf;
 
     bool m_locallyChanged;
     bool m_deleted;
@@ -244,8 +244,8 @@ private:
 
 } //namespace Tomahawk
 
-Q_DECLARE_METATYPE( Tomahawk::listeningroom_ptr )
+Q_DECLARE_METATYPE( Tomahawk::party_ptr )
 Q_DECLARE_METATYPE( Tomahawk::lrentry_ptr )
 Q_DECLARE_METATYPE( QList<Tomahawk::lrentry_ptr> )
 
-#endif // LISTENINGROOM_H
+#endif // PARTY_H

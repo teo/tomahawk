@@ -16,12 +16,12 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ListeningRoomItem.h"
+#include "PartyItem.h"
 
 #include <QMimeData>
 
 #include "DropJob.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 #include "SourcesModel.h"
 #include "Query.h"
 #include "ViewManager.h"
@@ -29,49 +29,49 @@
 #include "utils/Logger.h"
 
 
-ListeningRoomItem::ListeningRoomItem( SourcesModel* mdl,
+PartyItem::PartyItem( SourcesModel* mdl,
                                       SourceTreeItem* parent,
-                                      const Tomahawk::listeningroom_ptr& lr,
+                                      const Tomahawk::party_ptr& lr,
                                       int index )
-    : SourceTreeItem( mdl, parent, SourcesModel::ListeningRoom, index )
-    , m_listeningroom( lr )
+    : SourceTreeItem( mdl, parent, SourcesModel::Party, index )
+    , m_party( lr )
 {
-    tDebug() << Q_FUNC_INFO << "le wild Listening Room item appears.";
+    tDebug() << Q_FUNC_INFO << "le wild Party item appears.";
     Q_ASSERT( lr );
 
-    m_icon = QIcon( RESPATH "images/listeningroom.png" );
+    m_icon = QIcon( RESPATH "images/party.png" );
 
     connect( lr.data(), SIGNAL( changed() ), SLOT( onUpdated() ), Qt::QueuedConnection );
 
-    if ( ViewManager::instance()->pageForListeningRoom( lr ) )
-        model()->linkSourceItemToPage( this, ViewManager::instance()->pageForListeningRoom( lr ) );
+    if ( ViewManager::instance()->pageForParty( lr ) )
+        model()->linkSourceItemToPage( this, ViewManager::instance()->pageForParty( lr ) );
 }
 
 
 QString
-ListeningRoomItem::text() const
+PartyItem::text() const
 {
-    return tr( "%1 (%2)", "the name of a listening room, followed by the current host inside ()" )
-            .arg( m_listeningroom->title() )
-            .arg( m_listeningroom->author()->friendlyName() );
+    return tr( "%1 (%2)", "the name of a party, followed by the current host inside ()" )
+            .arg( m_party->title() )
+            .arg( m_party->author()->friendlyName() );
 }
 
 QString
-ListeningRoomItem::editorText() const
+PartyItem::editorText() const
 {
-    return m_listeningroom->title();
+    return m_party->title();
 }
 
 
-Tomahawk::listeningroom_ptr
-ListeningRoomItem::listeningroom() const
+Tomahawk::party_ptr
+PartyItem::party() const
 {
-    return m_listeningroom;
+    return m_party;
 }
 
 
 Qt::ItemFlags
-ListeningRoomItem::flags() const
+PartyItem::flags() const
 {
     Qt::ItemFlags flags = SourceTreeItem::flags();
     flags |= Qt::ItemIsEditable;
@@ -80,18 +80,18 @@ ListeningRoomItem::flags() const
 
 
 bool
-ListeningRoomItem::willAcceptDrag( const QMimeData* data ) const
+PartyItem::willAcceptDrag( const QMimeData* data ) const
 {
-    return !m_listeningroom.isNull() &&
-           m_listeningroom->author()->isLocal() &&
+    return !m_party.isNull() &&
+           m_party->author()->isLocal() &&
            DropJob::acceptsMimeData( data, DropJob::Track ) /*&&
-           !m_listeningroom->busy()*/;
+           !m_party->busy()*/;
     //FIXME: use busy or not!
 }
 
 
-ListeningRoomItem::DropTypes
-ListeningRoomItem::supportedDropTypes( const QMimeData* data ) const
+PartyItem::DropTypes
+PartyItem::supportedDropTypes( const QMimeData* data ) const
 {
     //same as PlaylistItem::supportedDropTypes
     if ( data->hasFormat( "application/tomahawk.mixed" ) )
@@ -139,18 +139,18 @@ ListeningRoomItem::supportedDropTypes( const QMimeData* data ) const
 
 
 bool
-ListeningRoomItem::dropMimeData( const QMimeData* data, Qt::DropAction action )
+PartyItem::dropMimeData( const QMimeData* data, Qt::DropAction action )
 {
     tDebug() << Q_FUNC_INFO;
     Q_UNUSED( action );
 
-//    if ( m_listeningroom->busy() )
+//    if ( m_party->busy() )
 //        return false;
 
     QList< Tomahawk::query_ptr > queries;
 
-    if ( data->hasFormat( "application/tomahawk.listeningroom.id" ) &&
-        data->data( "application/tomahawk.listeningroom.id" ) == m_listeningroom->guid() )
+    if ( data->hasFormat( "application/tomahawk.party.id" ) &&
+        data->data( "application/tomahawk.party.id" ) == m_party->guid() )
         return false; // don't allow dropping on ourselves
 
     if ( !DropJob::acceptsMimeData( data, DropJob::Track ) )
@@ -186,20 +186,20 @@ ListeningRoomItem::dropMimeData( const QMimeData* data, Qt::DropAction action )
 
 
 QIcon
-ListeningRoomItem::icon() const
+PartyItem::icon() const
 {
     return m_icon;
 }
 
 
 bool
-ListeningRoomItem::setData(const QVariant &v, bool role)
+PartyItem::setData(const QVariant &v, bool role)
 {
     Q_UNUSED( role );
 
-    if ( m_listeningroom->author()->isLocal() ) //if this is MY listening room
+    if ( m_party->author()->isLocal() ) //if this is MY listening party
     {
-        //FIXME: add listening room rename code
+        //FIXME: add party rename code
         return true;
     }
     return false;
@@ -207,23 +207,23 @@ ListeningRoomItem::setData(const QVariant &v, bool role)
 
 
 int
-ListeningRoomItem::peerSortValue() const
+PartyItem::peerSortValue() const
 {
     return 0;
 }
 
 
 int
-ListeningRoomItem::IDValue() const
+PartyItem::IDValue() const
 {
-    return m_listeningroom->createdOn();
+    return m_party->createdOn();
 }
 
 
 SourceTreeItem*
-ListeningRoomItem::activateCurrent()
+PartyItem::activateCurrent()
 {
-    if ( ViewManager::instance()->pageForListeningRoom( m_listeningroom ) ==
+    if ( ViewManager::instance()->pageForParty( m_party ) ==
          ViewManager::instance()->currentPage() )
     {
         model()->linkSourceItemToPage( this, ViewManager::instance()->currentPage() );
@@ -237,27 +237,27 @@ ListeningRoomItem::activateCurrent()
 
 
 void
-ListeningRoomItem::activate()
+PartyItem::activate()
 {
-    Tomahawk::ViewPage* p = ViewManager::instance()->show( m_listeningroom );
+    Tomahawk::ViewPage* p = ViewManager::instance()->show( m_party );
     model()->linkSourceItemToPage( this, p );
 }
 
 void
-ListeningRoomItem::onUpdated()
+PartyItem::onUpdated()
 {
     emit updated();
 }
 
 void
-ListeningRoomItem::parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks )
+PartyItem::parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks )
 {
     qDebug() << "adding" << tracks.count() << "tracks";
-    if ( tracks.count() && !m_listeningroom.isNull() && m_listeningroom->author()->isLocal() )
+    if ( tracks.count() && !m_party.isNull() && m_party->author()->isLocal() )
     {
-        qDebug() << "on listening room:" << m_listeningroom->title() << m_listeningroom->guid();
+        qDebug() << "on party:" << m_party->title() << m_party->guid();
 
-        m_listeningroom->addEntries( tracks );
+        m_party->addEntries( tracks );
     }
 }
 

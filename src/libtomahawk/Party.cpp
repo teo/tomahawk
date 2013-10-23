@@ -19,10 +19,10 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ListeningRoom.h"
+#include "Party.h"
 
 #include "database/Database.h"
-#include "database/DatabaseCommand_ListeningRoomInfo.h"
+#include "database/DatabaseCommand_PartyInfo.h"
 
 #include "Pipeline.h"
 #include "Source.h"
@@ -34,11 +34,11 @@
 using namespace Tomahawk;
 
 
-// ListeningRoomEntry
+// PartyEntry
 
 
 void
-ListeningRoomEntry::setQueryVariant( const QVariant& v )
+PartyEntry::setQueryVariant( const QVariant& v )
 {
     QVariantMap m = v.toMap();
 
@@ -51,22 +51,22 @@ ListeningRoomEntry::setQueryVariant( const QVariant& v )
 
 
 QVariant
-ListeningRoomEntry::queryVariant() const
+PartyEntry::queryVariant() const
 {
     return m_query->toVariant();
 }
 
 
-// ListeningRoom
+// Party
 
 
-ListeningRoom::ListeningRoom( const source_ptr& author )
+Party::Party( const source_ptr& author )
     : m_source( author )
     , m_lastmodified( 0 )
 {}
 
 
-ListeningRoom::ListeningRoom( const source_ptr& author,
+Party::Party( const source_ptr& author,
                               const QString& guid,
                               const QString& title,
                               const QString& creator,
@@ -85,12 +85,12 @@ ListeningRoom::ListeningRoom( const source_ptr& author,
 }
 
 
-ListeningRoom::~ListeningRoom()
+Party::~Party()
 {}
 
 
 void
-ListeningRoom::init()
+Party::init()
 {
     m_locallyChanged = false;
     m_deleted = false;
@@ -98,8 +98,8 @@ ListeningRoom::init()
 }
 
 
-listeningroom_ptr
-ListeningRoom::create( const source_ptr& author,
+party_ptr
+Party::create( const source_ptr& author,
                        const QString& guid,
                        const QString& title,
                        const QString& creator,
@@ -108,7 +108,7 @@ ListeningRoom::create( const source_ptr& author,
     QList< lrentry_ptr > entries;
     foreach( const Tomahawk::query_ptr& query, queries )
     {
-        lrentry_ptr p( new ListeningRoomEntry );
+        lrentry_ptr p( new PartyEntry );
         p->setGuid( uuid() );
         p->setDuration( query->track()->duration() );
         p->setLastmodified( 0 );
@@ -117,33 +117,33 @@ ListeningRoom::create( const source_ptr& author,
         entries << p;
     }
 
-    listeningroom_ptr listeningRoom( new ListeningRoom( author, guid, title, creator, entries ), &QObject::deleteLater );
-    listeningRoom->setWeakSelf( listeningRoom.toWeakRef() );
+    party_ptr party( new Party( author, guid, title, creator, entries ), &QObject::deleteLater );
+    party->setWeakSelf( party.toWeakRef() );
 
-    // Since the listening room isn't added to Source and hooked up to a model yet, we must prepare
+    // Since the listening party isn't added to Source and hooked up to a model yet, we must prepare
     // the dbcmd manually rather than calling pushUpdate().
-    DatabaseCommand_ListeningRoomInfo* cmd =
-            DatabaseCommand_ListeningRoomInfo::RoomInfo( author, listeningRoom );
-    connect( cmd, SIGNAL( finished() ), listeningRoom.data(), SIGNAL( created() ) );
+    DatabaseCommand_PartyInfo* cmd =
+            DatabaseCommand_PartyInfo::PartyInfo( author, party );
+    connect( cmd, SIGNAL( finished() ), party.data(), SIGNAL( created() ) );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
 
-    listeningRoom->reportCreated( listeningRoom );
+    party->reportCreated( party );
 
-    //This DBcmd has a postCommitHook in all peers which calls ViewManager::createListeningRoom and
+    //This DBcmd has a postCommitHook in all peers which calls ViewManager::createParty and
     //deserializes the variant to it.
 
-    return listeningRoom;
+    return party;
 }
 
 
-listeningroom_ptr
-ListeningRoom::load( const QString& guid )
+party_ptr
+Party::load( const QString& guid )
 {
-    listeningroom_ptr p;
+    party_ptr p;
 
     foreach( const Tomahawk::source_ptr& source, SourceList::instance()->sources() )
     {
-        p = source->listeningRoom( guid );
+        p = source->party( guid );
         if ( !p.isNull() )
             return p;
     }
@@ -153,18 +153,18 @@ ListeningRoom::load( const QString& guid )
 
 
 void
-ListeningRoom::remove( const listeningroom_ptr& room )
+Party::remove( const party_ptr& party )
 {
-    room->aboutToBeDeleted( room );
+    party->aboutToBeDeleted( party );
 
-    DatabaseCommand_ListeningRoomInfo* cmd =
-            DatabaseCommand_ListeningRoomInfo::DisbandRoom( room->author(), room->guid() );
+    DatabaseCommand_PartyInfo* cmd =
+            DatabaseCommand_PartyInfo::DisbandParty( party->author(), party->guid() );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
 }
 
 
 void
-ListeningRoom::updateFrom( const listeningroom_ptr& other )
+Party::updateFrom( const party_ptr& other )
 {
     Q_ASSERT( !other.isNull() );
     Q_ASSERT( other->guid() == guid() );
@@ -212,7 +212,7 @@ ListeningRoom::updateFrom( const listeningroom_ptr& other )
 
 
 QVariantList
-ListeningRoom::entriesV() const
+Party::entriesV() const
 {
     QVariantList v;
     foreach ( const Tomahawk::lrentry_ptr &e, m_entries )
@@ -224,12 +224,12 @@ ListeningRoom::entriesV() const
 
 
 void
-ListeningRoom::setEntriesV( const QVariantList& l )
+Party::setEntriesV( const QVariantList& l )
 {
     m_entries.clear();
     foreach ( const QVariant& e, l )
     {
-        ListeningRoomEntry* lre = new ListeningRoomEntry;
+        PartyEntry* lre = new PartyEntry;
         QJson::QObjectHelper::qvariant2qobject( e.toMap(), lre );
 
         if ( lre->isValid() )
@@ -239,7 +239,7 @@ ListeningRoom::setEntriesV( const QVariantList& l )
 
 
 void
-ListeningRoom::setListenerIdsV( const QVariantList& v )
+Party::setListenerIdsV( const QVariantList& v )
 {
     m_listenerIds.clear();
     foreach ( const QVariant &e, v )
@@ -255,7 +255,7 @@ ListeningRoom::setListenerIdsV( const QVariantList& v )
 
 
 QVariantList
-ListeningRoom::listenerIdsV() const
+Party::listenerIdsV() const
 {
     QVariantList v;
     foreach ( const QString &e, m_listenerIds )
@@ -267,7 +267,7 @@ ListeningRoom::listenerIdsV() const
 
 
 void
-ListeningRoom::setTitle( const QString& title )
+Party::setTitle( const QString& title )
 {
     if ( title == m_title )
         return;
@@ -280,24 +280,24 @@ ListeningRoom::setTitle( const QString& title )
 
 
 void
-ListeningRoom::reportCreated( const listeningroom_ptr& self )
+Party::reportCreated( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
-    m_source->addListeningRoom( self ); //or not add if the guid is the same!
+    m_source->addParty( self ); //or not add if the guid is the same!
 }
 
 
 void
-ListeningRoom::reportDeleted( const listeningroom_ptr& self )
+Party::reportDeleted( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
-    m_source->removeListeningRoom( self );
+    m_source->removeParty( self );
     emit deleted( self );
 }
 
 
 void
-ListeningRoom::onDeleteResult( SourceTreePopupDialog* dialog )
+Party::onDeleteResult( SourceTreePopupDialog* dialog )
 {
     dialog->deleteLater();
 
@@ -306,7 +306,7 @@ ListeningRoom::onDeleteResult( SourceTreePopupDialog* dialog )
 
 
 void
-ListeningRoom::resolve()
+Party::resolve()
 {
     QList< query_ptr > qlist;
     foreach( const lrentry_ptr& p, m_entries )
@@ -319,14 +319,14 @@ ListeningRoom::resolve()
 
 
 void
-ListeningRoom::onResultsChanged()
+Party::onResultsChanged()
 {
     m_locallyChanged = true;
 }
 
 
 void
-ListeningRoom::onResolvingFinished()
+Party::onResolvingFinished()
 {
     if ( m_locallyChanged && !m_deleted )
     {
@@ -337,7 +337,7 @@ ListeningRoom::onResolvingFinished()
 
 
 void
-ListeningRoom::insertEntry( const query_ptr& query, int position )
+Party::insertEntry( const query_ptr& query, int position )
 {
     QList< query_ptr > queries;
     queries << query;
@@ -347,7 +347,7 @@ ListeningRoom::insertEntry( const query_ptr& query, int position )
 
 
 void
-ListeningRoom::addEntries( const QList< query_ptr >& queries )
+Party::addEntries( const QList< query_ptr >& queries )
 {
     Q_ASSERT( m_source->isLocal() );
     QList< lrentry_ptr > el = entriesFromQueries( queries, true /*only return entries for these new queries*/ );
@@ -360,14 +360,14 @@ ListeningRoom::addEntries( const QList< query_ptr >& queries )
     pushUpdate();
 
     //We are appending at end, so notify listeners.
-    qDebug() << "ListeningRoom got" << queries.size() << "tracks added, emitting tracksInserted with:" << el.size() << "at pos:" << prevSize - 1;
+    qDebug() << "Party got" << queries.size() << "tracks added, emitting tracksInserted with:" << el.size() << "at pos:" << prevSize - 1;
 
     emit tracksInserted( el, prevSize );
 }
 
 
 void
-ListeningRoom::insertEntries( const QList< query_ptr >& queries,
+Party::insertEntries( const QList< query_ptr >& queries,
                               const int position )
 {
     QList< lrentry_ptr > toInsert = entriesFromQueries( queries, true );
@@ -386,13 +386,13 @@ ListeningRoom::insertEntries( const QList< query_ptr >& queries,
     pushUpdate();
 
     //Notify listeners.
-    qDebug() << "ListeningRoom got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
+    qDebug() << "Party got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
     emit tracksInserted( toInsert, position );
 }
 
 
 void
-ListeningRoom::moveEntries( const QList<lrentry_ptr>& entries, int position )
+Party::moveEntries( const QList<lrentry_ptr>& entries, int position )
 {
     QList< lrentry_ptr > buffer;
     foreach ( const lrentry_ptr& e, entries )
@@ -412,7 +412,7 @@ ListeningRoom::moveEntries( const QList<lrentry_ptr>& entries, int position )
 }
 
 
-void ListeningRoom::removeEntries( const QList< lrentry_ptr >& entries )
+void Party::removeEntries( const QList< lrentry_ptr >& entries )
 {
     foreach ( const lrentry_ptr& e, entries )
     {
@@ -423,7 +423,7 @@ void ListeningRoom::removeEntries( const QList< lrentry_ptr >& entries )
 
 
 void
-ListeningRoom::addListener( const Tomahawk::source_ptr& listener )
+Party::addListener( const Tomahawk::source_ptr& listener )
 {
     QString listenerId = listener->nodeId();
     if ( m_listenerIds.contains( listenerId ) )
@@ -441,7 +441,7 @@ ListeningRoom::addListener( const Tomahawk::source_ptr& listener )
 
 
 void
-ListeningRoom::removeListener( const Tomahawk::source_ptr& listener )
+Party::removeListener( const Tomahawk::source_ptr& listener )
 {
     QString listenerId = listener->nodeId();
     m_listenerIds.removeAll( listenerId );
@@ -455,7 +455,7 @@ ListeningRoom::removeListener( const Tomahawk::source_ptr& listener )
 
 
 void
-ListeningRoom::onListenerOffline()
+Party::onListenerOffline()
 {
     Source* s = qobject_cast< Source* >( sender() );
     if ( s )
@@ -468,22 +468,22 @@ ListeningRoom::onListenerOffline()
 
 
 void
-ListeningRoom::pushUpdate()
+Party::pushUpdate()
 {
-    Tomahawk::listeningroom_ptr thisRoom =
-            SourceList::instance()->getLocal()->listeningRoom( guid() );
+    Tomahawk::party_ptr thisParty =
+            SourceList::instance()->getLocal()->party( guid() );
 
-    if ( !thisRoom.isNull() && SourceList::instance()->getLocal() == author() ) //only the DJ can push updates!
+    if ( !thisParty.isNull() && SourceList::instance()->getLocal() == author() ) //only the DJ can push updates!
     {
-        DatabaseCommand_ListeningRoomInfo* cmd =
-                DatabaseCommand_ListeningRoomInfo::RoomInfo( author(), thisRoom );
+        DatabaseCommand_PartyInfo* cmd =
+                DatabaseCommand_PartyInfo::PartyInfo( author(), thisParty );
         Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
     }
 }
 
 
 QList< lrentry_ptr >
-ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, bool clearFirst )
+Party::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, bool clearFirst )
 {
     QList< lrentry_ptr > el;
     if ( !clearFirst )
@@ -491,7 +491,7 @@ ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, 
 
     foreach( const query_ptr& query, queries )
     {
-        lrentry_ptr e( new ListeningRoomEntry() );
+        lrentry_ptr e( new PartyEntry() );
         e->setGuid( uuid() );
         e->setDuration( query->queryTrack()->duration() );
         e->setLastmodified( 0 );
@@ -505,7 +505,7 @@ ListeningRoom::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, 
 
 
 Tomahawk::playlistinterface_ptr
-ListeningRoom::playlistInterface()
+Party::playlistInterface()
 {
     if ( m_playlistInterface.isNull() )
     {

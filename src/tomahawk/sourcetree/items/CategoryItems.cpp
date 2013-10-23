@@ -35,7 +35,7 @@
 #include "widgets/NewPlaylistWidget.h"
 #include "utils/ImageRegistry.h"
 #include "utils/Logger.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 
 
 using namespace Tomahawk;
@@ -67,8 +67,8 @@ CategoryAddItem::text() const
         case SourcesModel::StationsCategory:
             return tr( "Create new Station" );
 
-        case SourcesModel::ListeningRoomsCategory:
-            return tr( "Start new Listening Room" );
+        case SourcesModel::PartiesCategory:
+            return tr( "Start new Party" );
     }
 
     return QString();
@@ -88,8 +88,8 @@ CategoryAddItem::activate()
             APP->mainWindow()->createStation();
             break;
 
-        case SourcesModel::ListeningRoomsCategory:
-            APP->mainWindow()->createListeningRoom();
+        case SourcesModel::PartiesCategory:
+            APP->mainWindow()->createParty();
             break;
     }
 }
@@ -103,7 +103,7 @@ CategoryAddItem::flags() const
         switch ( m_categoryType )
         {
             case SourcesModel::PlaylistsCategory:
-            case SourcesModel::ListeningRoomsCategory:
+            case SourcesModel::PartiesCategory:
                 return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled;
 
             case SourcesModel::StationsCategory:
@@ -133,7 +133,7 @@ CategoryAddItem::willAcceptDrag( const QMimeData* data ) const
 {
     if ( ( m_categoryType == SourcesModel::PlaylistsCategory ||
            m_categoryType == SourcesModel::StationsCategory ||
-           m_categoryType == SourcesModel::ListeningRoomsCategory ) && DropJob::acceptsMimeData( data ) )
+           m_categoryType == SourcesModel::PartiesCategory ) && DropJob::acceptsMimeData( data ) )
     {
         return true;
     }
@@ -328,11 +328,11 @@ CategoryAddItem::parsedDroppedTracks( const QList< query_ptr >& tracks )
         ViewManager::instance()->show( newpl );
         connect( newpl.data(), SIGNAL( dynamicRevisionLoaded( Tomahawk::DynamicPlaylistRevision ) ), this, SLOT( playlistToRenameLoaded() ) );
     }
-    else if ( m_categoryType == SourcesModel::ListeningRoomsCategory )
+    else if ( m_categoryType == SourcesModel::PartiesCategory )
     {
-        listeningroom_ptr newlr = ListeningRoom::create( SourceList::instance()->getLocal(),
+        party_ptr newlr = Party::create( SourceList::instance()->getLocal(),
                                                          uuid(),
-                                                         "New Room",
+                                                         "New Party",
                                                          SourceList::instance()->getLocal()->friendlyName(),
                                                          tracks );
         ViewManager::instance()->show( newlr );
@@ -423,8 +423,8 @@ CategoryItem::text() const
         return tr( "Playlists" );
     case SourcesModel::StationsCategory:
         return tr( "Stations" );
-    case SourcesModel::ListeningRoomsCategory:
-        return tr( "Listening Rooms" );
+    case SourcesModel::PartiesCategory:
+        return tr( "Parties" );
     }
     return QString();
 }

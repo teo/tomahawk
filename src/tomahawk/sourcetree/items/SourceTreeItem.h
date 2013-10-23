@@ -113,6 +113,6 @@ private:
 };
 
 Q_DECLARE_METATYPE( SourceTreeItem* );
-Q_DECLARE_OPERATORS_FOR_FLAGS(SourceTreeItem::DropTypes) //for PlaylistItem and ListeningRoomItem
+Q_DECLARE_OPERATORS_FOR_FLAGS(SourceTreeItem::DropTypes) //for PlaylistItem and PartyItem
 
 #endif // SOURCETREEITEM_H

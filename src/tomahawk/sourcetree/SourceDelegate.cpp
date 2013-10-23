@@ -27,7 +27,7 @@
 #include "items/PlaylistItems.h"
 #include "items/CategoryItems.h"
 #include "items/TemporaryPageItem.h"
-#include "items/ListeningRoomItem.h"
+#include "items/PartyItem.h"
 #include "items/ScriptCollectionItem.h"
 #include "items/InboxItem.h"
 
@@ -181,7 +181,7 @@ SourceDelegate::paintDecorations( QPainter* painter, const QStyleOptionViewItem&
                             type == SourcesModel::TemporaryPage ||
                             type == SourcesModel::LovedTracksPage ||
                             type == SourcesModel::GenericPage ||
-                            type == SourcesModel::ListeningRoom );
+                            type == SourcesModel::Party );
     const bool playing = ( AudioEngine::instance()->isPlaying() || AudioEngine::instance()->isPaused() );
 
     if ( playable && playing && item->isBeingPlayed() )
@@ -798,7 +798,7 @@ SourceDelegate::updateEditorGeometry( QWidget* editor, const QStyleOptionViewIte
         editor->setGeometry( newGeometry );
     }
     else if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() ==
-              SourcesModel::ListeningRoom )
+              SourcesModel::Party )
         editor->setGeometry( option.rect.adjusted( 16 /*icon! hardcoded!*/, 0, 0, 0 ) ); //TODO: make smarter
     else
         QStyledItemDelegate::updateEditorGeometry( editor, option, index );
@@ -1008,12 +1008,12 @@ SourceDelegate::hoveredDropType() const
 void
 SourceDelegate::setEditorData( QWidget* editor, const QModelIndex& index ) const
 {
-    //We need to special-case the initial editor text for Listening Rooms because an item shows not
-    //only the room's title but also other non-editable data such as the name of the owner (i.e. the
-    //name of the source the room is hosted by).
-    if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::ListeningRoom )
+    //We need to special-case the initial editor text for Parties because an item shows not
+    //only the party's title but also other non-editable data such as the name of the owner (i.e. the
+    //name of the source the party is hosted by).
+    if ( index.data( SourcesModel::SourceTreeItemTypeRole ).toInt() == SourcesModel::Party )
     {
-        ListeningRoomItem* lrItem = qobject_cast< ListeningRoomItem* >( index.data( SourcesModel::SourceTreeItemRole ).value< SourceTreeItem* >() );
+        PartyItem* lrItem = qobject_cast< PartyItem* >( index.data( SourcesModel::SourceTreeItemRole ).value< SourceTreeItem* >() );
         QLineEdit* textEditor = qobject_cast< QLineEdit* >( editor );
         if ( textEditor )
             textEditor->setText( lrItem->editorText() );

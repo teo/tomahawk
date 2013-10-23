@@ -16,23 +16,23 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LISTENINGROOMITEM_H
-#define LISTENINGROOMITEM_H
+#ifndef PARTYITEM_H
+#define PARTYITEM_H
 
 #include "SourceTreeItem.h"
 
-class ListeningRoomItem : public SourceTreeItem
+class PartyItem : public SourceTreeItem
 {
     Q_OBJECT
 public:
-    explicit ListeningRoomItem( SourcesModel* mdl,
+    explicit PartyItem( SourcesModel* mdl,
                                 SourceTreeItem* parent,
-                                const Tomahawk::listeningroom_ptr& lr,
+                                const Tomahawk::party_ptr& lr,
                                 int index = -1 );
 
     QString text() const;
     virtual QString editorText() const;
-    virtual Tomahawk::listeningroom_ptr listeningroom() const;
+    virtual Tomahawk::party_ptr party() const;
     Qt::ItemFlags flags() const;
     bool willAcceptDrag( const QMimeData* data ) const;
     DropTypes supportedDropTypes( const QMimeData* data ) const;
@@ -54,7 +54,7 @@ private slots:
 
 private:
     QIcon m_icon;
-    Tomahawk::listeningroom_ptr m_listeningroom;
+    Tomahawk::party_ptr m_party;
 };
 
-#endif // LISTENINGROOMITEM_H
+#endif // PARTYITEM_H

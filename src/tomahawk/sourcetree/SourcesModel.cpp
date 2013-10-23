@@ -27,7 +27,7 @@
 #include "sourcetree/items/GroupItem.h"
 #include "sourcetree/items/GenericPageItems.h"
 #include "sourcetree/items/HistoryItem.h"
-#include "sourcetree/items/ListeningRoomsCategoryItem.h"
+#include "sourcetree/items/PartiesCategoryItem.h"
 #include "sourcetree/items/LovedTracksItem.h"
 #include "sourcetree/items/InboxItem.h"
 #include "SourceList.h"
@@ -329,7 +329,7 @@ SourcesModel::appendGroups()
                                                 boost::bind( &ViewManager::recentPlaysWidget, ViewManager::instance() ) );
     recent->setSortValue( 7 );
 
-    m_roomsGroup = new ListeningRoomsCategoryItem( this, m_rootItem, 8 );
+    m_partiesGroup = new PartiesCategoryItem( this, m_rootItem, 8 );
 
     m_collectionsGroup = new GroupItem( this, m_rootItem, tr( "Friends" ), 9 );
     m_cloudGroup = new GroupItem( this, m_rootItem, tr( "Cloud" ), 10 );
@@ -785,5 +785,5 @@ SourcesModel::sourcesWithViewPage() const
 
 void SourcesModel::performDefaultExpandForTopLevelItems()
 {
-    m_roomsGroup->checkExpandedState();
+    m_partiesGroup->checkExpandedState();
 }

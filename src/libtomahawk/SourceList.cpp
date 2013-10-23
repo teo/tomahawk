@@ -27,7 +27,7 @@
 #include "infosystem/InfoSystemCache.h"
 #include "resolvers/ExternalResolver.h"
 #include "resolvers/ScriptCollection.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 
 #include "utils/Logger.h"
 
@@ -241,12 +241,12 @@ SourceList::createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVaria
 
 
 void
-SourceList::createListeningRoom( const Tomahawk::source_ptr& src, const QVariant& contents )
+SourceList::createParty( const Tomahawk::source_ptr& src, const QVariant& contents )
 {
-    Tomahawk::listeningroom_ptr p = Tomahawk::listeningroom_ptr( new Tomahawk::ListeningRoom( src ) );
+    Tomahawk::party_ptr p = Tomahawk::party_ptr( new Tomahawk::Party( src ) );
     QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
     p->reportCreated( p );
-    tDebug() << Q_FUNC_INFO << "room created";
+    tDebug() << Q_FUNC_INFO << "party created";
 }
 
 void

@@ -89,11 +89,11 @@ public:
     void addCollection( const Tomahawk::collection_ptr& c );
     void removeCollection( const Tomahawk::collection_ptr& c );
 
-    Tomahawk::listeningroom_ptr listeningRoom() const;
-    Tomahawk::listeningroom_ptr listeningRoom( const QString& guid ) const;
-    bool hasListeningRooms() const;
-    void addListeningRoom( const Tomahawk::listeningroom_ptr& p );
-    void removeListeningRoom( const Tomahawk::listeningroom_ptr& p );
+    Tomahawk::party_ptr party() const;
+    Tomahawk::party_ptr party( const QString& guid ) const;
+    bool hasParties() const;
+    void addParty( const Tomahawk::party_ptr& p );
+    void removeParty( const Tomahawk::party_ptr& p );
 
     int id() const;
     ControlConnection* controlConnection() const;
@@ -124,8 +124,8 @@ signals:
     void collectionAdded( const Tomahawk::collection_ptr& collection );
     void collectionRemoved( const Tomahawk::collection_ptr& collection );
 
-    void listeningRoomAdded( const Tomahawk::listeningroom_ptr& );
-    void listeningRoomRemoved( const Tomahawk::listeningroom_ptr& );
+    void partyAdded( const Tomahawk::party_ptr& );
+    void partyRemoved( const Tomahawk::party_ptr& );
 
     void stats( const QVariantMap& );
 

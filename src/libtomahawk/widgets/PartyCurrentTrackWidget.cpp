@@ -16,10 +16,10 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ListeningRoomCurrentTrackWidget.h"
+#include "PartyCurrentTrackWidget.h"
 
 #include "ElidedLabel.h"
-#include "ListeningRoomModel.h"
+#include "PartyModel.h"
 #include "playlist/PlayableItem.h"
 #include "Album.h"
 #include "Artist.h"
@@ -31,7 +31,7 @@
 #include <QtGui/QBoxLayout>
 
 
-ListeningRoomCurrentTrackWidget::ListeningRoomCurrentTrackWidget( QWidget* parent )
+PartyCurrentTrackWidget::PartyCurrentTrackWidget( QWidget* parent )
     : QWidget( parent )
 {
     QHBoxLayout* mainLayout = new QHBoxLayout;
@@ -89,10 +89,10 @@ ListeningRoomCurrentTrackWidget::ListeningRoomCurrentTrackWidget( QWidget* paren
 
 
 void
-ListeningRoomCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
+PartyCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
 {
     int row = idx.row();
-    const ListeningRoomModel* model = qobject_cast< const ListeningRoomModel* >( idx.model() );
+    const PartyModel* model = qobject_cast< const PartyModel* >( idx.model() );
 
 
     PlayableItem* item = model->itemFromIndex( idx );

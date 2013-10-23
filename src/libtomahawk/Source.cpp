@@ -23,7 +23,7 @@
 #include "collection/Collection.h"
 #include "SourceList.h"
 #include "SourcePlaylistInterface.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 
 #include "accounts/AccountManager.h"
 #include "network/ControlConnection.h"
@@ -393,55 +393,55 @@ Source::removeCollection( const collection_ptr& c )
 }
 
 
-listeningroom_ptr
-Source::listeningRoom() const
+party_ptr
+Source::party() const
 {
     Q_D( const Source );
-    //TODO: remove this, just testing if a source never has more than one room
-    Q_ASSERT( d->listeningRooms.count() < 2 );
+    //TODO: remove this, just testing if a source never has more than one party
+    Q_ASSERT( d->partys.count() < 2 );
 
-    return d->listeningRooms.values().first();
+    return d->partys.values().first();
 }
 
 
-listeningroom_ptr
-Source::listeningRoom( const QString& guid ) const
+party_ptr
+Source::party( const QString& guid ) const
 {
     Q_D( const Source );
-    return d->listeningRooms.value( guid, Tomahawk::listeningroom_ptr() );
+    return d->partys.value( guid, Tomahawk::party_ptr() );
 }
 
 
 bool
-Source::hasListeningRooms() const
+Source::hasParties() const
 {
     Q_D( const Source );
-     return !d->listeningRooms.isEmpty();
+     return !d->partys.isEmpty();
 }
 
 void
-Source::addListeningRoom( const listeningroom_ptr& p )
+Source::addParty( const party_ptr& p )
 {
     Q_D( Source );
-    if( d->listeningRooms.contains( p->guid() ) )
+    if( d->partys.contains( p->guid() ) )
     {
-        if ( !d->listeningRooms[ p->guid() ]->author()->isLocal() )
-            d->listeningRooms[ p->guid() ]->updateFrom( p );
+        if ( !d->partys[ p->guid() ]->author()->isLocal() )
+            d->partys[ p->guid() ]->updateFrom( p );
         return;
     }
 
-    d->listeningRooms.insert( p->guid(), p );
+    d->partys.insert( p->guid(), p );
 
-    emit listeningRoomAdded( p );
+    emit partyAdded( p );
 }
 
 
 void
-Source::removeListeningRoom( const listeningroom_ptr& p )
+Source::removeParty( const party_ptr& p )
 {
     Q_D( Source );
-    d->listeningRooms.remove( p->guid() );
-    emit listeningRoomRemoved( p );
+    d->partys.remove( p->guid() );
+    emit partyRemoved( p );
 }
 
 
@@ -808,9 +808,9 @@ Source::reportSocialAttributesChanged( DatabaseCommand_SocialAction* action )
         {
             if ( to->isLocal() ) //somebody just latched onto me!
             {
-                if ( to->hasListeningRooms() )
+                if ( to->hasParties() )
                 {
-                    to->listeningRoom()->addListener( SourceList::instance()->get( d->id ) );
+                    to->party()->addListener( SourceList::instance()->get( d->id ) );
                 }
             }
 
@@ -824,9 +824,9 @@ Source::reportSocialAttributesChanged( DatabaseCommand_SocialAction* action )
         {
             if ( from->isLocal() ) //somebody just latched off from me!
             {
-                if ( from->hasListeningRooms() )
+                if ( from->hasParties() )
                 {
-                    from->listeningRoom()->removeListener( SourceList::instance()->get( d->id ) );
+                    from->party()->removeListener( SourceList::instance()->get( d->id ) );
                 }
             }
 

@@ -34,7 +34,7 @@ class QMimeData;
 
 class SourceTreeItem;
 class GroupItem;
-class ListeningRoomsCategoryItem;
+class PartiesCategoryItem;
 
 namespace Tomahawk {
     class Source;
@@ -68,13 +68,13 @@ public:
         ScriptCollection = 11,
         Inbox = 12,
 
-        ListeningRoom = 13
+        Party = 13
     };
 
     enum CategoryType {
         PlaylistsCategory = 0,
         StationsCategory = 1,
-        ListeningRoomsCategory = 2
+        PartiesCategory = 2
     };
 
     enum Roles {
@@ -167,7 +167,7 @@ private:
     GroupItem* m_browse;
     GroupItem* m_collectionsGroup;
     GroupItem* m_myMusicGroup;
-    ListeningRoomsCategoryItem* m_roomsGroup;
+    PartiesCategoryItem* m_partiesGroup;
     GroupItem* m_cloudGroup;
 
     QList< Tomahawk::source_ptr > m_sourcesWithViewPage;

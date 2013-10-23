@@ -16,8 +16,8 @@
  *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LISTENINGROOMHEADER_H
-#define LISTENINGROOMHEADER_H
+#ifndef PARTYHEADER_H
+#define PARTYHEADER_H
 
 #include "BasicHeader.h"
 
@@ -25,11 +25,11 @@
 
 #include <QtCore/QHash>
 
-class ListeningRoomWidget;
+class PartyWidget;
 class QBoxLayout;
 class QPushButton;
 
-class ListeningRoomHeader : public BasicHeader
+class PartyHeader : public BasicHeader
 {
     Q_OBJECT
 public:
@@ -40,15 +40,15 @@ public:
         Disband
     };
 
-    explicit ListeningRoomHeader( ListeningRoomWidget* parent );
-    virtual ~ListeningRoomHeader();
+    explicit PartyHeader( PartyWidget* parent );
+    virtual ~PartyHeader();
 
 public slots:
     void setListeners( const QStringList& listenerDbids );
     void setButtonState( ButtonState state );
 
 signals:
-    void joinLeaveButtonClicked( ListeningRoomHeader::ButtonState );
+    void joinLeaveButtonClicked( PartyHeader::ButtonState );
 
 private  slots:
     void onJoinLeaveButtonClicked();
@@ -72,4 +72,4 @@ private:
     QPushButton* m_joinLeaveButton;
 };
 
-#endif // LISTENINGROOMHEADER_H
+#endif // PARTYHEADER_H

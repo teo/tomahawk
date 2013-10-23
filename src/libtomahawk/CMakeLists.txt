@@ -162,9 +162,9 @@ set( libGuiSources
     widgets/SearchWidget.cpp
     widgets/SeekSlider.cpp
     widgets/SourceTreePopupDialog.cpp
-    widgets/ListeningRoomWidget.cpp
-    widgets/ListeningRoomHeader.cpp
-    widgets/ListeningRoomCurrentTrackWidget.cpp
+    widgets/PartyWidget.cpp
+    widgets/PartyHeader.cpp
+    widgets/PartyCurrentTrackWidget.cpp
     widgets/StatsGauge.cpp
     widgets/ToggleButton.cpp
     widgets/WhatsHotWidget.cpp
@@ -201,8 +201,8 @@ list(APPEND libSources
     AlbumPlaylistInterface.cpp
     CountryUtils.cpp
     FuncTimeout.cpp
-    ListeningRoom.cpp
-    ListeningRoomModel.cpp
+    Party.cpp
+    PartyModel.cpp
     Playlist.cpp
     PlaylistEntry.cpp
     PlaylistPlaylistInterface.cpp
@@ -296,7 +296,7 @@ list(APPEND libSources
     database/DatabaseCommand_SetDynamicPlaylistRevision.cpp
     database/DatabaseCommand_SetPlaylistRevision.cpp
     database/DatabaseCommand_SetTrackAttributes.cpp
-    database/DatabaseCommand_ListeningRoomInfo.cpp
+    database/DatabaseCommand_PartyInfo.cpp
     database/DatabaseCommand_ShareTrack.cpp
     database/DatabaseCommand_SocialAction.cpp
     database/DatabaseCommand_SourceOffline.cpp

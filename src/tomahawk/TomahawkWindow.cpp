@@ -65,7 +65,7 @@
 #include "filemetadata/ScanManager.h"
 
 #include "Playlist.h"
-#include "ListeningRoom.h"
+#include "Party.h"
 #include "Query.h"
 #include "Artist.h"
 #include "ViewManager.h"
@@ -1132,17 +1132,17 @@ TomahawkWindow::createPlaylist()
 
 
 void
-TomahawkWindow::createListeningRoom()
+TomahawkWindow::createParty()
 {
     QString creator = SourceList::instance()->getLocal()->nodeId();
-    QString roomName = tr( "%1's room" ).arg( creator );
+    QString partyName = tr( "%1's party" ).arg( creator );
     QString guid = uuid();
 
-    listeningroom_ptr listeningRoom = Tomahawk::ListeningRoom::create( SourceList::instance()->getLocal(),
+    party_ptr party = Tomahawk::Party::create( SourceList::instance()->getLocal(),
                                                                        uuid(),
-                                                                       roomName,
+                                                                       partyName,
                                                                        creator );
-    ViewManager::instance()->show( listeningRoom );
+    ViewManager::instance()->show( party );
 }
 
 
