@@ -297,7 +297,6 @@ list(APPEND libSources
     database/DatabaseCommand_SetPlaylistRevision.cpp
     database/DatabaseCommand_SetTrackAttributes.cpp
     database/DatabaseCommand_ListeningRoomInfo.cpp
-    database/DatabaseCommand_RenameListeningRoom.cpp
     database/DatabaseCommand_ShareTrack.cpp
     database/DatabaseCommand_SocialAction.cpp
     database/DatabaseCommand_SourceOffline.cpp

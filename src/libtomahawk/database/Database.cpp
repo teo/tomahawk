@@ -42,7 +42,6 @@
 #include "DatabaseCommand_SetCollectionAttributes.h"
 #include "DatabaseCommand_SetTrackAttributes.h"
 #include "DatabaseCommand_ListeningRoomInfo.h"
-#include "DatabaseCommand_RenameListeningRoom.h"
 
 // Forward Declarations breaking QSharedPointer
 #if QT_VERSION < QT_VERSION_CHECK( 5, 0, 0 )
@@ -112,7 +111,6 @@ Database::Database( const QString& dbname, QObject* parent )
     registerCommand<DatabaseCommand_SetTrackAttributes>();
     registerCommand<DatabaseCommand_ShareTrack>();
     registerCommand<DatabaseCommand_ListeningRoomInfo>();
-    registerCommand<DatabaseCommand_RenameListeningRoom>();
 
     if ( MAX_WORKER_THREADS < DEFAULT_WORKER_THREADS )
         m_maxConcurrentThreads = MAX_WORKER_THREADS;

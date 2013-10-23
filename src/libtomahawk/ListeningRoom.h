@@ -116,7 +116,6 @@ public:
                                                const QList<query_ptr>& queries = QList< Tomahawk::query_ptr >() );
 
     static void remove( const listeningroom_ptr& room );
-    void rename( const QString& title );
 
     void updateFrom( const Tomahawk::listeningroom_ptr& other );
 

@@ -23,7 +23,6 @@
 
 #include "database/Database.h"
 #include "database/DatabaseCommand_ListeningRoomInfo.h"
-#include "database/DatabaseCommand_RenameListeningRoom.h"
 
 #include "Pipeline.h"
 #include "Source.h"
@@ -161,18 +160,6 @@ ListeningRoom::remove( const listeningroom_ptr& room )
     DatabaseCommand_ListeningRoomInfo* cmd =
             DatabaseCommand_ListeningRoomInfo::DisbandRoom( room->author(), room->guid() );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
-}
-
-
-void
-ListeningRoom::rename( const QString& title )
-{
-    if ( title != m_title )
-    {
-        DatabaseCommand_RenameListeningRoom* cmd =
-                new DatabaseCommand_RenameListeningRoom( author(), guid(), title );
-        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
-    }
 }
 
 

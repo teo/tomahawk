@@ -199,7 +199,7 @@ ListeningRoomItem::setData(const QVariant &v, bool role)
 
     if ( m_listeningroom->author()->isLocal() ) //if this is MY listening room
     {
-        m_listeningroom->rename( v.toString() );
+        //FIXME: add listening room rename code
         return true;
     }
     return false;
