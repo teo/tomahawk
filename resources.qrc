@@ -136,7 +136,6 @@
         <file>data/images/account-none.svg</file>
         <file>data/images/green-dot.svg</file>
         <file>data/images/exfm.png</file>
-        <file>data/images/listeningroom.png</file>
         <file>data/images/soundcloud.svg</file>
         <file>data/images/resolver-default.svg</file>
         <file>data/images/spotify-sourceicon.svg</file>
@@ -169,5 +168,6 @@
         <file>data/www/css/font-awesome.css</file>
         <file>data/www/css/style.css</file>
         <file>data/www/js/html5shim.js</file>
+        <file>data/images/party.png</file>
     </qresource>
 </RCC>
