@@ -169,7 +169,7 @@ PartyWidget::pixmap() const
 
 
 void
-PartyWidget::setModel( PartyModel* model )
+PartyWidget::setModel( PlaylistModel* model )
 {
     Q_ASSERT( !m_model ); //TODO: does it ever happen that m_model is already assigned?
     if ( m_model )

@@ -118,7 +118,7 @@ PartiesCategoryItem::onPartyAdded( const Tomahawk::party_ptr& p )
         connect( p.data(), SIGNAL( deleted( Tomahawk::party_ptr ) ),
                  SLOT( onPartyDeleted( Tomahawk::party_ptr ) ), Qt::QueuedConnection );
 
-    tDebug() << "party added to model." << p->title();
+    tDebug() << "party added to model." << p->playlist()->title();
     onPartyCountChanged();
 }
 

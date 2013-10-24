@@ -1,7 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
- *   Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2012-2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -39,18 +39,18 @@ DatabaseCommand_PartyInfo::DatabaseCommand_PartyInfo( QObject* parent )
 
 /*private*/
 DatabaseCommand_PartyInfo::DatabaseCommand_PartyInfo( Action action,
-                                                                      const source_ptr& author )
+                                                      const source_ptr& author )
     : DatabaseCommandLoggable( author )
     , m_action( action )
 {}
 
 
 DatabaseCommand_PartyInfo*
-DatabaseCommand_PartyInfo::PartyInfo( const source_ptr& author,
-                                             const party_ptr& party )
+DatabaseCommand_PartyInfo::broadcastParty( const source_ptr& author,
+                                           const party_ptr& party )
 {
     DatabaseCommand_PartyInfo* cmd =
-            new DatabaseCommand_PartyInfo( Info, author );
+            new DatabaseCommand_PartyInfo( Broadcast, author );
     cmd->m_party = party;
     cmd->m_guid = party->guid();
 
@@ -58,8 +58,8 @@ DatabaseCommand_PartyInfo::PartyInfo( const source_ptr& author,
 }
 
 DatabaseCommand_PartyInfo*
-DatabaseCommand_PartyInfo::DisbandParty( const Tomahawk::source_ptr& author,
-                                                const QString& partyGuid )
+DatabaseCommand_PartyInfo::disbandParty( const Tomahawk::source_ptr& author,
+                                         const QString& partyGuid )
 {
     DatabaseCommand_PartyInfo* cmd =
             new DatabaseCommand_PartyInfo( Disband, author );
@@ -74,7 +74,7 @@ DatabaseCommand_PartyInfo::exec( DatabaseImpl* lib )
 {
     Q_UNUSED( lib );
     Q_ASSERT( !source().isNull() );
-    if ( m_action == Info )
+    if ( m_action == Broadcast )
     {
         tDebug() << Q_FUNC_INFO << "with action Info";
         Q_ASSERT( !( m_party.isNull() && m_v.isNull() ) );
@@ -97,6 +97,7 @@ DatabaseCommand_PartyInfo::exec( DatabaseImpl* lib )
     {
         tDebug() << Q_FUNC_INFO << "with action Disband";
         Q_ASSERT( !m_guid.isEmpty() );
+        //postCommitHook does all the work for Disband
     }
 }
 
@@ -104,7 +105,8 @@ DatabaseCommand_PartyInfo::exec( DatabaseImpl* lib )
 QVariant
 DatabaseCommand_PartyInfo::partyV() const
 {
-    if ( m_action == Info && m_v.isNull() ) //this is so that QVariant conversion only happens when serializing the DBcmd
+    //QVariant conversion only happens when serializing the DBcmd
+    if ( m_action == Broadcast && m_v.isNull() )
         return QJson::QObjectHelper::qobject2qvariant( (QObject*)m_party.data() );
     else
         return m_v;
@@ -121,23 +123,19 @@ DatabaseCommand_PartyInfo::postCommitHook()
         Servent::instance()->triggerDBSync();
     }
 
-
-    if ( m_action == Info )
+    if ( m_action == Broadcast )
     {
         if ( m_party.isNull() ) //if I'm not local
         {
             source_ptr src = source();
-    #ifndef ENABLE_HEADLESS
             // db commands run on separate threads, which is good!
             // But one must be careful what he does there, so to create something on the main thread,
             // you either emit a signal or do a queued invoke.
             QMetaObject::invokeMethod( SourceList::instance(),
-                                      "createParty",
+                                       "createPartyFromVariant",
                                        Qt::BlockingQueuedConnection,
                                        QGenericArgument( "Tomahawk::source_ptr", (const void*)&src ),
                                        Q_ARG( QVariant, m_v ) );
-
-    #endif
         }
         else
         {

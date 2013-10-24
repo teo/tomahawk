@@ -62,7 +62,7 @@ public:
      * and its model-view-ish contents. Ideally, LRW should access LR data through LRM rather than
      * getting a pointer to LR and talking to it directly.
      */
-    void setModel( PartyModel* model );
+    void setModel( PlaylistModel* model );
     
 protected:
     void resizeEvent( QResizeEvent* e );

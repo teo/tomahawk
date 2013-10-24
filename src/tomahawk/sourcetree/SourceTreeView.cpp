@@ -524,7 +524,7 @@ SourceTreeView::onDeletePlaylistOrPartyResult( bool result )
     {
         PartyItem* item = itemFromIndex< PartyItem >( idx );
         party_ptr party = item->party();
-        qDebug() << "Doing delete of party:" << party->title();
+        qDebug() << "Doing delete of party:" << party->playlist()->title();
         Party::remove( party );
     }
 }

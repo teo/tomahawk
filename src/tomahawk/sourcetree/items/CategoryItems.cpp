@@ -330,11 +330,7 @@ CategoryAddItem::parsedDroppedTracks( const QList< query_ptr >& tracks )
     }
     else if ( m_categoryType == SourcesModel::PartiesCategory )
     {
-        party_ptr newlr = Party::create( SourceList::instance()->getLocal(),
-                                                         uuid(),
-                                                         "New Party",
-                                                         SourceList::instance()->getLocal()->friendlyName(),
-                                                         tracks );
+        party_ptr newlr = Party::createNew( "New Party", tracks );
         ViewManager::instance()->show( newlr );
     }
 }

@@ -117,7 +117,7 @@ public:
     // linked to the sidebar. call it right after creating the playlist
     FlexibleView* createPageForPlaylist( const Tomahawk::playlist_ptr& playlist );
 
-    PartyWidget* createPageForParty( const Tomahawk::party_ptr& party );
+    /*PartyWidget**/PlaylistView* createPageForParty( const Tomahawk::party_ptr& party );
 
     FlexibleView* createPageForList( const QString& title, const QList< Tomahawk::query_ptr >& queries );
 
@@ -218,7 +218,8 @@ private:
     QHash< Tomahawk::query_ptr, QPointer<TrackInfoWidget> > m_trackViews;
     QHash< Tomahawk::playlist_ptr, QPointer<FlexibleView> > m_playlistViews;
     QHash< Tomahawk::source_ptr, QPointer<SourceInfoWidget> > m_sourceViews;
-    QHash< Tomahawk::party_ptr, QPointer<PartyWidget> > m_partyWidgets;
+    //QHash< Tomahawk::party_ptr, QPointer<PartyWidget> > m_partyWidgets;
+    QHash< Tomahawk::party_ptr, QPointer<PlaylistView> > m_partyWidgets;
 
     QList<Tomahawk::ViewPage*> m_pageHistoryBack;
     QList<Tomahawk::ViewPage*> m_pageHistoryFwd;

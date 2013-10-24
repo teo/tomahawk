@@ -3,7 +3,7 @@
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
  *   Copyright 2010-2011, Leo Franchi <lfranchi@kde.org>
  *   Copyright 2010-2012, Jeff Mitchell <jeff@tomahawk-player.org>
- *   Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2012-2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -29,56 +29,25 @@
 #include "SourceList.h"
 #include "SourcePlaylistInterface.h"
 #include "widgets/SourceTreePopupDialog.h"
+#include "utils/Logger.h"
 
 
 using namespace Tomahawk;
 
 
-// PartyEntry
-
-
-void
-PartyEntry::setQueryVariant( const QVariant& v )
-{
-    QVariantMap m = v.toMap();
-
-    QString artist = m.value( "artist" ).toString();
-    QString album = m.value( "album" ).toString();
-    QString track = m.value( "track" ).toString();
-
-    m_query = Tomahawk::Query::get( artist, track, album );
-}
-
-
-QVariant
-PartyEntry::queryVariant() const
-{
-    return m_query->toVariant();
-}
-
-
-// Party
-
-
 Party::Party( const source_ptr& author )
     : m_source( author )
-    , m_lastmodified( 0 )
 {}
 
 
 Party::Party( const source_ptr& author,
-                              const QString& guid,
-                              const QString& title,
-                              const QString& creator,
-                              const QList< Tomahawk::lrentry_ptr >& entries )
+              const QString& guid,
+              const playlist_ptr& basePlaylist )
     : QObject()
     , m_source( author )
     , m_guid( guid )
-    , m_title( title )
-    , m_creator( creator )
-    , m_lastmodified( 0 )
+    , m_playlist( basePlaylist )
     , m_createdOn( 0 ) //will be set later
-    , m_entries( entries )
     , m_currentRow( -1 )
 {
     init();
@@ -89,41 +58,25 @@ Party::~Party()
 {}
 
 
-void
-Party::init()
-{
-    m_locallyChanged = false;
-    m_deleted = false;
-    connect( Pipeline::instance(), SIGNAL( idle() ), SLOT( onResolvingFinished() ) );
-}
-
-
 party_ptr
-Party::create( const source_ptr& author,
-                       const QString& guid,
-                       const QString& title,
-                       const QString& creator,
-                       const QList< Tomahawk::query_ptr >& queries )
+Party::createFromPlaylist( const playlist_ptr& basePlaylist )
 {
-    QList< lrentry_ptr > entries;
-    foreach( const Tomahawk::query_ptr& query, queries )
+    Q_ASSERT( basePlaylist->author()->isLocal() );
+    if ( !basePlaylist->author()->isLocal() )
     {
-        lrentry_ptr p( new PartyEntry );
-        p->setGuid( uuid() );
-        p->setDuration( query->track()->duration() );
-        p->setLastmodified( 0 );
-        p->setQuery( query );
-        p->setScore( 0 );
-        entries << p;
+        tDebug() << "Error: cannot create Party from someone else's playlist.";
+        return party_ptr();
     }
 
-    party_ptr party( new Party( author, guid, title, creator, entries ), &QObject::deleteLater );
+    party_ptr party( new Party( SourceList::instance()->getLocal(),
+                                uuid(),
+                                basePlaylist ), &QObject::deleteLater );
     party->setWeakSelf( party.toWeakRef() );
 
     // Since the listening party isn't added to Source and hooked up to a model yet, we must prepare
     // the dbcmd manually rather than calling pushUpdate().
     DatabaseCommand_PartyInfo* cmd =
-            DatabaseCommand_PartyInfo::PartyInfo( author, party );
+            DatabaseCommand_PartyInfo::broadcastParty( basePlaylist->author(), party );
     connect( cmd, SIGNAL( finished() ), party.data(), SIGNAL( created() ) );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
 
@@ -133,6 +86,28 @@ Party::create( const source_ptr& author,
     //deserializes the variant to it.
 
     return party;
+}
+
+
+party_ptr Party::createNew( const QString& title, const QList<query_ptr>& queries )
+{
+    playlist_ptr basePlaylist = Playlist::create( SourceList::instance()->getLocal(),
+                                                  uuid(),
+                                                  title,
+                                                  QString(),
+                                                  SourceList::instance()->getLocal()->friendlyName(),
+                                                  true,
+                                                  queries );
+
+    return createFromPlaylist( basePlaylist );
+}
+
+
+void
+Party::init()
+{
+    m_locallyChanged = false;
+    m_deleted = false;
 }
 
 
@@ -161,7 +136,7 @@ Party::remove( const party_ptr& party )
     party->aboutToBeDeleted( party );
 
     DatabaseCommand_PartyInfo* cmd =
-            DatabaseCommand_PartyInfo::DisbandParty( party->author(), party->guid() );
+            DatabaseCommand_PartyInfo::disbandParty( party->author(), party->guid() );
     Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
 }
 
@@ -173,20 +148,6 @@ Party::updateFrom( const party_ptr& other )
     Q_ASSERT( other->guid() == guid() );
 
     bool isChanged = false;
-
-    if ( m_title != other->m_title )
-    {
-        QString oldTitle = m_title;
-        m_title = other->m_title;
-        emit renamed( m_title, oldTitle );
-        isChanged = true;
-    }
-
-    if ( m_creator != other->m_creator )
-    {
-        setCreator( other->creator() );
-        isChanged = true;
-    }
 
     if ( m_createdOn != other->m_createdOn )
     {
@@ -200,10 +161,11 @@ Party::updateFrom( const party_ptr& other )
         isChanged = true;
     }
 
-    //TODO: don't reload if not needed
-    m_entries.clear();
-    m_entries.append( other->m_entries );
-    isChanged = true;
+    if ( m_playlist->guid() != other->m_playlist->guid() )
+    {
+        setPlaylistByGuid( other->m_playlist->guid() );
+        isChanged = true;
+    }
 
     m_listenerIds.clear();
     m_listenerIds.append( other->m_listenerIds );
@@ -214,30 +176,52 @@ Party::updateFrom( const party_ptr& other )
 }
 
 
-QVariantList
-Party::entriesV() const
+source_ptr
+Party::author() const
 {
-    QVariantList v;
-    foreach ( const Tomahawk::lrentry_ptr &e, m_entries )
-    {
-        v.append( QJson::QObjectHelper::qobject2qvariant( e.data() ) );
-    }
-    return v;
+    return m_source;
+}
+
+
+QString
+Party::guid() const
+{
+    return m_guid;
+}
+
+
+uint
+Party::createdOn() const
+{
+    return m_createdOn;
+}
+
+
+int
+Party::currentRow() const
+{
+    return m_currentRow;
+}
+
+
+playlist_ptr
+Party::playlist() const
+{
+    return m_playlist;
 }
 
 
 void
-Party::setEntriesV( const QVariantList& l )
+Party::setGuid( const QString& s )
 {
-    m_entries.clear();
-    foreach ( const QVariant& e, l )
-    {
-        PartyEntry* lre = new PartyEntry;
-        QJson::QObjectHelper::qvariant2qobject( e.toMap(), lre );
+    m_guid = s;
+}
 
-        if ( lre->isValid() )
-            m_entries << lrentry_ptr( lre );
-    }
+
+void
+Party::setCreatedOn( uint createdOn )
+{
+    m_createdOn = createdOn;
 }
 
 
@@ -270,15 +254,32 @@ Party::listenerIdsV() const
 
 
 void
-Party::setTitle( const QString& title )
+Party::setCurrentRow( int row )
 {
-    if ( title == m_title )
-        return;
+    m_currentRow = row;
+}
 
-    const QString oldTitle = m_title;
-    m_title = title;
-    emit changed();
-    emit renamed( m_title, oldTitle );
+
+void
+Party::setPlaylistByGuid( const QString& guid )
+{
+    m_playlist = Playlist::get( guid );
+}
+
+
+QString
+Party::playlistGuid() const
+{
+    if ( !m_playlist.isNull() )
+        return m_playlist->guid();
+    return QString();
+}
+
+
+QStringList
+Party::listenerIds() const
+{
+    return m_listenerIds;
 }
 
 
@@ -286,7 +287,8 @@ void
 Party::reportCreated( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
-    m_source->setParty( self ); //or not add if the guid is the same!
+    setWeakSelf( self.toWeakRef() );
+    m_source->setParty( self ); //or not if the guid is the same!
 }
 
 
@@ -305,123 +307,6 @@ Party::onDeleteResult( SourceTreePopupDialog* dialog )
     dialog->deleteLater();
 
     //TODO: implement!
-}
-
-
-void
-Party::resolve()
-{
-    QList< query_ptr > qlist;
-    foreach( const lrentry_ptr& p, m_entries )
-    {
-        qlist << p->query();
-    }
-
-    Pipeline::instance()->resolve( qlist );
-}
-
-
-void
-Party::onResultsChanged()
-{
-    m_locallyChanged = true;
-}
-
-
-void
-Party::onResolvingFinished()
-{
-    if ( m_locallyChanged && !m_deleted )
-    {
-        m_locallyChanged = false;
-        pushUpdate();
-    }
-}
-
-
-void
-Party::insertEntry( const query_ptr& query, int position )
-{
-    QList< query_ptr > queries;
-    queries << query;
-
-    insertEntries( queries, position );
-}
-
-
-void
-Party::addEntries( const QList< query_ptr >& queries )
-{
-    Q_ASSERT( m_source->isLocal() );
-    QList< lrentry_ptr > el = entriesFromQueries( queries, true /*only return entries for these new queries*/ );
-
-    const int prevSize = m_entries.size();
-
-    m_entries.append( el );
-    emit changed();
-
-    pushUpdate();
-
-    //We are appending at end, so notify listeners.
-    qDebug() << "Party got" << queries.size() << "tracks added, emitting tracksInserted with:" << el.size() << "at pos:" << prevSize - 1;
-
-    emit tracksInserted( el, prevSize );
-}
-
-
-void
-Party::insertEntries( const QList< query_ptr >& queries,
-                              const int position )
-{
-    QList< lrentry_ptr > toInsert = entriesFromQueries( queries, true );
-
-    Q_ASSERT( position <= m_entries.size() );
-    if ( position > m_entries.size() )
-    {
-        qWarning() << "ERROR trying to insert tracks past end of playlist! Appending!!";
-        addEntries( queries );
-        return;
-    }
-
-    for ( int i = toInsert.size()-1; i >= 0; --i )
-        m_entries.insert( position, toInsert.at( i ) );
-
-    pushUpdate();
-
-    //Notify listeners.
-    qDebug() << "Party got" << toInsert.size() << "tracks inserted, emitting tracksInserted at pos:" << position;
-    emit tracksInserted( toInsert, position );
-}
-
-
-void
-Party::moveEntries( const QList<lrentry_ptr>& entries, int position )
-{
-    QList< lrentry_ptr > buffer;
-    foreach ( const lrentry_ptr& e, entries )
-    {
-        int i = m_entries.indexOf( e );
-        if ( i < position )
-            position--;
-        m_entries.removeAt( i );
-        buffer.append( e );
-    }
-    foreach ( const lrentry_ptr& e, buffer )
-    {
-        m_entries.insert( position, e );
-        position++;
-    }
-    pushUpdate();
-}
-
-
-void Party::removeEntries( const QList< lrentry_ptr >& entries )
-{
-    foreach ( const lrentry_ptr& e, entries )
-    {
-        m_entries.removeAll( e );
-    }
-    pushUpdate();
 }
 
 
@@ -471,39 +356,24 @@ Party::onListenerOffline()
 
 
 void
-Party::pushUpdate()
+Party::setWeakSelf( QWeakPointer< Party > self )
 {
-    Tomahawk::party_ptr thisParty =
-            SourceList::instance()->getLocal()->party();
-
-    if ( !thisParty.isNull() && SourceList::instance()->getLocal() == author() ) //only the DJ can push updates!
-    {
-        DatabaseCommand_PartyInfo* cmd =
-                DatabaseCommand_PartyInfo::PartyInfo( author(), thisParty );
-        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
-    }
+    m_weakSelf = self;
 }
 
 
-QList< lrentry_ptr >
-Party::entriesFromQueries( const QList< Tomahawk::query_ptr >& queries, bool clearFirst )
+void
+Party::pushUpdate()
 {
-    QList< lrentry_ptr > el;
-    if ( !clearFirst )
-        el = entries();
+    Tomahawk::party_ptr thisParty = m_weakSelf.toStrongRef();
 
-    foreach( const query_ptr& query, queries )
+    Q_ASSERT( author()->isLocal() );
+    if ( !thisParty.isNull() && author()->isLocal() ) //only the DJ can push updates!
     {
-        lrentry_ptr e( new PartyEntry() );
-        e->setGuid( uuid() );
-        e->setDuration( query->queryTrack()->duration() );
-        e->setLastmodified( 0 );
-        e->setQuery( query );
-        e->setScore( 0 );
-        el << e;
+        DatabaseCommand_PartyInfo* cmd =
+                DatabaseCommand_PartyInfo::broadcastParty( author(), thisParty );
+        Database::instance()->enqueue( QSharedPointer< DatabaseCommand >( cmd ) );
     }
-
-    return el;
 }
 
 

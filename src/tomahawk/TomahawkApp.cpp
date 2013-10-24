@@ -422,7 +422,6 @@ TomahawkApp::registerMetaTypes()
     qRegisterMetaType< QList<Tomahawk::dyncontrol_ptr> >("QList<Tomahawk::dyncontrol_ptr>");
     qRegisterMetaType< QList<Tomahawk::geninterface_ptr> >("QList<Tomahawk::geninterface_ptr>");
     qRegisterMetaType< QList<Tomahawk::plentry_ptr> >("QList<Tomahawk::plentry_ptr>");
-    qRegisterMetaType< QList<Tomahawk::lrentry_ptr> >("QList<Tomahawk::lrentry_ptr>");
     qRegisterMetaType< QList<Tomahawk::query_ptr> >("QList<Tomahawk::query_ptr>");
     qRegisterMetaType< QList<Tomahawk::track_ptr> >("QList<Tomahawk::track_ptr>");
     qRegisterMetaType< QList<Tomahawk::result_ptr> >("QList<Tomahawk::result_ptr>");

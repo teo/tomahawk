@@ -23,7 +23,6 @@
 
 #include "Artist.h"
 #include "Album.h"
-#include "Party.h"
 #include "PlaylistEntry.h"
 #include "Query.h"
 #include "Result.h"
@@ -128,24 +127,6 @@ PlayableItem::PlayableItem( const Tomahawk::plentry_ptr& entry, PlayableItem* pa
 
     connect( m_query->track().data(), SIGNAL( updated() ),
                                       SIGNAL( dataChanged() ) );
-
-    connect( m_query.data(), SIGNAL( resultsChanged() ),
-                               SLOT( onResultsChanged() ) );
-}
-
-
-PlayableItem::PlayableItem( const Tomahawk::lrentry_ptr& lrentry, PlayableItem* parent, int row )
-    : QObject( parent )
-    , m_lrentry( lrentry )
-{
-    m_query = lrentry->query();
-    init( parent, row );
-
-    connect( m_query.data(), SIGNAL( socialActionsLoaded() ),
-                             SIGNAL( dataChanged() ) );
-
-    connect( m_query.data(), SIGNAL( updated() ),
-                             SIGNAL( dataChanged() ) );
 
     connect( m_query.data(), SIGNAL( resultsChanged() ),
                                SLOT( onResultsChanged() ) );

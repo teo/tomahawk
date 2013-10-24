@@ -421,7 +421,9 @@ Source::setParty( const party_ptr& p )
         return;
     }
 
-    Q_ASSERT( d->party->guid() == p->guid() ); //we disallow "overwriting" THE party
+    Q_ASSERT( d->party->guid() == p->guid() ); //disallow replacing
+
+    if( d->party->guid() == p->guid() ); //update instead of replace
     {
         if ( !d->party->author()->isLocal() )
             d->party->updateFrom( p );

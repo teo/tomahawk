@@ -1,7 +1,7 @@
 /* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
  *
  *   Copyright 2010-2011, Christian Muehlhaeuser <muesli@tomahawk-player.org>
- *   Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *   Copyright 2012-2013, Teo Mrnjavac <teo@kde.org>
  *
  *   Tomahawk is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -34,17 +34,16 @@ class DLLEXPORT DatabaseCommand_PartyInfo : public DatabaseCommandLoggable
     Q_OBJECT
     Q_PROPERTY( QVariant party      READ partyV WRITE setPartyV )
     Q_PROPERTY( QString partyGuid   READ partyGuid WRITE setPartyGuid )
-    Q_PROPERTY( int action                  READ action WRITE setAction )
+    Q_PROPERTY( int action          READ action WRITE setAction )
 
 public:
-    //TODO: must use this same dbcmd to send delete messages as well.
     //Rationale: dbcmd_lri is a singleton, so only the last of its type gets executed.
     //For this reason it must have Actions, and if the last action in a non-trivial queue
     //is Delete the LR is never even shown
 
     enum Action
     {
-        Info = 1,
+        Broadcast = 1,
         Disband
     };
 
@@ -52,11 +51,11 @@ public:
     explicit DatabaseCommand_PartyInfo( QObject* parent = 0 );
 
     //Named ctors, use these!
-    static DatabaseCommand_PartyInfo* PartyInfo( const Tomahawk::source_ptr& author,
-                                                        const Tomahawk::party_ptr& party );
+    static DatabaseCommand_PartyInfo* broadcastParty( const Tomahawk::source_ptr& author,
+                                                      const Tomahawk::party_ptr& party );
 
-    static DatabaseCommand_PartyInfo* DisbandParty( const Tomahawk::source_ptr& author,
-                                                           const QString& partyGuid );
+    static DatabaseCommand_PartyInfo* disbandParty( const Tomahawk::source_ptr& author,
+                                                    const QString& partyGuid );
 
     virtual ~DatabaseCommand_PartyInfo() {}
 
@@ -83,7 +82,7 @@ protected:
 
 private:
     explicit DatabaseCommand_PartyInfo( Action action,
-                                                const Tomahawk::source_ptr& author ); //used by named ctors
+                                        const Tomahawk::source_ptr& author ); //used by named ctors
 
     Tomahawk::party_ptr m_party;
     Action m_action;

@@ -52,14 +52,14 @@ QString
 PartyItem::text() const
 {
     return tr( "%1 (%2)", "the name of a party, followed by the current host inside ()" )
-            .arg( m_party->title() )
-            .arg( m_party->author()->friendlyName() );
+            .arg( m_party->playlist()->title() )
+            .arg( m_party->playlist()->author()->friendlyName() );
 }
 
 QString
 PartyItem::editorText() const
 {
-    return m_party->title();
+    return m_party->playlist()->title();
 }
 
 
@@ -255,9 +255,9 @@ PartyItem::parsedDroppedTracks( const QList< Tomahawk::query_ptr >& tracks )
     qDebug() << "adding" << tracks.count() << "tracks";
     if ( tracks.count() && !m_party.isNull() && m_party->author()->isLocal() )
     {
-        qDebug() << "on party:" << m_party->title() << m_party->guid();
+        qDebug() << "on party:" << m_party->playlist()->title() << m_party->guid();
 
-        m_party->addEntries( tracks );
+        m_party->playlist()->addEntries( tracks );
     }
 }
 

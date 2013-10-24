@@ -42,7 +42,6 @@ namespace Tomahawk
     class Album;
     class Collection;
     class Party;
-    class PartyEntry;
     class Playlist;
     class PlaylistEntry;
     class PlaylistInterface;
@@ -60,7 +59,6 @@ namespace Tomahawk
 
     typedef QSharedPointer<Collection> collection_ptr;
     typedef QSharedPointer<Party> party_ptr;
-    typedef QSharedPointer<PartyEntry> lrentry_ptr;
     typedef QSharedPointer<Playlist> playlist_ptr;
     typedef QSharedPointer<PlaylistEntry> plentry_ptr;
     typedef QSharedPointer<PlaylistInterface> playlistinterface_ptr;

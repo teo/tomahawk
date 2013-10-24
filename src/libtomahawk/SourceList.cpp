@@ -241,8 +241,12 @@ SourceList::createDynamicPlaylist( const Tomahawk::source_ptr& src, const QVaria
 
 
 void
-SourceList::createParty( const Tomahawk::source_ptr& src, const QVariant& contents )
+SourceList::createPartyFromVariant( const Tomahawk::source_ptr& src, const QVariant& contents )
 {
+    Q_ASSERT( !src->isLocal() );
+    //This method does deserialization for incoming parties, and it is in
+    //SourceList only for convenience.
+    //The next step is Party::reportCreated(party_ptr) on both local and remote.
     Tomahawk::party_ptr p = Tomahawk::party_ptr( new Tomahawk::Party( src ) );
     QJson::QObjectHelper::qvariant2qobject( contents.toMap(), p.data() );
     p->reportCreated( p );

@@ -1136,12 +1136,8 @@ TomahawkWindow::createParty()
 {
     QString creator = SourceList::instance()->getLocal()->nodeId();
     QString partyName = tr( "%1's party" ).arg( creator );
-    QString guid = uuid();
 
-    party_ptr party = Tomahawk::Party::create( SourceList::instance()->getLocal(),
-                                                                       uuid(),
-                                                                       partyName,
-                                                                       creator );
+    party_ptr party = Tomahawk::Party::createNew( partyName );
     ViewManager::instance()->show( party );
 }
 
