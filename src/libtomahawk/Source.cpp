@@ -397,50 +397,45 @@ party_ptr
 Source::party() const
 {
     Q_D( const Source );
-    //TODO: remove this, just testing if a source never has more than one party
-    Q_ASSERT( d->partys.count() < 2 );
 
-    return d->partys.values().first();
-}
-
-
-party_ptr
-Source::party( const QString& guid ) const
-{
-    Q_D( const Source );
-    return d->partys.value( guid, Tomahawk::party_ptr() );
+    return d->party;
 }
 
 
 bool
-Source::hasParties() const
+Source::hasParty() const
 {
     Q_D( const Source );
-     return !d->partys.isEmpty();
+    return !d->party.isNull();
 }
 
 void
-Source::addParty( const party_ptr& p )
+Source::setParty( const party_ptr& p )
 {
     Q_D( Source );
-    if( d->partys.contains( p->guid() ) )
+    if ( d->party.isNull() )
     {
-        if ( !d->partys[ p->guid() ]->author()->isLocal() )
-            d->partys[ p->guid() ]->updateFrom( p );
+        d->party = p;
+        emit partyAdded( p );
+
         return;
     }
 
-    d->partys.insert( p->guid(), p );
-
-    emit partyAdded( p );
+    Q_ASSERT( d->party->guid() == p->guid() ); //we disallow "overwriting" THE party
+    {
+        if ( !d->party->author()->isLocal() )
+            d->party->updateFrom( p );
+        return;
+    }
 }
 
 
 void
-Source::removeParty( const party_ptr& p )
+Source::removeParty()
 {
     Q_D( Source );
-    d->partys.remove( p->guid() );
+    Tomahawk::party_ptr p = d->party;
+    d->party = Tomahawk::party_ptr();
     emit partyRemoved( p );
 }
 
@@ -808,7 +803,7 @@ Source::reportSocialAttributesChanged( DatabaseCommand_SocialAction* action )
         {
             if ( to->isLocal() ) //somebody just latched onto me!
             {
-                if ( to->hasParties() )
+                if ( to->hasParty() )
                 {
                     to->party()->addListener( SourceList::instance()->get( d->id ) );
                 }
@@ -824,7 +819,7 @@ Source::reportSocialAttributesChanged( DatabaseCommand_SocialAction* action )
         {
             if ( from->isLocal() ) //somebody just latched off from me!
             {
-                if ( from->hasParties() )
+                if ( from->hasParty() )
                 {
                     from->party()->removeListener( SourceList::instance()->get( d->id ) );
                 }

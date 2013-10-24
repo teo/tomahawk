@@ -129,7 +129,7 @@ Party::create( const source_ptr& author,
 
     party->reportCreated( party );
 
-    //This DBcmd has a postCommitHook in all peers which calls ViewManager::createParty and
+    //This DBcmd has a postCommitHook in all peers which calls SourceList::createParty and
     //deserializes the variant to it.
 
     return party;
@@ -143,8 +143,11 @@ Party::load( const QString& guid )
 
     foreach( const Tomahawk::source_ptr& source, SourceList::instance()->sources() )
     {
-        p = source->party( guid );
-        if ( !p.isNull() )
+        if ( !source->hasParty() )
+            continue;
+
+        p = source->party();
+        if ( p->guid() == guid )
             return p;
     }
 
@@ -283,7 +286,7 @@ void
 Party::reportCreated( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
-    m_source->addParty( self ); //or not add if the guid is the same!
+    m_source->setParty( self ); //or not add if the guid is the same!
 }
 
 
@@ -291,7 +294,7 @@ void
 Party::reportDeleted( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
-    m_source->removeParty( self );
+    m_source->removeParty();
     emit deleted( self );
 }
 
@@ -471,7 +474,7 @@ void
 Party::pushUpdate()
 {
     Tomahawk::party_ptr thisParty =
-            SourceList::instance()->getLocal()->party( guid() );
+            SourceList::instance()->getLocal()->party();
 
     if ( !thisParty.isNull() && SourceList::instance()->getLocal() == author() ) //only the DJ can push updates!
     {

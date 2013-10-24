@@ -88,10 +88,7 @@ PartiesCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
             removeChild( lrItem );
             endRowsRemoved();
 
-            src->removeParty( lrItem->party() );
-            lrItem->party()->deleteLater();
-
-            delete lrItem;
+            src->removeParty();
         }
         else
             ++i;
@@ -152,7 +149,7 @@ PartiesCategoryItem::onPartyDeleted( const Tomahawk::party_ptr& p )
 void
 PartiesCategoryItem::onPartyCountChanged()
 {
-    if ( SourceList::instance()->getLocal()->hasParties() ) //if this change affects my own LR
+    if ( SourceList::instance()->getLocal()->hasParty() ) //if this change affects my own LR
     {
         setAddItemVisible( false );
     }

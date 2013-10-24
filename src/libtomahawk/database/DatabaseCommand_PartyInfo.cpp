@@ -149,13 +149,13 @@ DatabaseCommand_PartyInfo::postCommitHook()
         if ( source().isNull() )
             return;
 
-        party_ptr party = source()->party( m_guid );
+        party_ptr party = source()->party();
         if ( party.isNull() )
         {
             tDebug() << "The Party does not exist or has already been disbanded.";
             return;
         }
-        source()->removeParty( party );
+        source()->removeParty();
         party->reportDeleted( party );
     }
 }

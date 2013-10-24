@@ -61,6 +61,8 @@ friend class DatabaseCommand_DeleteFiles;
 friend class DatabaseCommand_LoadAllSources;
 friend class DatabaseCommand_LogPlayback;
 friend class DatabaseCommand_SocialAction;
+friend class DatabaseCommand_PartyInfo;
+friend class Party;                     //TODO: remove me
 friend class ::MusicScanner;
 
 public:
@@ -90,10 +92,8 @@ public:
     void removeCollection( const Tomahawk::collection_ptr& c );
 
     Tomahawk::party_ptr party() const;
-    Tomahawk::party_ptr party( const QString& guid ) const;
-    bool hasParties() const;
-    void addParty( const Tomahawk::party_ptr& p );
-    void removeParty( const Tomahawk::party_ptr& p );
+    bool hasParty() const;
+    void removeParty();
 
     int id() const;
     ControlConnection* controlConnection() const;
@@ -165,6 +165,8 @@ private slots:
 private:
     Q_DECLARE_PRIVATE( Source )
     SourcePrivate* d_ptr;
+
+    void setParty( const Tomahawk::party_ptr& p );
 
     static bool friendlyNamesLessThan( const QString& first, const QString& second ); //lessThan for sorting
 
