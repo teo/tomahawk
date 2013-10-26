@@ -89,7 +89,8 @@ Party::createFromPlaylist( const playlist_ptr& basePlaylist )
 }
 
 
-party_ptr Party::createNew( const QString& title, const QList<query_ptr>& queries )
+party_ptr
+Party::createNew( const QString& title, const QList<query_ptr>& queries )
 {
     playlist_ptr basePlaylist = Playlist::create( SourceList::instance()->getLocal(),
                                                   uuid(),
@@ -297,6 +298,7 @@ Party::reportDeleted( const party_ptr& self )
 {
     Q_ASSERT( self.data() == this );
     m_source->removeParty();
+    m_playlist = Tomahawk::playlist_ptr();
     emit deleted( self );
 }
 

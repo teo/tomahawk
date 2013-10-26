@@ -436,8 +436,12 @@ void
 Source::removeParty()
 {
     Q_D( Source );
+    if ( d->party.isNull() )
+        return;
+
     Tomahawk::party_ptr p = d->party;
     d->party = Tomahawk::party_ptr();
+    p->playlist()->rename( tr( "Past party: %1" ).arg( p->playlist()->title() ) );
     emit partyRemoved( p );
 }
 

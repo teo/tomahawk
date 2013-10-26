@@ -23,6 +23,8 @@
 #include "SourceList.h"
 #include "SourcesModel.h"
 #include "sourcetree/items/SourceItem.h"
+#include "sourcetree/items/PlaylistItems.h"
+#include "Party.h"
 
 #include "utils/Logger.h"
 
@@ -66,6 +68,20 @@ SourcesProxyModel::filterAcceptsRow( int sourceRow, const QModelIndex& sourcePar
 
     if ( item && item->type() != SourcesModel::Divider && item->parent()->parent() == 0 && !item->children().count() )
         return false;
+
+    if ( item && item->type() == SourcesModel::StaticPlaylist )
+    {
+        PlaylistItem* plItem = qobject_cast< PlaylistItem* >( item );
+        if ( plItem )
+        {
+            foreach ( const Tomahawk::source_ptr& src, SourceList::instance()->sources( false ) )
+            {
+                if ( !src->party().isNull() &&
+                     plItem->playlist() == src->party()->playlist() )
+                    return false;
+            }
+        }
+    }
 
     if ( !m_filtered )
         return true;
