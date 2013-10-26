@@ -467,7 +467,7 @@ SourceTreeView::deletePlaylistOrParty( const QModelIndex& idxIn )
     if ( m_popupDialog.isNull() )
     {
         m_popupDialog = QPointer< SourceTreePopupDialog >( new SourceTreePopupDialog() );
-        connect( m_popupDialog.data(), SIGNAL( result( bool ) ), this, SLOT( onDeletePlaylistResult( bool ) ) );
+        connect( m_popupDialog.data(), SIGNAL( result( bool ) ), this, SLOT( onDeletePlaylistOrPartyResult( bool ) ) );
     }
 
     m_popupDialog.data()->setMainText( tr( "Would you like to %1 the %2 <b>\"%3\"</b>?", "e.g. Would you like to delete the playlist named Foobar?" )
