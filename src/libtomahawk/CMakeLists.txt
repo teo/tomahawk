@@ -162,9 +162,9 @@ set( libGuiSources
     widgets/SearchWidget.cpp
     widgets/SeekSlider.cpp
     widgets/SourceTreePopupDialog.cpp
-#    widgets/PartyWidget.cpp
-#    widgets/PartyHeader.cpp
-#    widgets/PartyCurrentTrackWidget.cpp
+    widgets/PartyWidget.cpp
+    widgets/PartyHeader.cpp
+    widgets/PartyCurrentTrackWidget.cpp
     widgets/StatsGauge.cpp
     widgets/ToggleButton.cpp
     widgets/WhatsHotWidget.cpp

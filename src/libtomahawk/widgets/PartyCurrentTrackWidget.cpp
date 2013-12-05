@@ -19,8 +19,8 @@
 #include "PartyCurrentTrackWidget.h"
 
 #include "ElidedLabel.h"
-#include "PartyModel.h"
 #include "playlist/PlayableItem.h"
+#include "playlist/PlaylistModel.h"
 #include "Album.h"
 #include "Artist.h"
 #include "utils/TomahawkUtilsGui.h"
@@ -30,6 +30,8 @@
 #include <QtGui/QLabel>
 #include <QtGui/QBoxLayout>
 
+namespace Tomahawk
+{
 
 PartyCurrentTrackWidget::PartyCurrentTrackWidget( QWidget* parent )
     : QWidget( parent )
@@ -92,8 +94,7 @@ void
 PartyCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
 {
     int row = idx.row();
-    const PartyModel* model = qobject_cast< const PartyModel* >( idx.model() );
-
+    const PlaylistModel* model = qobject_cast< const PlaylistModel* >( idx.model() );
 
     PlayableItem* item = model->itemFromIndex( idx );
 
@@ -131,4 +132,6 @@ PartyCurrentTrackWidget::setItem( const QPersistentModelIndex& idx )
     {
         m_durationLabel->setText( TomahawkUtils::timeToString( duration ) );
     }
+}
+
 }

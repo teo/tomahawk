@@ -28,13 +28,15 @@
 
 #include <QtGui/QIcon>
 
-class PartyHeader;
-class PartyModel;
-class PartyCurrentTrackWidget;
-class TrackView;
 class QTimeLine;
 class QPushButton;
 class QModelIndex;
+class TrackView;
+
+namespace Tomahawk
+{
+
+class PartyCurrentTrackWidget;
 
 class DLLEXPORT PartyWidget : public QWidget, public Tomahawk::ViewPage
 {
@@ -55,14 +57,7 @@ public:
 
     bool jumpToCurrentTrack() { return true; } //FIXME: what does this do?
 
-    /**
-     * @brief setModel sets the model for this PartyWidget
-     * @param model a pointer to the model
-     * PartyModel wraps around a Party object, for easy use with PartyWidget
-     * and its model-view-ish contents. Ideally, LRW should access LR data through LRM rather than
-     * getting a pointer to LR and talking to it directly.
-     */
-    void setModel( PlaylistModel* model );
+    void setParty( const party_ptr& party );
     
 protected:
     void resizeEvent( QResizeEvent* e );
@@ -80,7 +75,7 @@ private slots:
     void onMainViewItemActivated( const QModelIndex& idx );
 
 private:
-    PartyHeader *m_header;
+    PartyHeader *m_header;              //FIXME: remove
     QWidget* m_historyDrawer;
     QPushButton* m_previousTracksButton;
     TrackView* m_historyView;
@@ -88,7 +83,7 @@ private:
     PartyCurrentTrackWidget* m_currentTrackWidget;
 
     TrackView* m_view;
-    PartyModel* m_model;
+    Tomahawk::party_ptr m_party;
 
     QPixmap m_pixmap;
 
@@ -103,5 +98,7 @@ private:
 
     int m_currentRow;
 };
+
+}
 
 #endif // PARTYWIDGET_H

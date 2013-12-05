@@ -38,7 +38,6 @@
 #include "playlist/GridView.h"
 #include "playlist/AlbumModel.h"
 #include "Party.h"
-//#include "PartyModel.h"
 #include "SourceList.h"
 #include "TomahawkSettings.h"
 
@@ -159,8 +158,7 @@ ViewManager::createPageForPlaylist( const playlist_ptr& playlist )
     return view;
 }
 
-//PartyWidget*
-PlaylistView*
+PartyWidget*
 ViewManager::createPageForParty( const party_ptr& party )
 {
     /*
@@ -171,11 +169,16 @@ ViewManager::createPageForParty( const party_ptr& party )
     party->resolve();
     */
 
+    /*
     PlaylistView* w = new PlaylistView();
     PlaylistModel* model = new PlaylistModel();
 
     model->loadPlaylist( party->playlist() );
     w->setPlaylistModel( model );
+    party->playlist()->resolve();
+    */
+    PartyWidget* w = new PartyWidget();
+    w->setParty( party );
     party->playlist()->resolve();
 
     return w;
@@ -246,8 +249,7 @@ ViewManager::show( const Tomahawk::playlist_ptr& playlist )
 Tomahawk::ViewPage*
 ViewManager::show( const Tomahawk::party_ptr& party )
 {
-    //PartyWidget* w;
-    PlaylistView* w;
+    PartyWidget* w;
     if ( !m_partyWidgets.contains( party ) || m_partyWidgets.value( party ).isNull() )
     {
         w = createPageForParty( party );

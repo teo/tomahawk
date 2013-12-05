@@ -26,6 +26,9 @@ class QLabel;
 class ElidedLabel;
 class QPersistentModelIndex;
 
+namespace Tomahawk
+{
+
 class PartyCurrentTrackWidget : public QWidget
 {
     Q_OBJECT
@@ -44,5 +47,7 @@ private:
 
     QPixmap m_albumArtPlaceholder;
 };
+
+}
 
 #endif // PARTYCURRENTTRACKWIDGET_H

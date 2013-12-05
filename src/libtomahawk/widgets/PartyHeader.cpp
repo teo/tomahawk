@@ -26,6 +26,8 @@
 #include <QtGui/QLabel>
 #include <QtGui/QPushButton>
 
+namespace Tomahawk
+{
 
 PartyHeader::PartyHeader( PartyWidget* parent )
     : BasicHeader( parent )
@@ -137,4 +139,6 @@ void
 PartyHeader::onJoinLeaveButtonClicked()
 {
     emit joinLeaveButtonClicked( m_buttonState );
+}
+
 }

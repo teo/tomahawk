@@ -25,9 +25,13 @@
 
 #include <QtCore/QHash>
 
-class PartyWidget;
 class QBoxLayout;
 class QPushButton;
+
+namespace Tomahawk
+{
+
+class PartyWidget;
 
 class PartyHeader : public BasicHeader
 {
@@ -71,5 +75,7 @@ private:
 
     QPushButton* m_joinLeaveButton;
 };
+
+}
 
 #endif // PARTYHEADER_H

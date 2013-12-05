@@ -19,11 +19,11 @@
 #include "PartyWidget.h"
 
 #include "HeaderLabel.h"
-#include "PartyModel.h"
 #include "playlist/TrackView.h"
 #include "playlist/PlaylistLargeItemDelegate.h" //TODO: make nice delegate for parties!
 #include "playlist/PlayableProxyModel.h"
 #include "playlist/PlayableItem.h"
+#include "playlist/PlaylistModel.h"
 #include "Source.h"
 #include "utils/TomahawkUtilsGui.h"
 #include "Typedefs.h"
@@ -43,9 +43,11 @@
 
 #include "SourceList.h"
 
+namespace Tomahawk
+{
+
 PartyWidget::PartyWidget( QWidget* parent )
     : QWidget( parent )
-    , m_model( 0 )
     , m_drawerShown( false )
     , m_downArrow( QIcon( RESPATH "images/arrow-down-double.png" ) )
     , m_upArrow( QIcon( RESPATH "images/arrow-up-double.png" ) )
@@ -169,20 +171,23 @@ PartyWidget::pixmap() const
 
 
 void
-PartyWidget::setModel( PlaylistModel* model )
+PartyWidget::setParty( const party_ptr& party )
 {
-    Q_ASSERT( !m_model ); //TODO: does it ever happen that m_model is already assigned?
-    if ( m_model )
-        delete m_model;
+    Q_ASSERT( m_party.isNull() ); //TODO: does it ever happen that m_party is already assigned?
+    if ( m_party )
+        return;
 
-    m_model = model;
+    m_party = party;
+
+    PlaylistModel* model = new PlaylistModel();
+    model->loadPlaylist( party->playlist() );
 
     m_historyView->setPlayableModel( model );
     m_historyView->setSortingEnabled( false );
 
     m_view->setPlayableModel( model );
     m_view->setSortingEnabled( false );
-    if ( m_model->party()->author()->isLocal() )
+    if ( party->author()->isLocal() )
     {
         m_view->setManualProgression( true );
     }
@@ -197,11 +202,11 @@ PartyWidget::setModel( PlaylistModel* model )
     m_view->setEmptyTip( tr( "This party is currently empty.\n"
                              "Add some tracks to it and enjoy the music with your friends!" ) );
 
-    connect( m_model, SIGNAL( listenersChanged() ),
+    connect( m_party.data(), SIGNAL( listenersChanged() ),
              this, SLOT( onListenersChanged() ) );
     onListenersChanged();
 
-    connect( m_model, SIGNAL( dataChanged( QModelIndex, QModelIndex ) ),
+    connect( model, SIGNAL( dataChanged( QModelIndex, QModelIndex ) ),
              this, SLOT( onDataChanged( QModelIndex, QModelIndex ) ) );
 }
 
@@ -264,15 +269,13 @@ PartyWidget::onAnimationFinished()
 void
 PartyWidget::onListenersChanged()
 {
-    if ( m_model && !m_model->party().isNull() )
+    if ( m_party )
     {
-        Tomahawk::party_ptr lr = m_model->party();
-
-        m_header->setListeners( lr->listenerIds() );
-        m_header->setDescription( m_model->description() );
+        m_header->setListeners( m_party->listenerIds() );
+        m_header->setDescription( m_view->model()->description() );
 
         // If I'm the DJ
-        if ( lr->author() == SourceList::instance()->getLocal() )
+        if ( m_party->author() == SourceList::instance()->getLocal() )
         {
             m_header->setButtonState( PartyHeader::Disband );
         }
@@ -282,7 +285,7 @@ PartyWidget::onListenersChanged()
             // I need to ask the DatabaseImpl directly because Source::userName() answers just
             // "My Collection" instead of the dbid if the source is local.
             // This is probably a FIXME.
-            if ( lr->listenerIds().contains( Tomahawk::Database::instance()->impl()->dbid() ) )
+            if ( m_party->listenerIds().contains( Tomahawk::Database::instance()->impl()->dbid() ) )
             {
                 m_header->setButtonState( PartyHeader::Leave );
             }
@@ -299,7 +302,7 @@ void
 PartyWidget::onJoinLeaveButtonClicked( PartyHeader::ButtonState state )
 {
     Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
-    Tomahawk::source_ptr lrSource = m_model->party()->author();
+    Tomahawk::source_ptr lrSource = m_party->author();
 
     switch ( state )
     {
@@ -316,8 +319,8 @@ PartyWidget::onJoinLeaveButtonClicked( PartyHeader::ButtonState state )
         lman->unlatchRequest( lrSource );
         break;
     case PartyHeader::Disband:
-        qDebug() << "Doing delete of party:" << m_model->party()->title();
-        Tomahawk::Party::remove( m_model->party() );
+        qDebug() << "Doing delete of party:" << m_view->model()->title();
+        Tomahawk::Party::remove( m_party );
     }
 }
 
@@ -328,13 +331,14 @@ PartyWidget::onDataChanged( const QModelIndex& topLeft, const QModelIndex& botto
     Q_UNUSED( topLeft );
     Q_UNUSED( bottomRight );
 
-    if ( m_model->currentItem().row() != m_currentRow )
+    PlayableModel* model = m_view->model();
+    if ( model->currentItem().row() != m_currentRow )
     {
-        m_currentRow = ( m_model->currentItem() == QModelIndex() ) ? -1 : m_model->currentItem().row();
+        m_currentRow = ( model->currentItem() == QModelIndex() ) ? -1 : model->currentItem().row();
         m_view->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowAfter, m_currentRow );
         m_historyView->proxyModel()->setFilterCutoff( PlayableProxyModel::ShowBefore, m_currentRow );
         if ( m_currentRow > -1 )
-            m_currentTrackWidget->setItem( m_model->currentItem() );
+            m_currentTrackWidget->setItem( model->currentItem() );
     }
 }
 
@@ -342,25 +346,28 @@ PartyWidget::onDataChanged( const QModelIndex& topLeft, const QModelIndex& botto
 void
 PartyWidget::onHistoryItemActivated( const QModelIndex& idx )
 {
-    Q_ASSERT( !m_model->party().isNull() );
-    Q_ASSERT( !m_model->party()->author().isNull() );
+    Q_ASSERT( !m_party.isNull() );
+    Q_ASSERT( !m_party->author().isNull() );
 
-    if ( m_model->party()->author()->isLocal() )
+    PlaylistModel* model = qobject_cast< PlaylistModel* >( m_view->model() );
+    Q_ASSERT( model );
+
+    if ( m_party->author()->isLocal() )
     {
-        PlayableItem* item = m_model->itemFromIndex( m_historyView->proxyModel()->mapToSource( idx ) );
-        if ( !item->lrentry().isNull() )
+        PlayableItem* item = model->itemFromIndex( m_historyView->proxyModel()->mapToSource( idx ) );
+        if ( !item->entry().isNull() )
         {
-            QList< Tomahawk::lrentry_ptr > entries;
-            const Tomahawk::lrentry_ptr& lre = item->lrentry();
-            entries.append( lre );
-            m_model->insertEntriesFromView( entries, m_currentRow + 1 );
+            QList< Tomahawk::plentry_ptr > entries;
+            const Tomahawk::plentry_ptr& pe = item->entry();
+            entries.append( pe );
+            model->insertEntries( entries, m_currentRow + 1 );
             playlistInterface()->nextResult();
         }
     }
     else
     {
         Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
-        if ( !lman->isLatched( m_model->party()->author() ) )
+        if ( !lman->isLatched( m_party->author() ) )
         {
             onJoinLeaveButtonClicked( PartyHeader::Join );
         }
@@ -370,27 +377,30 @@ PartyWidget::onHistoryItemActivated( const QModelIndex& idx )
 void
 PartyWidget::onMainViewItemActivated( const QModelIndex& idx )
 {
-    Q_ASSERT( !m_model->party().isNull() );
-    Q_ASSERT( !m_model->party()->author().isNull() );
+    Q_ASSERT( !m_party.isNull() );
+    Q_ASSERT( !m_party->author().isNull() );
 
-    if ( m_model->party()->author()->isLocal() )
+    PlaylistModel* model = qobject_cast< PlaylistModel* >( m_view->model() );
+    Q_ASSERT( model );
+
+    if ( m_party->author()->isLocal() )
     {
-        PlayableItem* item = m_model->itemFromIndex( m_view->proxyModel()->mapToSource( idx ) );
-        if ( !item->lrentry().isNull() )
+        PlayableItem* item = model->itemFromIndex( m_view->proxyModel()->mapToSource( idx ) );
+        if ( !item->entry().isNull() )
         {
-            QList< Tomahawk::lrentry_ptr > entries;
-            const Tomahawk::lrentry_ptr& lre = item->lrentry();
-            entries.append( lre );
+            QList< Tomahawk::plentry_ptr > entries;
+            const Tomahawk::plentry_ptr& pe = item->entry();
+            entries.append( pe );
 
-            m_model->removeIndex( m_view->proxyModel()->mapToSource( idx ) );
-            m_model->insertEntriesFromView( entries, m_currentRow + 1 );
+            model->removeIndex( m_view->proxyModel()->mapToSource( idx ) );
+            model->insertEntries( entries, m_currentRow + 1 );
             m_view->startPlayingFromStart();
         }
     }
     else
     {
         Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
-        if ( !lman->isLatched( m_model->party()->author() ) )
+        if ( !lman->isLatched( m_party->author() ) )
         {
             onJoinLeaveButtonClicked( PartyHeader::Join );
         }
@@ -401,7 +411,7 @@ PartyWidget::onMainViewItemActivated( const QModelIndex& idx )
 Tomahawk::playlistinterface_ptr
 PartyWidget::playlistInterface() const
 {
-    if ( !m_model )
+    if ( !m_view->model() )
     {
         return Tomahawk::playlistinterface_ptr();
     }
@@ -411,4 +421,4 @@ PartyWidget::playlistInterface() const
     }
 }
 
-
+}
