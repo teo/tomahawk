@@ -1,5 +1,5 @@
 /*
- *  Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *  Copyright 2012, 2013 Teo Mrnjavac <teo@kde.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,7 +23,8 @@
 
 #include "Typedefs.h"
 #include "Party.h"
-#include "PartyHeader.h"
+#include "PartyCommandWidget.h"
+#include "BasicHeader.h"
 #include "ViewPage.h"
 
 #include <QtGui/QIcon>
@@ -67,7 +68,7 @@ private slots:
     void onAnimationStep( int );
     void onAnimationFinished();
     void onListenersChanged();
-    void onJoinLeaveButtonClicked( PartyHeader::ButtonState );
+    void onJoinLeaveButtonClicked( PartyCommandWidget::ButtonState );
 
     void onDataChanged( const QModelIndex&, const QModelIndex& );
 
@@ -75,7 +76,8 @@ private slots:
     void onMainViewItemActivated( const QModelIndex& idx );
 
 private:
-    PartyHeader *m_header;              //FIXME: remove
+    BasicHeader *m_header;
+    PartyCommandWidget *m_commandWidget;
     QWidget* m_historyDrawer;
     QPushButton* m_previousTracksButton;
     TrackView* m_historyView;

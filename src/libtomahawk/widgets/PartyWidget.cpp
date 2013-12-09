@@ -1,5 +1,5 @@
 /*
- *  Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *  Copyright 2012, 2013 Teo Mrnjavac <teo@kde.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 #include "database/Database.h"
 #include "database/DatabaseImpl.h"
 #include "LatchManager.h"
-#include "widgets/PartyCurrentTrackWidget.h"
 #include "Party.h"
+#include "PartyCurrentTrackWidget.h"
 
 #include <QtCore/QTimeLine>
 #include <QtGui/QLabel>
@@ -56,13 +56,25 @@ PartyWidget::PartyWidget( QWidget* parent )
     QBoxLayout* mainLayout = new QVBoxLayout;
     setLayout( mainLayout );
 
-    m_header = new PartyHeader( this );
+    QBoxLayout* mainHLayout = new QHBoxLayout;
+    QBoxLayout* innerMainLayout = new QVBoxLayout;
+    QBoxLayout* sidebarLayout = new QVBoxLayout;
+
+    m_header = new BasicHeader( this );
     m_historyDrawer = new QWidget( this );
     m_body = new QWidget( this );
+    m_commandWidget = new PartyCommandWidget( this );
 
     mainLayout->addWidget( m_header );
-    mainLayout->addWidget( m_historyDrawer );
-    mainLayout->addWidget( m_body );
+    mainLayout->addLayout( mainHLayout );
+
+    mainHLayout->addLayout( innerMainLayout, 2 );
+    mainHLayout->addLayout( sidebarLayout, 1 );
+
+    innerMainLayout->addWidget( m_historyDrawer );
+    innerMainLayout->addWidget( m_body );
+
+    sidebarLayout->addWidget( m_commandWidget );
 
     m_historyDrawer->setMaximumHeight( 0 );
 
@@ -143,7 +155,7 @@ PartyWidget::PartyWidget( QWidget* parent )
     connect( m_view, SIGNAL( itemActivated( QModelIndex ) ),
              this, SLOT( onMainViewItemActivated( QModelIndex ) ) );
 
-    connect( m_header, SIGNAL( joinLeaveButtonClicked( PartyHeader::ButtonState ) ),
+    connect( m_commandWidget, SIGNAL( joinLeaveButtonClicked( PartyHeader::ButtonState ) ),
              this, SLOT( onJoinLeaveButtonClicked( PartyHeader::ButtonState ) ) );
 }
 
@@ -271,13 +283,13 @@ PartyWidget::onListenersChanged()
 {
     if ( m_party )
     {
-        m_header->setListeners( m_party->listenerIds() );
+        m_commandWidget->setListeners( m_party->listenerIds() );
         m_header->setDescription( m_view->model()->description() );
 
         // If I'm the DJ
         if ( m_party->author() == SourceList::instance()->getLocal() )
         {
-            m_header->setButtonState( PartyHeader::Disband );
+            m_commandWidget->setButtonState( PartyCommandWidget::Disband );
         }
         // If I'm one of the listeners
         else
@@ -287,11 +299,11 @@ PartyWidget::onListenersChanged()
             // This is probably a FIXME.
             if ( m_party->listenerIds().contains( Tomahawk::Database::instance()->impl()->dbid() ) )
             {
-                m_header->setButtonState( PartyHeader::Leave );
+                m_commandWidget->setButtonState( PartyCommandWidget::Leave );
             }
             else
             {
-                m_header->setButtonState( PartyHeader::Join );
+                m_commandWidget->setButtonState( PartyCommandWidget::Join );
             }
         }
     }
@@ -299,26 +311,27 @@ PartyWidget::onListenersChanged()
 
 
 void
-PartyWidget::onJoinLeaveButtonClicked( PartyHeader::ButtonState state )
+PartyWidget::onJoinLeaveButtonClicked( PartyCommandWidget::ButtonState state )
 {
     Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
     Tomahawk::source_ptr lrSource = m_party->author();
 
     switch ( state )
     {
-    case PartyHeader::Join:
+    case PartyCommandWidget::Join:
         if ( lman->isLatched( lrSource ) )
             lman->catchUpRequest();
         else
             lman->latchRequest( lrSource );
 
-        lman->latchModeChangeRequest( lrSource, true /*we always latch on realtime if we are a LR*/ );
+        lman->latchModeChangeRequest( lrSource,
+                                      true /*always latch on realtime if we are a party*/ );
 
         break;
-    case PartyHeader::Leave:
+    case PartyCommandWidget::Leave:
         lman->unlatchRequest( lrSource );
         break;
-    case PartyHeader::Disband:
+    case PartyCommandWidget::Disband:
         qDebug() << "Doing delete of party:" << m_view->model()->title();
         Tomahawk::Party::remove( m_party );
     }
@@ -369,7 +382,7 @@ PartyWidget::onHistoryItemActivated( const QModelIndex& idx )
         Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
         if ( !lman->isLatched( m_party->author() ) )
         {
-            onJoinLeaveButtonClicked( PartyHeader::Join );
+            onJoinLeaveButtonClicked( PartyCommandWidget::Join );
         }
     }
 }
@@ -402,7 +415,7 @@ PartyWidget::onMainViewItemActivated( const QModelIndex& idx )
         Tomahawk::LatchManager* lman = Tomahawk::LatchManager::instance();
         if ( !lman->isLatched( m_party->author() ) )
         {
-            onJoinLeaveButtonClicked( PartyHeader::Join );
+            onJoinLeaveButtonClicked( PartyCommandWidget::Join );
         }
     }
 }

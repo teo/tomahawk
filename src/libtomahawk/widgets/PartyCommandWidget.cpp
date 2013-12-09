@@ -1,45 +1,48 @@
-/* === This file is part of Tomahawk Player - <http://tomahawk-player.org> ===
+/*
+ *  Copyright 2012, 2013 Teo Mrnjavac <teo@kde.org>
  *
- *   Copyright 2012, Teo Mrnjavac <teo@kde.org>
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- *   Tomahawk is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
  *
- *   Tomahawk is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with Tomahawk. If not, see <http://www.gnu.org/licenses/>.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "PartyHeader.h"
+#include "PartyCommandWidget.h"
 
-#include "PartyWidget.h"
 #include "SourceList.h"
 #include "utils/TomahawkUtilsGui.h"
 
-#include <QtGui/QBoxLayout>
-#include <QtGui/QLabel>
-#include <QtGui/QPushButton>
+#include <QBoxLayout>
+#include <QLabel>
+#include <QPushButton>
 
 namespace Tomahawk
 {
 
-PartyHeader::PartyHeader( PartyWidget* parent )
-    : BasicHeader( parent )
+PartyCommandWidget::PartyCommandWidget( QWidget* parent )
+    : QWidget( parent )
     , m_buttonState( Disband ) //just so the first setting gets applied
 {
-    m_listenersWidget = new QWidget( this );
-    m_mainLayout->addWidget( m_listenersWidget );
+    QVBoxLayout *mainLayout = new QVBoxLayout;
+    setLayout( mainLayout );
+
     QHBoxLayout* controlsLayout = new QHBoxLayout;
-    m_verticalLayout->addLayout( controlsLayout );
+    mainLayout->addLayout( controlsLayout );
     m_joinLeaveButton = new QPushButton( this );
     controlsLayout->addWidget( m_joinLeaveButton );
     controlsLayout->addStretch();
+
+    m_listenersWidget = new QWidget( this );
+    mainLayout->addWidget( m_listenersWidget );
 
     m_buttonStrings[ Join ]    = tr( "Join", "Button for a listener to join a party" );
     m_buttonStrings[ Leave ]   = tr( "Leave", "Button for a listener to leave a party" );
@@ -69,15 +72,11 @@ PartyHeader::PartyHeader( PartyWidget* parent )
     m_unnamedListenersLabel->setAlignment( Qt::AlignVCenter | Qt::AlignRight );
 
     listenersWidgetLayout->addWidget( m_unnamedListenersLabel );
-//TODO: unmargin maybe?
 }
 
-PartyHeader::~PartyHeader()
-{
-}
 
 void
-PartyHeader::setListeners( const QStringList& listenerDbids )
+PartyCommandWidget::setListeners( const QStringList& listenerDbids )
 {
     qDeleteAll( m_avatarLabels );
     m_avatarLabels.clear();
@@ -109,7 +108,9 @@ PartyHeader::setListeners( const QStringList& listenerDbids )
     fillListeners();
 }
 
-void PartyHeader::setButtonState( PartyHeader::ButtonState state )
+
+void
+PartyCommandWidget::setButtonState( PartyCommandWidget::ButtonState state )
 {
     if ( state == m_buttonState )
         return;
@@ -122,7 +123,7 @@ void PartyHeader::setButtonState( PartyHeader::ButtonState state )
 
 
 void
-PartyHeader::fillListeners()
+PartyCommandWidget::fillListeners()
 {
     if ( m_unnamedListeners )
         m_unnamedListenersLabel->setText( tr( "and %n other listener(s).", "", m_unnamedListeners ) );
@@ -136,9 +137,8 @@ PartyHeader::fillListeners()
 
 
 void
-PartyHeader::onJoinLeaveButtonClicked()
+PartyCommandWidget::onJoinLeaveButtonClicked()
 {
     emit joinLeaveButtonClicked( m_buttonState );
 }
-
 }

@@ -163,7 +163,7 @@ set( libGuiSources
     widgets/SeekSlider.cpp
     widgets/SourceTreePopupDialog.cpp
     widgets/PartyWidget.cpp
-    widgets/PartyHeader.cpp
+    widgets/PartyCommandWidget.cpp
     widgets/PartyCurrentTrackWidget.cpp
     widgets/StatsGauge.cpp
     widgets/ToggleButton.cpp
