@@ -155,8 +155,8 @@ PartyWidget::PartyWidget( QWidget* parent )
     connect( m_view, SIGNAL( itemActivated( QModelIndex ) ),
              this, SLOT( onMainViewItemActivated( QModelIndex ) ) );
 
-    connect( m_commandWidget, SIGNAL( joinLeaveButtonClicked( PartyHeader::ButtonState ) ),
-             this, SLOT( onJoinLeaveButtonClicked( PartyHeader::ButtonState ) ) );
+    connect( m_commandWidget, SIGNAL( joinLeaveButtonClicked( PartyCommandWidget::ButtonState ) ),
+             this, SLOT( onJoinLeaveButtonClicked( PartyCommandWidget::ButtonState ) ) );
 }
 
 
