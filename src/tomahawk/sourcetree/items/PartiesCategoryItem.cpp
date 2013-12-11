@@ -75,6 +75,7 @@ PartiesCategoryItem::onSourceAdded( const Tomahawk::source_ptr& src )
 void
 PartiesCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
 {
+    tDebug() << "Begin" << Q_FUNC_INFO;
     if ( src->isOnline() )
         return;
     tDebug() << Q_FUNC_INFO;
@@ -93,12 +94,14 @@ PartiesCategoryItem::onSourceRemoved( const Tomahawk::source_ptr& src )
         else
             ++i;
     }
+    tDebug() << "End" << Q_FUNC_INFO;
 }
 
 
 void
 PartiesCategoryItem::onPartyAdded( const Tomahawk::party_ptr& p )
 {
+    tDebug() << "Begin" << Q_FUNC_INFO;
     if ( p.isNull() )
         return;
 
@@ -120,12 +123,14 @@ PartiesCategoryItem::onPartyAdded( const Tomahawk::party_ptr& p )
 
     tDebug() << "party added to model." << p->playlist()->title();
     onPartyCountChanged();
+    tDebug() << "End" << Q_FUNC_INFO;
 }
 
 
 void
 PartiesCategoryItem::onPartyDeleted( const Tomahawk::party_ptr& p )
 {
+    tDebug() << "Begin" << Q_FUNC_INFO;
     Q_ASSERT( p );
 
     int count = children().count();
@@ -143,12 +148,14 @@ PartiesCategoryItem::onPartyDeleted( const Tomahawk::party_ptr& p )
         }
     }
     //onPartyCountChanged() is called afterwards through a signal from Source
+    tDebug() << "End" << Q_FUNC_INFO << "\n onPartyCountChanged will be notified by Source.";
 }
 
 
 void
 PartiesCategoryItem::onPartyCountChanged()
 {
+    tDebug() << "Begin" << Q_FUNC_INFO;
     if ( SourceList::instance()->getLocal()->hasParty() ) //if this change affects my own LR
     {
         setAddItemVisible( false );
@@ -157,4 +164,5 @@ PartiesCategoryItem::onPartyCountChanged()
     {
         setAddItemVisible( true );
     }
+    tDebug() << "End" << Q_FUNC_INFO;
 }
